@@ -10,7 +10,7 @@ find_package(OpenCV )
 
 include_directories(
     ${OpenCV_LIBS}
-    /home/artcs/Desktop/Keypoints/SPHORB-master/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 #add_executable (example1 example1.cpp pfm.cpp utility.cpp detector.cpp nonmax.cpp SPHORB.cpp)
