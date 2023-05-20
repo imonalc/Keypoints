@@ -9,7 +9,7 @@ find_package(OpenCV REQUIRED )
 
 include_directories(
     ${OpenCV_LIBS}
-    /home/artcs/Desktop/Keypoints/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils
 )
 
 
