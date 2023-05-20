@@ -1,3 +1,25 @@
+# Memo
+Install pytorch==1.11.
+<!-- pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 --extra-index-url https://download.pytorch.org/whl/cu113 -->
+
+Bug: If you import packages following order:
+```
+import torch
+import build.fivep as f
+```
+I got the following error.
+```
+    import build.fivep as f                                                  
+ImportError: /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.30' not found (required by /home/komatsu/anaconda3/envs/py37-keypoints/lib/libopencv_core.so.405)  
+```
+
+However, if I import `fivep` first, I didn't get any error.
+```
+import build.fivep as f
+import torch
+```
+
+---- Original Readme ----
 # Keypoints
 
 This is the official repository of the OMNICV-CVPR2022 workshop named "Pose Estimation for Two-View Panoramas: a Comparative Analysis"

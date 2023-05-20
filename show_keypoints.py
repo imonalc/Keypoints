@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.getcwd()+'/fivepoint')
+import build.fivep as f
 import time
 import torch
 import torch.nn.functional as F
