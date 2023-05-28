@@ -192,7 +192,7 @@ def main():
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
     parser.add_argument('--points', type=int, default = 12000)
     parser.add_argument('--descriptor', default = 'sift')
-    parser.add_argument('--path', default = "./data/Room/0/")
+    parser.add_argument('--path', default = "./data/Room/0")
     args = parser.parse_args()
 
 
@@ -222,13 +222,19 @@ def main():
 
         path_o = "."+path_o
 
+        #pts1: coordinate, desc1: feature descriptor
         pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
+        
+        im = cv2.imread(path_o)
+        print(im.shape)
 
+        # normalization & scaling
         pts1[:,0] = pts1[:,0]/640
-        pts1[:,0]*=512
+        pts1[:,0]*=im.shape[0]#512
+        
 
         pts1[:,1] = pts1[:,1]/1280
-        pts1[:,1]*=1024
+        pts1[:,1]*=im.shape[1]#1024
 
 
     if len(pts1.shape) == 1:
@@ -236,10 +242,12 @@ def main():
 
     print(pts1)
 
+    ### for neural network ###
+    # convert image to tensor, Restrict tensor channels to RGB only
     img = load_torch_img(path_o)[:3, ...].float()
+    # change size according to scale_factor(method: bilinear) unsqueeze(0): add dimension, sqeeze(0): del dimension
     img = F.interpolate(img.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-
-
+    # convert image to numpy
     img = torch2numpy(img.byte())
 
 
