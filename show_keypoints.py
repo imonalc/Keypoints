@@ -234,7 +234,7 @@ def main():
         
 
         pts1[:,1] = pts1[:,1]/1280
-        pts1[:,1]*=im.shape[1]#1024
+        pts1[:,1]*=im.shape[1]#1024##
 
 
     if len(pts1.shape) == 1:
