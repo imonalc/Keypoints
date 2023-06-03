@@ -240,7 +240,6 @@ def main():
             for indicador, descriptor in enumerate(DESCRIPTORS):
 
 
-
                 try:
 
                     opt, mode, sphered = get_descriptor(descriptor)
@@ -253,6 +252,7 @@ def main():
 
                     path_o = path + '/O.png'
                     path_r = path + '/R.png'
+                    im = cv2.imread(path_o)
 
                     if opt != 'sphorb':
 
@@ -381,6 +381,9 @@ def main():
 
         ROT, TRA, MET = np.zeros((len(P),len(L))), np.zeros((len(P),len(L))), np.zeros((len(P),METRICS.shape[1]))
 
+        print(ROT)
+        print(TRA)
+        print(MET)
         for i in range(len(P)):
             ROT[i,:], TRA[i,:], MET[i,:] = AUC(R_ERROR[i], T_ERROR[i], METRICS[i], L)
 
@@ -389,11 +392,11 @@ def main():
         mat_M = {}
 
         for ind, l in enumerate(L):
-            mat_R[l]=ROT[:,ind]*100
-            mat_T[l]=TRA[:,ind]*100
+            mat_R[l]=ROT[:,ind]*NUM #100
+            mat_T[l]=TRA[:,ind]*NUM #100
 
         for ind, m in enumerate(metrics):
-            mat_M[m]=MET[:,ind]*100
+            mat_M[m]=MET[:,ind]*NUM #100
 
         ROTATION = pd.DataFrame(mat_R, index=P)
         os.system('mkdir -p '+'results/metrics/'+data+'_'+file+'_'+args.inliers+'_'+args.solver)

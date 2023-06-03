@@ -11,8 +11,8 @@ import numpy as np
 import _spherical_distortion_ext._mesh as _mesh
 import argparse
 
-import superpoint.magic_sp.superpoint as magic_sp
-import superpoint.train_sp.superpoint as train_sp
+import utils.superpoint.magic_sp.superpoint as magic_sp
+import utils.superpoint.train_sp.superpoint as train_sp
 
 def process_img(img):
     """ Process a image transposing it and convert to grayscale format, Then normalize
@@ -284,7 +284,7 @@ def process_image_to_keypoints(image_path, corners, scale_factor, base_order, sa
 def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
-    parser.add_argument('--opt', default ='spoint')
+    parser.add_argument('--opt', default ='sphorb')
     parser.add_argument('--points', type=int, default = 400)
     parser.add_argument('path') # test: inputs/I1.png
     args = parser.parse_args()

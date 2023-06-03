@@ -187,6 +187,7 @@ def get_kd(array):
     return K,D
 
 
+
 def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
@@ -223,9 +224,11 @@ def main():
         os.chdir('SPHORB-master/')
 
         path_o = "."+path_o
+        path_r = "."+path_r
 
         #pts1: coordinate, desc1: feature descriptor
         pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
+        pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
         
         im = cv2.imread(path_o)
         print(im.shape)
@@ -233,43 +236,77 @@ def main():
         # normalization & scaling
         pts1[:,0] = pts1[:,0]/640
         pts1[:,0]*=im.shape[0]#512
-        
+        pts2[:,0] = pts2[:,0]/640
+        pts2[:,0]*=im.shape[0]#512
 
         pts1[:,1] = pts1[:,1]/1280
         pts1[:,1]*=im.shape[1]#1024##
+        pts2[:,1] = pts2[:,1]/1280
+        pts2[:,1]*=im.shape[1]#1024##
 
 
     if len(pts1.shape) == 1:
         pts1 = pts1.reshape(1,-1)
 
-    print(pts1)
+    #print(pts1)
 
     ### for neural network ###
     # convert image to tensor, Restrict tensor channels to RGB only
-    img = load_torch_img(path_o)[:3, ...].float()
+    img1 = load_torch_img(path_o)[:3, ...].float()
     # change size according to scale_factor(method: bilinear) unsqueeze(0): add dimension, sqeeze(0): del dimension
-    img = F.interpolate(img.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+    img1 = F.interpolate(img1.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
     # convert image to numpy
-    img = torch2numpy(img.byte())
+    img1 = torch2numpy(img1.byte())
+
+    ### for neural network ###
+    # convert image to tensor, Restrict tensor channels to RGB only
+    img2 = load_torch_img(path_r)[:3, ...].float()
+    # change size according to scale_factor(method: bilinear) unsqueeze(0): add dimension, sqeeze(0): del dimension
+    img2 = F.interpolate(img2.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+    # convert image to numpy
+    img2 = torch2numpy(img2.byte())
 
 
 
     fig, ax = plt.subplots(1, 1)
+    ## Set up the plot
+    #ax.set_aspect(1, adjustable='box')
+    #ax.imshow(img)
+    #ax.get_xaxis().set_ticks([])
+    #ax.get_yaxis().set_ticks([])
+    ##ax.plot(erp_kp[:, 0], erp_kp[:, 1], 'r.', markersize=3.0)
+    ##tangent_image_kp[(tangent_image_kp[:, [0]] >= img.shape[-2] - 1
+    ##              ).expand_as(tangent_image_kp)] = float('nan')
+    #ax.plot(pts1[:, 0], pts1[:, 1], 'b.', markersize=3.0)
+    #plt.axis('off')
 
-    # Set up the plot
-    ax.set_aspect(1, adjustable='box')
-    ax.imshow(img)
-    ax.get_xaxis().set_ticks([])
-    ax.get_yaxis().set_ticks([])
-    #ax.plot(erp_kp[:, 0], erp_kp[:, 1], 'r.', markersize=3.0)
-    #tangent_image_kp[(tangent_image_kp[:, [0]] >= img.shape[-2] - 1
-    #              ).expand_as(tangent_image_kp)] = float('nan')
-    ax.plot(pts1[:, 0], pts1[:, 1], 'b.', markersize=3.0)
-    plt.axis('off')
+    # マッチャーオブジェクトを作成
+    matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
 
-    plt.show()
+    pts1 = pts1.numpy()
+    pts2 = pts2.numpy()
+    desc1 = desc1.t().numpy()
+    desc2 = desc2.t().numpy()
+    # 特徴記述子をマッチング
+    matches = matcher.match(desc1, desc2)
+
+    # 特徴点の距離でソート
+    matches = sorted(matches, key=lambda x: x.distance)
+
+    # 上位N個のマッチング結果を選択
+    N = 50
+    matches = matches[:N]
+
+    print(pts1.shape)
+    keypoints1 = [cv2.KeyPoint(pt[0], pt[1], 1) for pt in pts1]
+    keypoints2 = [cv2.KeyPoint(pt[0], pt[1], 1) for pt in pts2]
+    # マッチング結果を描画
+    result = cv2.drawMatches(img1, keypoints1, img2, keypoints2, matches, None, flags=2)
+
+    # 結果を表示
+    cv2.imshow('Matching Result', result)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 if __name__ == '__main__':
     main()
-
-
