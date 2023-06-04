@@ -282,19 +282,22 @@ def main():
 
     # マッチャーオブジェクトを作成
     matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
+    if opt != 'sphorb':
+        pts1 = pts1.numpy()
+        pts2 = pts2.numpy()
+        desc1 = desc1.t().numpy()
+        desc2 = desc2.t().numpy()
+    else:
+        desc1 = desc1.astype(np.float32)
+        desc2 = desc2.astype(np.float32)
 
-    pts1 = pts1.numpy()
-    pts2 = pts2.numpy()
-    desc1 = desc1.t().numpy()
-    desc2 = desc2.t().numpy()
-    # 特徴記述子をマッチング
     matches = matcher.match(desc1, desc2)
 
     # 特徴点の距離でソート
     matches = sorted(matches, key=lambda x: x.distance)
 
     # 上位N個のマッチング結果を選択
-    N = 50
+    N = 100
     matches = matches[:N]
 
     print(pts1.shape)
