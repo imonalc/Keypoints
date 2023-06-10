@@ -22,16 +22,20 @@ def main():
 
     path_o = args.path + '/O.png'
     path_r = args.path + '/R.png'
-    print(path_o)
+    
 
     img_o = cv2.imread(path_o)
     img_r = cv2.imread(path_r)
+    Rx = np.load(args.path+"/R.npy")
 
-    resized_img_o = cv2.resize(img_o, (1280, 640))
-    resized_img_r = cv2.resize(img_r, (1280, 640))
+    print(Rx)
 
-    cv2.imwrite(args.path + "/O2.png", resized_img_o)
-    cv2.imwrite(args.path + "/R2.png", resized_img_r)
+
+
+    # 画像の深度を計算する
+    depth = img_o.shape[2]  # 画像のチャンネル数
+
+    print('画像の深度:', depth)
 
 if __name__ == '__main__':
     main()

@@ -268,18 +268,6 @@ def main():
 
 
 
-    fig, ax = plt.subplots(1, 1)
-    ## Set up the plot
-    #ax.set_aspect(1, adjustable='box')
-    #ax.imshow(img)
-    #ax.get_xaxis().set_ticks([])
-    #ax.get_yaxis().set_ticks([])
-    ##ax.plot(erp_kp[:, 0], erp_kp[:, 1], 'r.', markersize=3.0)
-    ##tangent_image_kp[(tangent_image_kp[:, [0]] >= img.shape[-2] - 1
-    ##              ).expand_as(tangent_image_kp)] = float('nan')
-    #ax.plot(pts1[:, 0], pts1[:, 1], 'b.', markersize=3.0)
-    #plt.axis('off')
-
     # マッチャーオブジェクトを作成
     matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
     if opt != 'sphorb':
@@ -307,7 +295,7 @@ def main():
     result = cv2.drawMatches(img1, keypoints1, img2, keypoints2, matches, None, flags=2)
 
     # 結果を表示
-    cv2.imshow('Matching Result', result)
+    cv2.imshow('Matching Result', result[:, :, ::-1])
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
