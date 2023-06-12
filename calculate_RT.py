@@ -94,13 +94,13 @@ def main():
                     if x1.shape[0] < 8:
                         R_error, T_error = 3.14, 3.14
                     else:
-                        E, can = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+                        E, _ = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                         R1_,R2_,T1_,T2_ = decomposeE(E.T)
                         R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
                         print(R_, T_)
                 
             except:
-                    print("Unexpected error")
+                print("Unexpected error")
 
     GL = time.time()
     print("Time:", GL-ST)
