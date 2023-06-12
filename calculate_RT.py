@@ -37,7 +37,6 @@ def main():
     parser.add_argument('--points', type=int, default = 12000)
     parser.add_argument('--match', default="ratio")
     parser.add_argument('--g_metrics',default="False")
-    parser.add_argument('--solver', default="None")
     parser.add_argument('--inliers', default="8PA")
     parser.add_argument('--datas'      , nargs='+')
     parser.add_argument('--descriptors', nargs='+')
@@ -87,23 +86,15 @@ def main():
                 if len(pts2.shape) == 1:
                     pts2 = pts2.reshape(1,-1)
 
-                if pts1.shape[0] > 0 or pts2.shape[0] >0:
-                    s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, '100p', opt, args.match)
+                if pts1.shape[0] > 0 or pts2.shape[0] > 0:
+                    matching_ratio = 100
+                    s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, matching_ratio, opt, args.match)
                     x1,x2 = coord_3d(x1, dim), coord_3d(x2, dim)
                     s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
                     if x1.shape[0] < 8:
                         R_error, T_error = 3.14, 3.14
                     else:
-                        if args.solver   == 'None':
-                            E, cam = get_cam_pose_by_ransac_8pa(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-                        elif args.solver == 'SK':
-                            E, can = get_cam_pose_by_ransac_opt_SK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-                        elif args.solver == 'GSM':
-                            E, can = get_cam_pose_by_ransac_GSM(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-                        elif args.solver == 'GSM_wRT':
-                            E, can = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-                        elif args.solver == 'GSM_SK':
-                            E, can = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+                        E, can = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                         R1_,R2_,T1_,T2_ = decomposeE(E.T)
                         R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
                         print(R_, T_)
@@ -171,12 +162,7 @@ def get_kd(array):
 
 def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio'):
 
-    if opt[-1] == 'p':
-        porce = int(opt[:-1])
-        n_key = int(porce/100 * pts1.shape[0])
-    else:
-        n_key = int(opt)
-
+    n_key = int(opt/100 * pts1.shape[0])
     s_pts1  = pts1.copy()[:n_key,:]
     s_pts2  = pts2.copy()[:n_key,:]
     s_desc1 = desc1.copy().astype('float32')[:n_key,:]
