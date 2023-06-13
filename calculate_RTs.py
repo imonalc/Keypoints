@@ -6,7 +6,6 @@
 import sys
 import os
 import cv2
-import open3d as o3d
 
 import sys
 import pandas as pd
@@ -39,52 +38,70 @@ def main():
     parser.add_argument('--match', default="ratio")
     parser.add_argument('--g_metrics',default="False")
     parser.add_argument('--inliers', default="8PA")
-    parser.add_argument('--path', default = "/data/Room/0")
+    parser.add_argument('--datas'      , nargs='+')
     parser.add_argument('--descriptors', nargs='+')
     args = parser.parse_args()
 
-    path = args.path
+
+    DATAS       = args.datas
     DESCRIPTOR = args.descriptors[0]
     # ----------------------------------------------
     # Parameters
     # ----------------------------------------------
 
     ST = time.time()
-    opt, mode, sphered = get_descriptor(DESCRIPTOR)
-    base_order = 1  # Base sphere resolution
-    sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
-    scale_factor = 1.0  # How much to scale input equirectangular image by
-    dim = np.array([2*sphered, sphered])
-    path_o = os.getcwd()+path + '/O.png' ##
-    path_r = os.getcwd()+path + '/R.png' ##
-    if opt != 'sphorb':
-        corners = tangent_image_corners(base_order, sample_order)
-        pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
-        pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
-        pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
-    else:
-        os.chdir('SPHORB-master/')
-        pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
-        pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
-        os.chdir('../')
-    
-    if len(pts1.shape) == 1:
-        pts1 = pts1.reshape(1,-1)
-    if len(pts2.shape) == 1:
-        pts2 = pts2.reshape(1,-1)
-    if pts1.shape[0] > 0 or pts2.shape[0] > 0:
-        matching_ratio = 100
-        s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, matching_ratio, opt, args.match)
-        x1,x2 = coord_3d(x1, dim), coord_3d(x2, dim)
-        s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
-        if x1.shape[0] < 8:
-            R_error, T_error = 3.14, 3.14
-        else:
-            E, _ = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-            R1_,R2_,T1_,T2_ = decomposeE(E.T)
-            R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
-            vis_posture(R_, T_)
-            
+
+    NUM = 0
+    for data in DATAS:
+
+        mypath = os.path.join('data',data)
+        paths  = [os.path.join(os.getcwd(),'data',data,f) for f in listdir('data/'+data) if isdir(join(mypath, f))]
+        NUM = NUM + len(paths)
+
+        for path in tqdm(paths):
+
+            try:
+                opt, mode, sphered = get_descriptor(DESCRIPTOR)
+                base_order = 1  # Base sphere resolution
+                sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
+                scale_factor = 1.0  # How much to scale input equirectangular image by
+                dim = np.array([2*sphered, sphered])
+                path_o = path + '/O.png'
+                path_r = path + '/R.png'
+                print(path_o)
+
+                if opt != 'sphorb':
+                    corners = tangent_image_corners(base_order, sample_order)
+                    pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
+                    pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
+                    pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
+                else:
+                    os.chdir('SPHORB-master/')
+                    pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
+                    pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
+                    os.chdir('../')
+
+
+                if len(pts1.shape) == 1:
+                    pts1 = pts1.reshape(1,-1)
+                if len(pts2.shape) == 1:
+                    pts2 = pts2.reshape(1,-1)
+
+                if pts1.shape[0] > 0 or pts2.shape[0] > 0:
+                    matching_ratio = 100
+                    s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, matching_ratio, opt, args.match)
+                    x1,x2 = coord_3d(x1, dim), coord_3d(x2, dim)
+                    s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
+                    if x1.shape[0] < 8:
+                        R_error, T_error = 3.14, 3.14
+                    else:
+                        E, _ = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+                        R1_,R2_,T1_,T2_ = decomposeE(E.T)
+                        R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
+                        print(R_, T_)
+                
+            except:
+                print("Unexpected error")
 
     GL = time.time()
     print("Time:", GL-ST)
@@ -180,18 +197,6 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio'):
         M[1,ind] = match.trainIdx
 
     return s_pts1, s_pts2, s_pts1[M[0,:].astype(int),:3], s_pts2[M[1,:].astype(int),:3]
-
-def vis_posture(R, T):
-    axis_a = o3d.geometry.TriangleMesh.create_coordinate_frame()
-    axis_b = o3d.geometry.TriangleMesh.create_coordinate_frame()
-    T_a = np.eye(4) # Camera pose A
-    T_b = np.pad(R, ((0, 1), (0, 1)), mode='constant') #Camera pose B
-    for idx in range(3): T_b[idx][3] = T[idx]
-    T_b[3][3] = 1
-
-    axis_a.transform(T_a)
-    axis_b.transform(T_b)
-    o3d.visualization.draw_geometries([axis_a, axis_b])
 
 if __name__ == '__main__':
     main()
