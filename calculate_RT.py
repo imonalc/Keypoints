@@ -57,6 +57,7 @@ def main():
     dim = np.array([2*sphered, sphered])
     path_o = os.getcwd()+path + '/O.png' ##
     path_r = os.getcwd()+path + '/R.png' ##
+    print(path_o)
     if opt != 'sphorb':
         corners = tangent_image_corners(base_order, sample_order)
         pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)

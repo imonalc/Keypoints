@@ -99,6 +99,7 @@ def main():
                         R1_,R2_,T1_,T2_ = decomposeE(E.T)
                         R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
                         print(R_, T_)
+                        
                 
             except:
                 print("Unexpected error")
