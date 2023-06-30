@@ -6,9 +6,9 @@ import argparse
 import image_resize
 
 
-def eqr2dualfisheye(path="./data/test_farm/0/O.png", output_size=(1024, 512)):
-    img_eqr = cv2.imread(path)
-    img_eqr = cv2.resize(img_eqr, output_size)
+def eqr2dualfisheye(img, output_size=(1024, 512)):
+    img_resized = cv2.resize(img, output_size)
+    img_eqr = cut_rightside(img_resized)
     h_img_eqr, w_img_eqr = img_eqr.shape[:2]
     h_img_Dfish, w_img_Dfish = img_eqr.shape[:2]
     f = h_img_eqr / np.pi
@@ -43,23 +43,42 @@ def eqr2dualfisheye(path="./data/test_farm/0/O.png", output_size=(1024, 512)):
     return dual_fisheye_image
 
 
-def main():
-    parser = argparse.ArgumentParser(description = 'Tangent Plane')
-    parser.add_argument('--path', default = "./data/test_farm/0/O.png")
-    args = parser.parse_args()
+def cut_rightside(img):
+    print(img.shape)
+    h_img, w_img = img.shape[:2]
+    st_col = w_img // 4
+    ed_col = w_img * 3 // 4
+    left_img = img
+    left_img[:, st_col:ed_col] = (0, 0, 0)
 
-    #path = args.path
-    #print(path)
-    #resized_img = image_resize.image_resize(path, rows=5376, cols=2688)
-    #print(resized_img.shape)
-    #cv2.imwrite("data/test_farm/0/O2.png", resized_img)
-    #print(args.path + "/O2.png")
-    #dual_fisheye_image = eqr2dualfisheye("data/test_farm/0/O2.png")
-    dual_fisheye_image = eqr2dualfisheye(args.path)
-    ###
-    cv2.imshow('Dual Fisheye Image', dual_fisheye_image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    #cv2.imshow("Modified Image", left_img)
+    #cv2.waitKey(0)
+    #cv2.destroyAllWindows()
+    return left_img
 
-if __name__ == '__main__':
-    main()
+
+
+
+#def main():
+#    parser = argparse.ArgumentParser(description = 'Tangent Plane')
+#    parser.add_argument('--path', default = "./data/test_farm/0/O.png")
+#    args = parser.parse_args()
+#
+#    #path = args.path
+#    #print(path)
+#    #resized_img = image_resize.image_resize(path, rows=5376, cols=2688)
+#    #print(resized_img.shape)
+#    #cv2.imwrite("data/test_farm/0/O2.png", resized_img)
+#    #print(args.path + "/O2.png")
+#    #dual_fisheye_image = eqr2dualfisheye("data/test_farm/0/O2.png")
+#    img_eqr = cv2.imread(args.path)
+#    dual_fisheye_image = eqr2dualfisheye(img_eqr)
+#    h_dual_fisheye_image, w_dual_fisheye_image = dual_fisheye_image.shape[:2]
+#    right_fisheye_image = dual_fisheye_image[:, w_dual_fisheye_image //2:w_dual_fisheye_image]
+#    ###
+#    cv2.imshow('Dual Fisheye Image', right_fisheye_image)
+#    cv2.waitKey(0)
+#    cv2.destroyAllWindows()
+#
+#if __name__ == '__main__':
+#    main()
