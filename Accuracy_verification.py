@@ -46,7 +46,7 @@ def main():
     parser.add_argument('--g_metrics',default="False")
     parser.add_argument('--solver', default="None")
     parser.add_argument('--inliers', default="8PA")
-    parser.add_argument('--data'      , default="Calibration/pose_test")
+    parser.add_argument('--pose'      , default="pose_test")
     parser.add_argument('--descriptors', nargs='+')
     args = parser.parse_args()
 
@@ -56,10 +56,10 @@ def main():
     # ----------------------------------------------
 
     NUM = 0
-    R_list, T_list = [], []
+    R_errors, T_errors = [], []
     for i in range(len(DESCRIPTORS)):
-        R_list.append([])
-        T_list.append([])
+        R_errors.append([])
+        T_errors.append([])
 
     if args.g_metrics == "False":
         METRICS = np.zeros((len(DESCRIPTORS),2))
@@ -68,13 +68,16 @@ def main():
         METRICS = np.zeros((len(DESCRIPTORS),7))
         metrics = ['Matched','Keypoint','Pmr','Pr','R','Ms','E']
 
-    data = args.data
+    pose = args.pose
     TIMES = []
+    path_true_value = os.path.join(os.getcwd(), "data/Calibration/", pose)
+    RQ_true_value = np.genfromtxt(path_true_value + "/RQ_true_value.csv", delimiter=',')
+    T_true_value = np.genfromtxt(path_true_value + "/T_true_value.csv", delimiter=',')
 
-    mypath = os.path.join('data',data)
-    paths  = [os.path.join(os.getcwd(),'data',data,f) for f in listdir('data/'+data) if isdir(join(mypath, f))]
+    mypath = os.path.join('data/Farm',pose)
+    paths  = [os.path.join(os.getcwd(),'data/Farm/',pose,f) for f in listdir('data/Farm/'+pose) if isdir(join(mypath, f))]
     NUM = NUM + len(paths)
-    #print(paths)
+    print(paths)
 
     std = []
     for path in tqdm(paths):
@@ -93,8 +96,6 @@ def main():
 
                 path_o = path + '/O2.png'
                 path_r = path + '/R2.png'
-                
-                #print(descriptor, path_o)
 
 
                 if opt != 'sphorb':
@@ -140,8 +141,15 @@ def main():
                         R1_,R2_,T1_,T2_ = decomposeE(E.T)
                         R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
 
-                    R_list[indicador].append(R_)
-                    T_list[indicador].append(T_)
+                        RQ = mat2quat(R_)
+                        T_norm = T_ / np.linalg.norm(T_)
+                    
+
+                    R_error = 2 * np.arccos(np.dot(RQ, RQ_true_value))
+                    T_error = math.acos(np.dot(T_norm, T_true_value))
+
+                    R_errors[indicador].append(R_error)
+                    T_errors[indicador].append(T_error)
 
                     METRICS[indicador,:] = METRICS[indicador,:] + [x1.shape[0], (s_pts1.shape[0]+s_pts2.shape[1])/2]
 
@@ -151,29 +159,14 @@ def main():
 
 
 
-        #print(np.mean(np.array(TIMES)))
     print('ALL:')
     print(np.mean(np.array(TIMES)))
-    N_ARRAY = np.zeros((len(DESCRIPTORS),1))
-    for indice, _ in enumerate(DESCRIPTORS):
-        N_ARRAY[indice,0] = len(R_list[indice])
 
-    R_quat_l = []
-    T_norm_l = []
-    for R in R_list[0]:
-        R_quat_l.append(mat2quat(R))
-    for T in T_list[0]:
-        T_norm_l.append(T/np.linalg.norm(T))
-    T_norm_array = np.array([T for T in T_norm_l])
-    
-    RQ_true_value = mean_quat(R_quat_l)
-    T_true_value = np.mean(T_norm_array, axis=0)
+    print(R_errors)
+    print(T_errors)
 
-    print(RQ_true_value)
-    print(T_true_value)
-
-    np.savetxt(os.path.join(os.getcwd(),'data',data, 'RQ_true_value.csv'), RQ_true_value, delimiter=',')
-    np.savetxt(os.path.join(os.getcwd(),'data',data, 'T_true_value.csv'), T_true_value, delimiter=',')
+    np.savetxt(os.path.join(os.getcwd(),'data/Farm', pose, 'R_errors.csv'), R_errors, delimiter=',')
+    np.savetxt(os.path.join(os.getcwd(),'data/Farm', pose, 'T_errors.csv'), T_errors, delimiter=',')
 
     return
 

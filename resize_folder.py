@@ -41,7 +41,7 @@ def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
     parser.add_argument('--points', type=int, default = 12000)
-    parser.add_argument('--data'      , default="Calibration")
+    parser.add_argument('--data'      , default="Calibration/pose_test")
     args = parser.parse_args()
 
 
