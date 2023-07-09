@@ -70,12 +70,14 @@ def main():
 
     pose = args.pose
     TIMES = []
-    path_true_value = os.path.join(os.getcwd(), "data/Calibration/", pose)
+    st = time.time()
+    path_true_value = os.path.join(os.getcwd(), "Calibration/", pose)
     RQ_true_value = np.genfromtxt(path_true_value + "/RQ_true_value.csv", delimiter=',')
     T_true_value = np.genfromtxt(path_true_value + "/T_true_value.csv", delimiter=',')
 
     mypath = os.path.join('data/Farm',pose)
-    paths  = [os.path.join(os.getcwd(),'data/Farm/',pose,f) for f in listdir('data/Farm/'+pose) if isdir(join(mypath, f))]
+    paths  = [os.path.join(os.getcwd(),'data/Farm',pose,f) for f in listdir('data/Farm/'+pose) if isdir(join(mypath, f))]
+    print(os.path.join(os.getcwd(),'data/Farm',pose))
     NUM = NUM + len(paths)
     print(paths)
 
@@ -91,11 +93,10 @@ def main():
                 base_order = 1  # Base sphere resolution
                 sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
                 scale_factor = 1.0  # How much to scale input equirectangular image by
-                save_ply = False  # Whether to save the PLY visualizations too
                 dim = np.array([2*sphered, sphered])
 
-                path_o = path + '/O2.png'
-                path_r = path + '/R2.png'
+                path_o = path + '/O.JPG'
+                path_r = path + '/R.JPG'
 
 
                 if opt != 'sphorb':
@@ -156,11 +157,12 @@ def main():
                     std.append(x1.shape[0])
             except:
                 print("Unexpected error")
+    gl = time.time()
+    print(descriptor, gl - st)
 
 
-
-    print('ALL:')
-    print(np.mean(np.array(TIMES)))
+    #print('ALL:')
+    #print(np.mean(np.array(TIMES)))
 
     print(R_errors)
     print(T_errors)

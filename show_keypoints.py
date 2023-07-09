@@ -208,8 +208,8 @@ def main():
     save_ply = False  # Whether to save the PLY visualizations too
     dim = np.array([2*sphered, sphered])
 
-    path_o = args.path + '/O.png'
-    path_r = args.path + '/R.png'
+    path_o = args.path + '/R2.png'
+    path_r = args.path + '/R2.png'
     print(path_o)
     if opt != 'sphorb':
 

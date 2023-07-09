@@ -3,12 +3,17 @@ import os
 import cv2
 import numpy as np
 import argparse
-import image_resize
 
 
-def eqr2dualfisheye(img, output_size=(1024, 512)):
+def eqr2dualfisheye(img, output_size=(1024, 512), side="right"):
     img_resized = cv2.resize(img, output_size)
-    img_eqr = cut_rightside(img_resized)
+    if side == "right":
+        img_eqr = cut_leftside(img_resized)
+    elif side == "left":
+        img_eqr = cut_rightside(img_resized)
+    else:
+        print("error")
+        exit()
     h_img_eqr, w_img_eqr = img_eqr.shape[:2]
     h_img_Dfish, w_img_Dfish = img_eqr.shape[:2]
     f = h_img_eqr / np.pi
@@ -39,8 +44,12 @@ def eqr2dualfisheye(img, output_size=(1024, 512)):
     x_map_fisheye2eqr = x_map_eqr.astype('float32')
 
     dual_fisheye_image = cv2.remap(img_eqr, y_map_fisheye2eqr, x_map_fisheye2eqr, cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP)
+    if side == "right":
+        ret = dual_fisheye_image[:, :w_img_Dfish//2]
+    else:
+        ret = dual_fisheye_image[:, w_img_Dfish//2:w_img_Dfish]
 
-    return dual_fisheye_image
+    return ret
 
 
 def cut_rightside(img):
@@ -56,6 +65,19 @@ def cut_rightside(img):
     #cv2.destroyAllWindows()
     return left_img
 
+def cut_leftside(img):
+    print(img.shape)
+    h_img, w_img = img.shape[:2]
+    st_col = w_img // 4
+    ed_col = w_img * 3 // 4
+    right_img = img
+    right_img[:, 0:st_col] = (0, 0, 0)
+    right_img[:, ed_col: w_img] = (0, 0, 0)
+
+    #cv2.imshow("Modified Image", left_img)
+    #cv2.waitKey(0)
+    #cv2.destroyAllWindows()
+    return right_img
 
 
 
