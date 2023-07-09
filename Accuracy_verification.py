@@ -95,8 +95,8 @@ def main():
                 scale_factor = 1.0  # How much to scale input equirectangular image by
                 dim = np.array([2*sphered, sphered])
 
-                path_o = path + '/O.JPG'
-                path_r = path + '/R.JPG'
+                path_o = path + '/O.jpg'
+                path_r = path + '/R.jpg'
 
 
                 if opt != 'sphorb':

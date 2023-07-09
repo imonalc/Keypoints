@@ -5,7 +5,7 @@ import numpy as np
 import argparse
 
 
-def eqr2dualfisheye(img, output_size=(1024, 512), side="right"):
+def eqr2dualfisheye(img, output_size=(3840, 1920), side="right"):
     img_resized = cv2.resize(img, output_size)
     if side == "right":
         img_eqr = cut_leftside(img_resized)

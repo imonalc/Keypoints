@@ -37,13 +37,9 @@ from scipy.spatial.transform import Rotation
 
 
 
-def main():
+def calib_sph(data):
 
-    parser = argparse.ArgumentParser(description = 'Tangent Plane')
-    parser.add_argument('--data'      , default="pose0/0")
-    args = parser.parse_args()
-
-    raw = (5504, 2752)
+    raw = (3840, 1920)
     resized = (1024, 512)
 
     # チェスボードの格子点の数
@@ -61,8 +57,8 @@ def main():
     img_points2 = []  # 画像2の座標
 
     # 画像ファイルのパス
-    image1_path = os.path.join(os.getcwd(), "data/Calibration", args.data, 'O.JPG')
-    image2_path = os.path.join(os.getcwd(), "data/Calibration", args.data, 'R.JPG')
+    image1_path = os.path.join(os.getcwd(), "data/Calibration", data, 'O.jpg')
+    image2_path = os.path.join(os.getcwd(), "data/Calibration", data, 'R.jpg')
 
     print(image1_path)
 
@@ -140,28 +136,7 @@ def main():
         #print("カメラ1の歪み係数:\n", D1)
         #print("カメラ2行列:\n", K2)
         #print("カメラ2の歪み係数:\n", D2)
-        print("R=")
-        print("[", end="")
-        for i in range(9):
-            if i % 3 == 0:
-                print("[", end="")
-            print(R[i//3][i%3], end="")
-            if i % 3 != 2:
-                print(",", end="")
-            elif i != 8:
-                print("],")
-            else:
-                print("]]")
-        
-        print("T=")
-        for i in range(3):
-            if i % 3 == 0:
-                print("[", end="")
-            print(T[i%3][0], end="")
-            if i % 3 == 2:
-                print("]")
-            else:
-                print(",", end="")
+
 
         ## 画像1を保存
         #cv2.imwrite('image1_corners.jpg', image1)
@@ -173,9 +148,23 @@ def main():
         #cv2.imshow('Image 1 with Corners', image1)
         #cv2.imshow('Image 2 with Corners', image2)
         #cv2.waitKey(0)
+        return R, T
     else:
-        print("チェスボードの格子点が検出されませんでした。")
+        #print("チェスボードの格子点が検出されませんでした。")
+        R = np.array([[ 0, 0, 0],
+            [0, 0, 0],
+            [0,  0, 0]])
+        T = np.array([0,0,0])
+        return R, T
 
+
+def main():
+
+    parser = argparse.ArgumentParser(description = 'Tangent Plane')
+    parser.add_argument('--data'      , default="pose0/0")
+    args = parser.parse_args()
+    R, T = calib_sph(args.data)
+    
 
 if __name__ == '__main__':
     main()

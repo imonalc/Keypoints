@@ -35,7 +35,7 @@ from os.path import isfile, join, isdir
 from tqdm import tqdm
 from scipy.spatial.transform import Rotation
 
-def extract_frames(video_path, output_path, frame_interval):
+def extract_frames(video_path, output_path, frame_interval, name):
     # 動画ファイルを開く
     video_capture = cv2.VideoCapture(video_path)
     
@@ -52,13 +52,17 @@ def extract_frames(video_path, output_path, frame_interval):
         
         # フレームカウンタが指定したフレーム間隔の倍数のときに画像を保存
         if frame_count % frame_interval == 0:
-            output_filename = f"{output_path}/frame_{frame_count}.jpg"
+            output_foldername = f"{output_path}/{frame_count//50}"
+            if not os.path.exists(output_foldername):
+                os.makedirs(output_foldername)
+            output_filename = f"{output_foldername}/{name}.jpg"
             cv2.imwrite(output_filename, frame)
         
         # フレームカウンタをインクリメント
         frame_count += 1
     
     # メモリを解放し、ファイルを閉じる
+    print(frame_count)
     video_capture.release()
     cv2.destroyAllWindows()
 
@@ -70,22 +74,22 @@ def main():
 
 
     video_path = os.path.join(os.getcwd(), "data", args.data, "O.MP4")
-    output_path = os.path.join(os.getcwd(), "data", args.data, 'imageO')    # 出力画像の保存先ディレクトリパス
+    output_path = os.path.join(os.getcwd(), "data", args.data)    # 出力画像の保存先ディレクトリパス
     frame_interval = 50               # 画像を切り出すフレーム間隔
 
     print(video_path)
     print(output_path)
 
-    extract_frames(video_path, output_path, frame_interval)
+    extract_frames(video_path, output_path, frame_interval, "O")
 
     video_path = os.path.join(os.getcwd(), "data", args.data, "R.MP4")
-    output_path = os.path.join(os.getcwd(), "data", args.data, 'imageR')    # 出力画像の保存先ディレクトリパス
+    output_path = os.path.join(os.getcwd(), "data", args.data)    # 出力画像の保存先ディレクトリパス
     frame_interval = 50               # 画像を切り出すフレーム間隔
 
     print(video_path)
     print(output_path)
 
-    extract_frames(video_path, output_path, frame_interval)
+    extract_frames(video_path, output_path, frame_interval, "R")
 
 
 if __name__ == '__main__':
