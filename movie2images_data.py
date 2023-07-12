@@ -52,17 +52,17 @@ def extract_frames(video_path, output_path, frame_interval, name):
         
         # フレームカウンタが指定したフレーム間隔の倍数のときに画像を保存
         if frame_count % frame_interval == 0:
-            output_foldername = f"{output_path}/{frame_count//50}"
+            output_foldername = f"{output_path}/{frame_count//frame_interval}"
             if not os.path.exists(output_foldername):
                 os.makedirs(output_foldername)
             output_filename = f"{output_foldername}/{name}.jpg"
             cv2.imwrite(output_filename, frame)
         
         # フレームカウンタをインクリメント
+        if frame_count // frame_interval >=49:
+            break
         frame_count += 1
-    
     # メモリを解放し、ファイルを閉じる
-    print(frame_count)
     video_capture.release()
     cv2.destroyAllWindows()
 
@@ -75,7 +75,7 @@ def main():
 
     video_path = os.path.join(os.getcwd(), "data", args.data, "O.MP4")
     output_path = os.path.join(os.getcwd(), "data", args.data)    # 出力画像の保存先ディレクトリパス
-    frame_interval = 50               # 画像を切り出すフレーム間隔
+    frame_interval = 30               # 画像を切り出すフレーム間隔
 
     print(video_path)
     print(output_path)
@@ -84,7 +84,7 @@ def main():
 
     video_path = os.path.join(os.getcwd(), "data", args.data, "R.MP4")
     output_path = os.path.join(os.getcwd(), "data", args.data)    # 出力画像の保存先ディレクトリパス
-    frame_interval = 50               # 画像を切り出すフレーム間隔
+    frame_interval = 30               # 画像を切り出すフレーム間隔
 
     print(video_path)
     print(output_path)

@@ -65,7 +65,7 @@ def computes_orb_keypoints(img):
     img = torch2numpy(img.byte())
 
     # Initialize OpenCV ORB detector
-    orb = cv2.ORB_create(scoreType=cv2.ORB_HARRIS_SCORE, nfeatures=10000)
+    orb = cv2.ORB_create(scoreType=cv2.ORB_HARRIS_SCORE, nfeatures=100000)
 
     keypoints, desc = orb.detectAndCompute(img, None)
 
@@ -94,7 +94,7 @@ def computes_sift_keypoints(img):
     img = torch2numpy(img.byte())
 
     # Initialize OpenCV ORB detector
-    sift = cv2.xfeatures2d.SIFT_create(nfeatures=10000)
+    sift = cv2.xfeatures2d.SIFT_create(nfeatures=100000)
 
     keypoints, desc = sift.detectAndCompute(img, None)
 

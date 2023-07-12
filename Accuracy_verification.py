@@ -57,9 +57,13 @@ def main():
 
     NUM = 0
     R_errors, T_errors = [], []
+    num_keypoints = []
+    TIMES_feature = []
     for i in range(len(DESCRIPTORS)):
         R_errors.append([])
         T_errors.append([])
+        num_keypoints.append([])
+        TIMES_feature.append([])
 
     if args.g_metrics == "False":
         METRICS = np.zeros((len(DESCRIPTORS),2))
@@ -98,7 +102,7 @@ def main():
                 path_o = path + '/O.jpg'
                 path_r = path + '/R.jpg'
 
-
+                st = time.time()
                 if opt != 'sphorb':
                     corners = tangent_image_corners(base_order, sample_order)
                     pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
@@ -110,7 +114,16 @@ def main():
                     pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
                     pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
                     os.chdir('../')
-
+                 
+                if len(pts1) > 10000:
+                    pts1 = pts1[-10000:]
+                    desc1 = desc1[-10000:]
+                if len(pts2) > 10000:
+                    pts2 = pts2[-10000:]
+                    desc2 = desc2[-10000:]
+                
+                num_keypoints[indicador].append(len(pts1))
+                num_keypoints[indicador].append(len(pts1))
 
                 if len(pts1.shape) == 1:
                     pts1 = pts1.reshape(1,-1)
@@ -145,12 +158,15 @@ def main():
                         RQ = mat2quat(R_)
                         T_norm = T_ / np.linalg.norm(T_)
                     
-
+                    gl = time.time()
+                    
                     R_error = 2 * np.arccos(np.dot(RQ, RQ_true_value))
                     T_error = math.acos(np.dot(T_norm, T_true_value))
 
                     R_errors[indicador].append(R_error)
                     T_errors[indicador].append(T_error)
+                    TIMES_feature[indicador].append(gl - st)
+                    
 
                     METRICS[indicador,:] = METRICS[indicador,:] + [x1.shape[0], (s_pts1.shape[0]+s_pts2.shape[1])/2]
 
@@ -166,9 +182,12 @@ def main():
 
     print(R_errors)
     print(T_errors)
-
-    np.savetxt(os.path.join(os.getcwd(),'data/Farm', pose, 'R_errors.csv'), R_errors, delimiter=',')
-    np.savetxt(os.path.join(os.getcwd(),'data/Farm', pose, 'T_errors.csv'), T_errors, delimiter=',')
+    print(num_keypoints)
+    for i, descriptor in enumerate(DESCRIPTORS):
+        np.savetxt(os.path.join(os.getcwd(),'data/Farm', "output", DESCRIPTORS[i], pose, 'R_errors.csv'), R_errors[i], delimiter=',')
+        np.savetxt(os.path.join(os.getcwd(),'data/Farm', "output", DESCRIPTORS[i], pose, 'T_errors.csv'), T_errors[i], delimiter=',')
+        np.savetxt(os.path.join(os.getcwd(),'data/Farm', "output", DESCRIPTORS[i], pose, 'num_keypoints.csv'), num_keypoints[i], delimiter=',')
+        np.savetxt(os.path.join(os.getcwd(),'data/Farm', "output", DESCRIPTORS[i], pose, 'calculate_time.csv'), TIMES_feature[i], delimiter=',')
 
     return
 
