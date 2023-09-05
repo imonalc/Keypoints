@@ -6,7 +6,7 @@
 import sys
 import os
 sys.path.append(os.getcwd()+'/fivepoint')
-import build.fivep as f
+import fivepoint.build.fivep as f
 
 import time
 import torch
@@ -39,158 +39,9 @@ from os.path import isfile, join, isdir
 from tqdm import tqdm
 
 sys.path.append(os.getcwd()+'/SPHORB-master')
+sys.path.append('utils/ALIKE/alnet.py')
 
 import build1.sphorb_cpp as sphorb
-
-def sort_key(pts1, pts2, desc1, desc2, points):
-
-    ind1 = np.argsort(pts1[:,2].numpy(),axis = 0)[::-1]
-    ind2 = np.argsort(pts2[:,2].numpy(),axis = 0)[::-1]
-
-    max1 = np.min([points,ind1.shape[0]])
-    max2 = np.min([points,ind2.shape[0]])
-
-    ind1 = ind1[:max1]
-    ind2 = ind2[:max2]
-
-    pts1 = pts1[ind1.copy(),:]
-    pts2 = pts2[ind2.copy(),:]
-
-    desc1 = desc1[:,ind1.copy()]
-    desc2 = desc2[:,ind2.copy()]
-
-    pts1 = np.concatenate((pts1[:,:2], np.ones((pts1.shape[0],1))), axis = 1 )
-    pts2 = np.concatenate((pts2[:,:2], np.ones((pts2.shape[0],1))), axis = 1 )
-
-    desc1 = np.transpose(desc1,[1,0]).numpy()
-    desc2 = np.transpose(desc2,[1,0]).numpy()
-
-    return pts1, pts2, desc1, desc2
-
-def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio'):
-
-    if opt[-1] == 'p':
-        porce = int(opt[:-1])
-        n_key = int(porce/100 * pts1.shape[0])
-    else:
-        n_key = int(opt)
-
-    s_pts1  = pts1.copy()[:n_key,:]
-    s_pts2  = pts2.copy()[:n_key,:]
-    s_desc1 = desc1.copy().astype('float32')[:n_key,:]
-    s_desc2 = desc2.copy().astype('float32')[:n_key,:]
-
-    if  'orb' in args_opt:
-        s_desc1 = s_desc1.astype(np.uint8)
-        s_desc2 = s_desc2.astype(np.uint8)
-
-    if match == '2-cross':
-        if 'orb' in args_opt:
-            bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
-        else:
-            bf = cv2.BFMatcher(cv2.NORM_L2, True)
-        matches = bf.match(s_desc1, s_desc2)
-    elif match == 'ratio':
-        if 'orb' in args_opt:
-            bf = cv2.BFMatcher(cv2.NORM_HAMMING, False)
-        else:
-            bf = cv2.BFMatcher(cv2.NORM_L2, False)
-        matches = bf.knnMatch(s_desc1,s_desc2, k=2)
-        good = []
-        for m,n in matches:
-            if m.distance < 0.75*n.distance:
-                good.append(m)
-        matches = good
-
-    M = np.zeros((2,len(matches)))
-    for ind, match in zip(np.arange(len(matches)),matches):
-        M[0,ind] = match.queryIdx
-        M[1,ind] = match.trainIdx
-
-    num_M = M.shape[1]
-
-    return s_pts1, s_pts2, s_pts1[M[0,:].astype(int),:3], s_pts2[M[1,:].astype(int),:3]
-
-def get_error(x1, x2, Rx, Tx):
-
-    S = computeEssentialMatrixByRANSAC(x1, x2)
-    I = S[1]
-    I = I.astype(np.int64)
-
-    x1 = x1[I,:]
-    x2 = x2[I,:]
-
-    F = calc_ematrix(x1,x2)
-
-
-    R1,R2,T1,T2 = decomposeE(F)
-
-    R,T = choose_rt(R1,R2,T1,T2,x1,x2)
-
-    R_error = r_error(Rx,R)
-    T_error = t_error(Tx,T)
-
-    return R_error, T_error
-
-def get_descriptor(descriptor):
-    if descriptor == 'sphorb':
-        return 'sphorb', 'erp', 640
-    elif descriptor == 'sift':
-        return 'sift', 'erp', 512
-    elif descriptor == 'tsift':
-        return 'sift', 'tangent', 512
-    elif descriptor == 'orb':
-        return 'orb', 'erp', 512
-    elif descriptor == 'torb':
-        return 'orb', 'tangent', 512
-    elif descriptor == 'spoint':
-        return 'superpoint', 'erp', 512
-    elif descriptor == 'tspoint':
-        return 'superpoint', 'tangent', 512
-
-
-def AUC(ROT, TRA, MET, L):
-
-    RAUC  = np.zeros(len(L))
-    TAUC  = np.zeros(len(L))
-
-    for index, t in enumerate(L):
-        ids = np.where(ROT<np.radians(t))[0]
-        RAUC[index] = len(ids)/len(ROT)
-
-    for index, t in enumerate(L):
-        ids = np.where(TRA<np.radians(t))[0]
-        TAUC[index] = len(ids)/len(TRA)
-
-    return RAUC, TAUC, np.array(MET)
-
-def get_data(DATAS):
-    if len(DATAS) == 1:
-        data = DATAS[0]
-    elif set(['Urban1','Urban2','Urban3','Urban4']) == set(DATAS):
-        data = 'Outdoor'
-    elif set(['Realistic','Interior1','Interior2','Room','Classroom']) == set(DATAS):
-        data = 'Indoor'
-    elif set(['Urban1_R','Urban2_R','Urban3_R','Urban4_R','Realistic_R','Interior1_R','Interior2_R','Room_R','Classroom_R']) == set(DATAS):
-        data = 'OnlyRot'
-    elif set(['Urban1_T','Urban2_T','Urban3_T','Urban4_T','Realistic_T','Interior1_T','Interior2_T','Room_T','Classroom_T']) == set(DATAS):
-        data = 'OnlyTra'
-    else:
-        data = ''
-        for DA in DATAS:
-            data+=DA
-
-    return data
-
-
-def get_kd(array):
-
-    array = np.array(array)
-    delimiter = int(array[-1])
-    A = array[:-1]
-    K = A[:delimiter].reshape(-1,3)
-    D = A[delimiter:].reshape(-1,32)
-    return K,D
 
 
 def main():
@@ -229,10 +80,9 @@ def main():
     TIMES = []
     for data in DATAS:
 
-        mypath = os.path.join('data',data)
-        paths  = [os.path.join(os.getcwd(),'data',data,f) for f in listdir('data/'+data) if isdir(join(mypath, f))]
+        mypath = os.path.join('data/data_100',data)
+        paths  = [os.path.join(os.getcwd(),'data/data_100',data,f) for f in listdir('data/data_100/'+data) if isdir(join(mypath, f))]
         NUM = NUM + len(paths)
-        
         std = []
 
         for path in tqdm(paths):
@@ -435,6 +285,159 @@ def main():
 #
 #        plt.savefig('results/metrics/'+data+'_'+file+'_'+args.inliers+'_'+args.solver+'/Translation.png')
 #
+
+
+
+def sort_key(pts1, pts2, desc1, desc2, points):
+
+    ind1 = np.argsort(pts1[:,2].numpy(),axis = 0)[::-1]
+    ind2 = np.argsort(pts2[:,2].numpy(),axis = 0)[::-1]
+
+    max1 = np.min([points,ind1.shape[0]])
+    max2 = np.min([points,ind2.shape[0]])
+
+    ind1 = ind1[:max1]
+    ind2 = ind2[:max2]
+
+    pts1 = pts1[ind1.copy(),:]
+    pts2 = pts2[ind2.copy(),:]
+
+    desc1 = desc1[:,ind1.copy()]
+    desc2 = desc2[:,ind2.copy()]
+
+    pts1 = np.concatenate((pts1[:,:2], np.ones((pts1.shape[0],1))), axis = 1 )
+    pts2 = np.concatenate((pts2[:,:2], np.ones((pts2.shape[0],1))), axis = 1 )
+
+    desc1 = np.transpose(desc1,[1,0]).numpy()
+    desc2 = np.transpose(desc2,[1,0]).numpy()
+
+    return pts1, pts2, desc1, desc2
+
+def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio'):
+
+    if opt[-1] == 'p':
+        porce = int(opt[:-1])
+        n_key = int(porce/100 * pts1.shape[0])
+    else:
+        n_key = int(opt)
+
+    s_pts1  = pts1.copy()[:n_key,:]
+    s_pts2  = pts2.copy()[:n_key,:]
+    s_desc1 = desc1.copy().astype('float32')[:n_key,:]
+    s_desc2 = desc2.copy().astype('float32')[:n_key,:]
+
+    if  'orb' in args_opt:
+        s_desc1 = s_desc1.astype(np.uint8)
+        s_desc2 = s_desc2.astype(np.uint8)
+
+    if match == '2-cross':
+        if 'orb' in args_opt:
+            bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
+        else:
+            bf = cv2.BFMatcher(cv2.NORM_L2, True)
+        matches = bf.match(s_desc1, s_desc2)
+    elif match == 'ratio':
+        if 'orb' in args_opt:
+            bf = cv2.BFMatcher(cv2.NORM_HAMMING, False)
+        else:
+            bf = cv2.BFMatcher(cv2.NORM_L2, False)
+        matches = bf.knnMatch(s_desc1,s_desc2, k=2)
+        good = []
+        for m,n in matches:
+            if m.distance < 0.75*n.distance:
+                good.append(m)
+        matches = good
+
+    M = np.zeros((2,len(matches)))
+    for ind, match in zip(np.arange(len(matches)),matches):
+        M[0,ind] = match.queryIdx
+        M[1,ind] = match.trainIdx
+
+    num_M = M.shape[1]
+
+    return s_pts1, s_pts2, s_pts1[M[0,:].astype(int),:3], s_pts2[M[1,:].astype(int),:3]
+
+def get_error(x1, x2, Rx, Tx):
+
+    S = computeEssentialMatrixByRANSAC(x1, x2)
+    I = S[1]
+    I = I.astype(np.int64)
+
+    x1 = x1[I,:]
+    x2 = x2[I,:]
+
+    F = calc_ematrix(x1,x2)
+
+
+    R1,R2,T1,T2 = decomposeE(F)
+
+    R,T = choose_rt(R1,R2,T1,T2,x1,x2)
+
+    R_error = r_error(Rx,R)
+    T_error = t_error(Tx,T)
+
+    return R_error, T_error
+
+def get_descriptor(descriptor):
+    if descriptor == 'sphorb':
+        return 'sphorb', 'erp', 640
+    elif descriptor == 'sift':
+        return 'sift', 'erp', 512
+    elif descriptor == 'tsift':
+        return 'sift', 'tangent', 512
+    elif descriptor == 'orb':
+        return 'orb', 'erp', 512
+    elif descriptor == 'torb':
+        return 'orb', 'tangent', 512
+    elif descriptor == 'spoint':
+        return 'superpoint', 'erp', 512
+    elif descriptor == 'tspoint':
+        return 'superpoint', 'tangent', 512
+
+
+def AUC(ROT, TRA, MET, L):
+
+    RAUC  = np.zeros(len(L))
+    TAUC  = np.zeros(len(L))
+
+    for index, t in enumerate(L):
+        ids = np.where(ROT<np.radians(t))[0]
+        RAUC[index] = len(ids)/len(ROT)
+
+    for index, t in enumerate(L):
+        ids = np.where(TRA<np.radians(t))[0]
+        TAUC[index] = len(ids)/len(TRA)
+
+    return RAUC, TAUC, np.array(MET)
+
+def get_data(DATAS):
+    if len(DATAS) == 1:
+        data = DATAS[0]
+    elif set(['Urban1','Urban2','Urban3','Urban4']) == set(DATAS):
+        data = 'Outdoor'
+    elif set(['Realistic','Interior1','Interior2','Room','Classroom']) == set(DATAS):
+        data = 'Indoor'
+    elif set(['Urban1_R','Urban2_R','Urban3_R','Urban4_R','Realistic_R','Interior1_R','Interior2_R','Room_R','Classroom_R']) == set(DATAS):
+        data = 'OnlyRot'
+    elif set(['Urban1_T','Urban2_T','Urban3_T','Urban4_T','Realistic_T','Interior1_T','Interior2_T','Room_T','Classroom_T']) == set(DATAS):
+        data = 'OnlyTra'
+    else:
+        data = ''
+        for DA in DATAS:
+            data+=DA
+
+    return data
+
+
+def get_kd(array):
+
+    array = np.array(array)
+    delimiter = int(array[-1])
+    A = array[:-1]
+    K = A[:delimiter].reshape(-1,3)
+    D = A[delimiter:].reshape(-1,32)
+    return K,D
+
 
 
 if __name__ == '__main__':

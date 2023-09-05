@@ -12,6 +12,7 @@ import argparse
 
 import utils.superpoint.magic_sp.superpoint as magic_sp
 import utils.superpoint.train_sp.superpoint as train_sp
+from utils.ALIKE.alike import ALike, configs
 
 def process_img(img):
     """ Process a image transposing it and convert to grayscale format, Then normalize
@@ -48,6 +49,25 @@ def computes_superpoint_keypoints(img, opt, nms_dist=4, conf_thresh = 0.015, nn_
         desc = np.transpose(desc, [1,0])
         return torch.from_numpy(kpt_details), torch.from_numpy(desc)
     return None
+
+
+def computes_ALIKE_keypoints(img, opt, device="cuda", top_k=-1, scores_th=0.2, n_limit=5000):
+
+
+    model = ALike(**configs[model],
+        device=device,
+        top_k=top_k,
+        scores_th=scores_th,
+        n_limit=n_limit)
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    pred = model(img_rgb, subpixel=True)
+    kpts = pred["keypoints"]
+    desc = pred["descriptors"]
+    if len(pred)>0:
+        desc = np.transpose(desc, [1,0])
+        return torch.from_numpy(kpts), torch.from_numpy(desc)
+    return None
+
 
 def format_keypoints(keypoints, desc):
     """
@@ -94,7 +114,7 @@ def computes_sift_keypoints(img):
     img = torch2numpy(img.byte())
 
     # Initialize OpenCV ORB detector
-    sift = cv2.xfeatures2d.SIFT_create(nfeatures=10000)
+    sift = cv2.SIFT_create(nfeatures=10000)
 
     keypoints, desc = sift.detectAndCompute(img, None)
 
