@@ -52,8 +52,7 @@ def computes_superpoint_keypoints(img, opt, nms_dist=4, conf_thresh = 0.015, nn_
 
 
 def computes_alike_keypoints(img, model_nm="alike-n", device="cuda", top_k=-1, scores_th=0.2, n_limit=5000):
-
-    img_permuted = img.permute(2, 1, 0)
+    img_permuted = img.permute(1, 2, 0)
     model = ALike(**configs[model_nm],
         device=device,
         top_k=top_k,
@@ -65,7 +64,7 @@ def computes_alike_keypoints(img, model_nm="alike-n", device="cuda", top_k=-1, s
     desc = pred["descriptors"]
     scores = pred["scores"]
     score_map = pred["scores_map"]
-    print(kpts.shape, desc.shape, scores.shape, score_map.shape)
+    #print(kpts.shape, desc.shape, scores.shape, score_map.shape)
 
     kpt_details = np.zeros((kpts.shape[0],4))
 
@@ -236,8 +235,8 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
 
     erp_kp = erp_kp_details[0]
     erp_desc = erp_kp_details[1]
-    print(type(erp_kp), type(erp_desc))
-    print(erp_kp.shape, erp_desc.shape)
+    #print(type(erp_kp), type(erp_desc))
+    #print(erp_kp.shape, erp_desc.shape)
 
     # If top top and bottom of image is padding
     crop_h = compute_crop(img.shape[-2:], crop_degree)
