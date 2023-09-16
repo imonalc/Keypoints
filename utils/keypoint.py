@@ -38,8 +38,8 @@ def computes_superpoint_keypoints(img, opt, nms_dist=4, conf_thresh = 0.015, nn_
     fe = train_sp.SuperPointFrontend(weights_path = 'utils/models/superpoint-trained.pth.tar', nms_dist= nms_dist, conf_thresh = conf_thresh, nn_thresh= nn_thresh, cuda = cuda )
 
 
-
     pts, desc, heatmap = fe.run(img)
+    #print(pts.shape)
     kpt_details = np.zeros((pts.shape[1],4))
     kpt_details[:,0] = pts[0,:]
     kpt_details[:,1] = pts[1,:]
@@ -51,20 +51,30 @@ def computes_superpoint_keypoints(img, opt, nms_dist=4, conf_thresh = 0.015, nn_
     return None
 
 
-def computes_ALIKE_keypoints(img, opt, device="cuda", top_k=-1, scores_th=0.2, n_limit=5000):
+def computes_alike_keypoints(img, model_nm="alike-n", device="cuda", top_k=-1, scores_th=0.2, n_limit=5000):
 
-
-    model = ALike(**configs[model],
+    img_permuted = img.permute(2, 1, 0)
+    model = ALike(**configs[model_nm],
         device=device,
         top_k=top_k,
         scores_th=scores_th,
         n_limit=n_limit)
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    pred = model(img_rgb, subpixel=True)
+    img_rgb = cv2.cvtColor(img_permuted.numpy(), cv2.COLOR_BGR2RGB)
+    pred = model(img_rgb)
     kpts = pred["keypoints"]
     desc = pred["descriptors"]
-    if len(pred)>0:
-        desc = np.transpose(desc, [1,0])
+    scores = pred["scores"]
+    score_map = pred["scores_map"]
+    print(kpts.shape, desc.shape, scores.shape, score_map.shape)
+
+    kpt_details = np.zeros((kpts.shape[0],4))
+
+    kpt_details[:,0] = kpts[:,1]
+    kpt_details[:,1] = kpts[:,0]
+    kpt_details[:,2] = scores.squeeze()
+    kpt_details[:,3] = scores.squeeze()
+
+    if len(kpts)>0:
         return torch.from_numpy(kpts), torch.from_numpy(desc)
     return None
 
@@ -159,7 +169,9 @@ def keypoint_tangent_images(tex_image, base_order, sample_order, image_shape, op
 
         if opt == 'surf':
             kp_details = computes_surf_keypoints(img)
-
+        
+        if opt == 'alike':
+            kp_details = computes_alike_keypoints(img)
 
         if kp_details is not None:
             valid_mask = get_valid_coordinates(base_order,
@@ -219,9 +231,13 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
     if opt == 'surf':
         erp_kp_details = computes_surf_keypoints(img)
 
+    if opt == 'alike':
+        erp_kp_details = computes_alike_keypoints(img)
 
     erp_kp = erp_kp_details[0]
     erp_desc = erp_kp_details[1]
+    print(type(erp_kp), type(erp_desc))
+    print(erp_kp.shape, erp_desc.shape)
 
     # If top top and bottom of image is padding
     crop_h = compute_crop(img.shape[-2:], crop_degree)

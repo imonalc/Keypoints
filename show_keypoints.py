@@ -215,6 +215,10 @@ def get_descriptor(descriptor):
         return 'superpoint', 'erp', 512
     elif descriptor == 'tspoint':
         return 'superpoint', 'tangent', 512
+    elif descriptor == 'alike':
+        return 'alike', 'erp', 512
+    elif descriptor == 'talike':
+        return 'alike', 'tangent', 512
 
 
 def AUC(ROT, TRA, MET, L):

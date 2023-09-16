@@ -39,7 +39,6 @@ from os.path import isfile, join, isdir
 from tqdm import tqdm
 
 sys.path.append(os.getcwd()+'/SPHORB-master')
-sys.path.append('utils/ALIKE/alnet.py')
 
 import build1.sphorb_cpp as sphorb
 
