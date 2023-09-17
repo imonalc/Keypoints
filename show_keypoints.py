@@ -84,7 +84,7 @@ def main():
     if len(pts1.shape) == 1:
         pts1 = pts1.reshape(1,-1)
 
-    print(pts1)
+    print(len(pts1))
 
     img = load_torch_img(path_o)[:3, ...].float()
     img = F.interpolate(img.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)

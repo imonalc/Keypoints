@@ -209,7 +209,7 @@ def main():
                             std.append(x1.shape[0])
                 except:
                     print("Unexpected error")
-
+            break ###
         #print(np.array(std).std())
 
 
