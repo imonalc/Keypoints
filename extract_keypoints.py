@@ -127,6 +127,10 @@ def main():
                         pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
                         os.chdir('../')
 
+                    #print("1:", pts1)
+                    #print("2:", pts2)
+                    #print(np.min(pts2, axis=0))
+                    #print(np.max(pts2, axis=0))
 
                     depth = np.load("results/depth/"+data+".npy")
 
@@ -139,10 +143,10 @@ def main():
                     Tx = np.load(path+"/T.npy")
 
                     for indice, option in enumerate(['100p']):
-
                         if pts1.shape[0] > 0 or pts2.shape[0] >0:
 
                             s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, option, opt, args.match)
+                            print(x1, x2)
 
                             z_d = depth[(x1[:,1]*512/sphered).astype('int')%512,(x1[:,0]*512/sphered).astype('int')%1024]
                             z_d2 = depth[(s_pts1[:,1]*512/sphered).astype('int')%512,(s_pts1[:,0]*512/sphered).astype('int')%1024]
@@ -192,6 +196,7 @@ def main():
 
                                 #R_error, T_error = get_error(x1, x2, Rx, Tx)
                                 R_error, T_error = r_error(Rx,R_), t_error(Tx,T_)
+                                print(R_error, T_error)
 
                             R_ERROR[indicador].append(R_error)
                             T_ERROR[indicador].append(T_error)

@@ -59,7 +59,7 @@ def computes_alike_keypoints(img, model_nm="alike-n", device="cuda", top_k=-1, s
         scores_th=scores_th,
         n_limit=n_limit)
     img_rgb = cv2.cvtColor(img_permuted.numpy(), cv2.COLOR_BGR2RGB)
-    pred = model(img_rgb)
+    pred = model(img_rgb, sub_pixel=True)
     kpts = pred["keypoints"]
     desc = pred["descriptors"]
     scores = pred["scores"]
@@ -68,13 +68,13 @@ def computes_alike_keypoints(img, model_nm="alike-n", device="cuda", top_k=-1, s
 
     kpt_details = np.zeros((kpts.shape[0],4))
 
-    kpt_details[:,0] = kpts[:,1]
-    kpt_details[:,1] = kpts[:,0]
+    kpt_details[:,0] = kpts[:,0]
+    kpt_details[:,1] = kpts[:,1]
     kpt_details[:,2] = scores.squeeze()
     kpt_details[:,3] = scores.squeeze()
 
     if len(kpts)>0:
-        return torch.from_numpy(kpts), torch.from_numpy(desc)
+        return torch.from_numpy(kpt_details), torch.from_numpy(desc)
     return None
 
 
@@ -236,6 +236,7 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
     erp_kp = erp_kp_details[0]
     erp_desc = erp_kp_details[1]
     #print(type(erp_kp), type(erp_desc))
+    #print(erp_kp.shape, erp_desc.shape)
     #print(erp_kp.shape, erp_desc.shape)
 
     # If top top and bottom of image is padding
