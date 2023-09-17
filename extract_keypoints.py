@@ -144,9 +144,11 @@ def main():
 
                     for indice, option in enumerate(['100p']):
                         if pts1.shape[0] > 0 or pts2.shape[0] >0:
-
+                            print(pts1.shape, desc1.shape)
+                            print(pts2.shape, desc2.shape)
+                            print(opt)
                             s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, option, opt, args.match)
-                            print(x1, x2)
+                            
 
                             z_d = depth[(x1[:,1]*512/sphered).astype('int')%512,(x1[:,0]*512/sphered).astype('int')%1024]
                             z_d2 = depth[(s_pts1[:,1]*512/sphered).astype('int')%512,(s_pts1[:,0]*512/sphered).astype('int')%1024]
@@ -209,7 +211,7 @@ def main():
                             std.append(x1.shape[0])
                 except:
                     print("Unexpected error")
-            break ###
+            #exit(0) ###
         #print(np.array(std).std())
 
 
@@ -317,7 +319,18 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 
     return pts1, pts2, desc1, desc2
 
+def mnn_mather(desc1, desc2):
+    sim = desc1 @ desc2.transpose()
+    sim[sim < 0.75] = 0
+    nn12 = np.argmax(sim, axis=1)
+    nn21 = np.argmax(sim, axis=0)
+    ids1 = np.arange(0, sim.shape[0])
+    mask = (ids1 == nn21[nn12])
+    matches = np.stack([ids1[mask], nn12[mask]])
+    return matches.transpose()
+
 def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio'):
+
 
     if opt[-1] == 'p':
         porce = int(opt[:-1])
@@ -334,7 +347,14 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio'):
         s_desc1 = s_desc1.astype(np.uint8)
         s_desc2 = s_desc2.astype(np.uint8)
 
-    if match == '2-cross':
+    if args_opt == "alike":
+        print("aaaa")
+        matches_idx = mnn_mather(s_desc1, s_desc2)
+        matches = []
+        for idx in matches_idx:
+            matches.append((idx[0], idx[1]))
+        print("aaa", matches_idx)
+    elif match == '2-cross':
         if 'orb' in args_opt:
             bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         else:
@@ -352,14 +372,19 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio'):
                 good.append(m)
         matches = good
 
-    M = np.zeros((2,len(matches)))
-    for ind, match in zip(np.arange(len(matches)),matches):
-        M[0,ind] = match.queryIdx
-        M[1,ind] = match.trainIdx
+
+    if args_opt == "alike":
+        M = np.array(matches).T
+    else:
+        M = np.zeros((2,len(matches)))
+        for ind, match in zip(np.arange(len(matches)),matches):
+            M[0,ind] = match.queryIdx
+            M[1,ind] = match.trainIdx
 
     num_M = M.shape[1]
 
     return s_pts1, s_pts2, s_pts1[M[0,:].astype(int),:3], s_pts2[M[1,:].astype(int),:3]
+
 
 def get_error(x1, x2, Rx, Tx):
 

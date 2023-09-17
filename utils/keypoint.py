@@ -316,6 +316,8 @@ def process_image_to_keypoints(image_path, corners, scale_factor, base_order, sa
         tangent_image_kp, tangent_image_desc = keypoint_equirectangular(img, opt)
 
 
+    #print(tangent_image_desc.shape)
+    #print(np.transpose(tangent_image_desc,[1,0]).shape)
     return tangent_image_kp, np.transpose(tangent_image_desc,[1,0])
 
 
