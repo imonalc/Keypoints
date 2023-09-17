@@ -144,9 +144,9 @@ def main():
 
                     for indice, option in enumerate(['100p']):
                         if pts1.shape[0] > 0 or pts2.shape[0] >0:
-                            print(pts1.shape, desc1.shape)
-                            print(pts2.shape, desc2.shape)
-                            print(opt)
+                            #print(pts1.shape, desc1.shape)
+                            #print(pts2.shape, desc2.shape)
+                            #print(opt)
                             s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, option, opt, args.match)
                             
 
@@ -198,7 +198,7 @@ def main():
 
                                 #R_error, T_error = get_error(x1, x2, Rx, Tx)
                                 R_error, T_error = r_error(Rx,R_), t_error(Tx,T_)
-                                print(R_error, T_error)
+                                #print(R_error, T_error)
 
                             R_ERROR[indicador].append(R_error)
                             T_ERROR[indicador].append(T_error)
@@ -321,7 +321,7 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 
 def mnn_mather(desc1, desc2):
     sim = desc1 @ desc2.transpose()
-    sim[sim < 0.75] = 0
+    sim[sim < 0.3] = 0 ####
     nn12 = np.argmax(sim, axis=1)
     nn21 = np.argmax(sim, axis=0)
     ids1 = np.arange(0, sim.shape[0])
@@ -348,12 +348,12 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio'):
         s_desc2 = s_desc2.astype(np.uint8)
 
     if args_opt == "alike":
-        print("aaaa")
+        #print("aaaa")
         matches_idx = mnn_mather(s_desc1, s_desc2)
         matches = []
         for idx in matches_idx:
             matches.append((idx[0], idx[1]))
-        print("aaa", matches_idx)
+        #print("aaa", matches_idx)
     elif match == '2-cross':
         if 'orb' in args_opt:
             bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
