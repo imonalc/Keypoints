@@ -426,6 +426,8 @@ def get_descriptor(descriptor):
         return 'alike', 'erp', 512
     elif descriptor == 'talike':
         return 'alike', 'tangent', 512
+    elif descriptor == 'calike':
+        return 'alike', 'cube', 512
 
 
 def AUC(ROT, TRA, MET, L):

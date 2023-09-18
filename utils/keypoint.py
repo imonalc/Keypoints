@@ -249,6 +249,77 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
 
     return erp_kp, erp_desc
 
+
+def keypoint_cube(image, opt="orb"):
+    """
+    Extracts only the visible Superpoint features from a collection tangent image. That is, only returns the keypoints visible to a spherical camera at the center of the icosahedron.
+
+    tex_image: 3 x N x H x W
+    corners: N x 4 x 3 coordinates of tangent image corners in 3D
+    image_shape: (H, W) of equirectangular image that we render back to
+    crop_degree: [optional] scalar value in degrees dictating how much of input equirectangular image is 0-padding
+
+    returns [visible_kp, visible_desc] (M x 4, M x length_descriptors)
+    """
+    # ----------------------------------------------
+    # Compute descriptors for each patch
+    # ----------------------------------------------
+    kp_list = []  # Stores keypoint coords
+    desc_list = []  # Stores keypoint descriptors
+    quad_idx_list = []  # Stores quad index for each keypoint
+    for i in range(tex_image.shape[1]):
+        #print(i)
+        img = tex_image[:, i, ...]
+
+        if opt == 'superpoint':
+            img = process_img(img)
+            kp_details = computes_superpoint_keypoints(img, opt)
+
+        if opt == 'sift':
+            kp_details = computes_sift_keypoints(img)
+
+        if opt == 'orb':
+            kp_details = computes_orb_keypoints(img)
+
+        if opt == 'surf':
+            kp_details = computes_surf_keypoints(img)
+        
+        if opt == 'alike':
+            kp_details = computes_alike_keypoints(img)
+
+        if kp_details is not None:
+            valid_mask = get_valid_coordinates(base_order,
+                                               sample_order,
+                                               i,
+                                               kp_details[0][:, :2],
+                                               return_mask=True)[1]
+            visible_kp = kp_details[0][valid_mask]
+            visible_desc = kp_details[1][valid_mask]
+
+            # Convert tangent image coordinates to equirectangular
+            visible_kp[:, :2] = convert_spherical_to_image(
+                torch.stack(
+                    convert_tangent_image_coordinates_to_spherical(
+                        base_order, sample_order, i, visible_kp[:, :2]), -1),
+                image_shape)
+
+            kp_list.append(visible_kp)
+            desc_list.append(visible_desc)
+
+    all_visible_kp = torch.cat(kp_list, 0).float()  # M x 4 (x, y, s, o)
+    all_visible_desc = torch.cat(desc_list, 0).float()  # M x 128
+
+    # If top top and bottom of image is padding
+    crop_h = compute_crop(image_shape, crop_degree)
+
+    # Ignore keypoints along the stitching boundary
+    mask = (all_visible_kp[:, 1] > crop_h) & (all_visible_kp[:, 1] <
+                                              image_shape[0] - crop_h)
+    all_visible_kp = all_visible_kp[mask]  # M x 4
+    all_visible_desc = all_visible_desc[mask]  # M x 128
+    return all_visible_kp, all_visible_desc
+
+
 def nn_match_two_way(desc1, desc2, nn_thresh = 0.7):
     """
     Performs two-way nearest neighbor matching of two sets of descriptors, such
@@ -310,14 +381,17 @@ def process_image_to_keypoints(image_path, corners, scale_factor, base_order, sa
     tex_image = create_tangent_images(img, base_order, sample_order).byte()
 
     if mode == 'tangent':
-        tangent_image_kp, tangent_image_desc = keypoint_tangent_images(tex_image, base_order, sample_order, img.shape[-2:], opt , 0)
+        image_kp, image_desc = keypoint_tangent_images(tex_image, base_order, sample_order, img.shape[-2:], opt , 0)
 
     if mode == 'erp':
-        tangent_image_kp, tangent_image_desc = keypoint_equirectangular(img, opt)
+        image_kp, image_desc = keypoint_equirectangular(img, opt)
+    
+    if mode == "cube":
+        image_kp, image_desc = keypoint_cube(img, opt)
 
 
     #print(tangent_image_desc.shape)
     #print(np.transpose(tangent_image_desc,[1,0]).shape)
-    return tangent_image_kp, np.transpose(tangent_image_desc,[1,0])
+    return image_kp, np.transpose(image_desc,[1,0])
 
 
