@@ -211,6 +211,8 @@ def get_descriptor(descriptor):
         return 'orb', 'erp', 512
     elif descriptor == 'torb':
         return 'orb', 'tangent', 512
+    elif descriptor == 'corb':
+        return 'orb', 'cube', 512
     elif descriptor == 'spoint':
         return 'superpoint', 'erp', 512
     elif descriptor == 'tspoint':

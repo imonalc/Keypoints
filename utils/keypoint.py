@@ -13,6 +13,9 @@ import argparse
 import utils.superpoint.magic_sp.superpoint as magic_sp
 import utils.superpoint.train_sp.superpoint as train_sp
 from utils.ALIKE.alike import ALike, configs
+from utils.eqr2cub import *
+from utils.cub2eqr import *
+from utils.cubcor2eqrcor import *
 
 def process_img(img):
     """ Process a image transposing it and convert to grayscale format, Then normalize
@@ -250,7 +253,7 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
     return erp_kp, erp_desc
 
 
-def keypoint_cube(image, opt="orb"):
+def keypoint_cube(img, opt="orb", crop_degree=0):
     """
     Extracts only the visible Superpoint features from a collection tangent image. That is, only returns the keypoints visible to a spherical camera at the center of the icosahedron.
 
@@ -266,11 +269,33 @@ def keypoint_cube(image, opt="orb"):
     # ----------------------------------------------
     kp_list = []  # Stores keypoint coords
     desc_list = []  # Stores keypoint descriptors
-    quad_idx_list = []  # Stores quad index for each keypoint
-    for i in range(tex_image.shape[1]):
-        #print(i)
-        img = tex_image[:, i, ...]
 
+    pad_w = 50
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #print(img.cpu().numpy(), img.shape)
+    [back_img, bottom_img, front_img, left_img, right_img, top_img], cube_w = create_cube_imgs(img.permute(2, 1, 0).cpu().numpy())
+    #print(back_img.shape, cube_w, type(back_img))
+    cube_map_img = create_cube_map(back_img, bottom_img, front_img, left_img, right_img, top_img, cube_w)
+    cube_pad_img = padding_cube(cube_map_img, pad_w, device)
+    face_size = img.shape[1] // 4
+
+    top_face = cube_pad_img.clone()[:face_size+pad_w*2, face_size:2*face_size+pad_w*2,:]
+    left_face = cube_pad_img.clone()[face_size:2*face_size+pad_w*2, 0:face_size+pad_w*2, :]
+    front_face = cube_pad_img.clone()[face_size:2*face_size+pad_w*2,face_size:2*face_size+pad_w*2,  :]
+    right_face = cube_pad_img.clone()[face_size:2*face_size+pad_w*2,2*face_size:3*face_size+pad_w*2,  :]
+    bottom_face = cube_pad_img.clone()[2*face_size:3*face_size+pad_w*2, face_size:2*face_size+pad_w*2, :]
+    back_face = cube_pad_img.clone()[face_size:2*face_size+pad_w*2, 3*face_size:4*face_size+pad_w*2, :]
+
+    # 各面をクロップ
+    face_dict = {"top": top_face,
+                 "left": left_face,
+                 "front": front_face,
+                 "right": right_face,
+                 "bottom": bottom_face, 
+                 "back": back_face
+    }
+    for idx, (face, img) in enumerate(face_dict.items()):
+        img = img.permute(2, 1, 0)
         if opt == 'superpoint':
             img = process_img(img)
             kp_details = computes_superpoint_keypoints(img, opt)
@@ -279,45 +304,38 @@ def keypoint_cube(image, opt="orb"):
             kp_details = computes_sift_keypoints(img)
 
         if opt == 'orb':
+            print(img.shape, type(img))
             kp_details = computes_orb_keypoints(img)
 
         if opt == 'surf':
             kp_details = computes_surf_keypoints(img)
-        
+
         if opt == 'alike':
             kp_details = computes_alike_keypoints(img)
 
+
         if kp_details is not None:
-            valid_mask = get_valid_coordinates(base_order,
-                                               sample_order,
-                                               i,
-                                               kp_details[0][:, :2],
-                                               return_mask=True)[1]
-            visible_kp = kp_details[0][valid_mask]
-            visible_desc = kp_details[1][valid_mask]
+            kp = kp_details[0]
+            desc = kp_details[1]
+            for i in range(len(kp)):
+                kp_list.append(cube_to_equirectangular_coord(face, (kp[i][0], kp[i][1]), face_size))
+                desc_list.append(desc[i])
+    print(kp_list)
+    print()
+    #print(desc_list)
 
-            # Convert tangent image coordinates to equirectangular
-            visible_kp[:, :2] = convert_spherical_to_image(
-                torch.stack(
-                    convert_tangent_image_coordinates_to_spherical(
-                        base_order, sample_order, i, visible_kp[:, :2]), -1),
-                image_shape)
 
-            kp_list.append(visible_kp)
-            desc_list.append(visible_desc)
 
-    all_visible_kp = torch.cat(kp_list, 0).float()  # M x 4 (x, y, s, o)
-    all_visible_desc = torch.cat(desc_list, 0).float()  # M x 128
 
     # If top top and bottom of image is padding
-    crop_h = compute_crop(image_shape, crop_degree)
+    crop_h = compute_crop(img.shape[-2:], crop_degree)
 
     # Ignore keypoints along the stitching boundary
-    mask = (all_visible_kp[:, 1] > crop_h) & (all_visible_kp[:, 1] <
-                                              image_shape[0] - crop_h)
-    all_visible_kp = all_visible_kp[mask]  # M x 4
-    all_visible_desc = all_visible_desc[mask]  # M x 128
-    return all_visible_kp, all_visible_desc
+    mask = (kp_list[:, 1] > crop_h) & (kp_list[:, 1] < img.shape[1] - crop_h)
+    kp_list = kp_list[mask]
+    desc_list = desc_list[mask]
+
+    return kp_list, desc_list
 
 
 def nn_match_two_way(desc1, desc2, nn_thresh = 0.7):

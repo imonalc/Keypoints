@@ -2,24 +2,19 @@ from tqdm import tqdm
 import torch
 import cv2
 import numpy as np
-import math
 import matplotlib.pyplot as plt
 OUTPUT_DIR = "./output/"
 
 
 def create_3dmap_from_size_torch(img_w, img_h, device):
-    # np.linspaceをtorch.linspaceに置き換え
     h = torch.linspace(-np.pi/2, np.pi/2, img_h, device=device)
     w = torch.linspace(-np.pi, np.pi, img_w, device=device)
     
-    # オフセットの追加
     h += (np.pi/2) / img_h
     w += np.pi / img_w
     
-    # np.meshgridをtorch.meshgridに置き換え
     theta, phi = torch.meshgrid(w, h, indexing="ij")
     
-    # 3D座標の計算
     x = torch.cos(phi) * torch.cos(theta)
     y = torch.cos(phi) * torch.sin(theta)
     z = torch.sin(phi)
@@ -28,17 +23,14 @@ def create_3dmap_from_size_torch(img_w, img_h, device):
     return x, y, z
 
 
-def padding_cube(img, device):
-    # Convert input numpy array to PyTorch tensor
+def padding_cube(img, pad_w, device):
     img_tensor = torch.tensor(img).to(device)#.permute(0, 1, pad_w)
     
     h, w, c = img_tensor.shape
     cw = w // 4
     #print(h, w, c)
 
-    pad_w = 2
     
-    # Initialize canvas tensor
     canvas = torch.zeros((h+pad_w*2, w+pad_w*2, c), dtype=img_tensor.dtype, device=device)
     canvas[pad_w:-pad_w, pad_w:-pad_w,:] = img_tensor
     
@@ -47,11 +39,10 @@ def padding_cube(img, device):
     # bottom
     canvas[-pad_w:, cw+pad_w:2*cw+pad_w,:] = torch.rot90(img_tensor[2*cw-pad_w:2*cw, 3*cw:,:], 2, [0,1])
     # left
-    canvas[cw+pad_w:2*cw+pad_w, 0:2,:] = img_tensor[cw:2*cw, -2:,:]
+    canvas[cw+pad_w:2*cw+pad_w, 0:pad_w,:] = img_tensor[cw:2*cw, -pad_w:,:]
     # right
-    canvas[cw+pad_w:2*cw+pad_w, -2:,:] = img_tensor[cw:2*cw, 0:2,:]
+    canvas[cw+pad_w:2*cw+pad_w, -pad_w:,:] = img_tensor[cw:2*cw, 0:pad_w,:]
 
-    # Rotate and copy
     canvas[cw:cw+pad_w, :cw+pad_w,:] = torch.rot90(canvas[:cw+pad_w, cw+pad_w:cw+pad_w*2,:], 1, [0,1])
     canvas[:cw+pad_w, cw:cw+pad_w,:] = torch.rot90(canvas[cw+pad_w:cw+pad_w*2, :cw+pad_w,:], 3, [0,1])
     canvas[2*cw+pad_w:2*cw+pad_w*2, :cw+pad_w,:] = torch.rot90(canvas[2*cw+pad_w:, cw+pad_w:cw+pad_w*2,:], 3, [0,1])
@@ -60,17 +51,14 @@ def padding_cube(img, device):
     canvas[:cw+pad_w, 2*cw+pad_w:2*cw+pad_w*2,:] = torch.rot90(canvas[cw+pad_w:cw+pad_w*2, 2*cw+pad_w:3*cw+pad_w*2,:], 1, [0,1])
     canvas[2*cw+pad_w:2*cw+pad_w*2, 2*cw+pad_w:3*cw+pad_w,:] = torch.rot90(canvas[2*cw+pad_w:-pad_w, 2*cw:2*cw+pad_w,:], 1, [0,1])
     canvas[2*cw+pad_w:, 2*cw+pad_w:2*cw+pad_w*2,:] = torch.rot90(canvas[2*cw:2*cw+pad_w, 2*cw+pad_w:3*cw+pad_w*2,:], 3, [0,1])
+
+    canvas[cw:cw+pad_w, 3*cw+pad_w:4*cw+pad_w*2,:] = torch.rot90(canvas[0:pad_w, cw+pad_w:2*cw+pad_w*2,:], 2, [0,1])
+    canvas[2*cw+pad_w:2*cw+pad_w*2, 3*cw+pad_w:4*cw+pad_w*2,:] = torch.rot90(canvas[-pad_w:, cw+pad_w:2*cw+pad_w*2,:], 2, [0,1])
     
-    # Flip and copy
-    #canvas[cw:cw+2, 3*cw+2:,:] = torch.flip(canvas[3:1:-1, 2*cw+1:cw-1:-1,:], [0,1])
-    #canvas[2*cw+2:2*cw+4, 3*cw+2:,:] = torch.flip(canvas[-3:-5:-1, 2*cw+1:cw-1:-1,:], [0,1])
-    
-    # Convert the tensor back to a numpy array
-    return canvas#.cpu().numpy()
+    return canvas
 
 
-def cube_to_equirectangular_torch(img, width, device):
-    # imgをテンソルに変換
+def cube_to_equirectangular_torch(img, width, pad_width, device):
     img_tensor = torch.tensor(img, device=device).float()
 
     img_w = width
@@ -124,12 +112,11 @@ def cube_to_equirectangular_torch(img, width, device):
     tmpx = torch.where(mask, xx*width + width, tmpx)
     tmpy = torch.where(mask, yy*width + width*2, tmpy)
 
-    cube = padding_cube(img, device)
+    cube = padding_cube(img, pad_width, device)
     # Offset
-    tmpx += (2.0 - 0.5)
-    tmpy += (2.0 - 0.5)
+    tmpx += (pad_width - 0.5)
+    tmpy += (pad_width - 0.5)
     
-    # Convert back to numpy for remap
     cube_np = cube.cpu().numpy()
     tmpx_np = tmpx.cpu().numpy().astype(np.float32)
     tmpy_np = tmpy.cpu().numpy().astype(np.float32)
@@ -142,7 +129,8 @@ def cube_to_equirectangular_torch(img, width, device):
 
 
 if __name__ == "__main__":
-    cube_img = cv2.imread("output/cube_map.png")
+    cube_img = cv2.imread("cube_map.png")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(cube_img.shape)
-    immm = cube_to_equirectangular_torch(cube_img, 1920*2, device)
+    immm = cube_to_equirectangular_torch(cube_img, 1920*2, 50, device)
+    cv2.imwrite("cub2eqr.jpg", immm)
