@@ -17,6 +17,7 @@ def create_equirectangler_to_bottom_and_top_map(input_w, input_h, output_sqr, z)
                           torch.linspace(-output_sqr/2.0, output_sqr/2.0-1, output_sqr),indexing='ij')
     x, y = x.to(device), y.to(device)
     z = torch.tensor(z).to(device)
+    #print(x.shape, z)
     
     rho = torch.sqrt(x**2 + y**2 + z**2)
     norm_theta = get_theta_torch(x, y) / (2 * math.pi)

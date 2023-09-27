@@ -58,7 +58,7 @@ def main():
     save_ply = False  # Whether to save the PLY visualizations too
     dim = np.array([2*sphered, sphered])
 
-    path_o = args.path + '/O.png'
+    path_o = args.path + '/R.png'
     print(path_o)
     if opt != 'sphorb':
 
@@ -221,6 +221,8 @@ def get_descriptor(descriptor):
         return 'alike', 'erp', 512
     elif descriptor == 'talike':
         return 'alike', 'tangent', 512
+    elif descriptor == 'calike':
+        return 'alike', 'cube', 512
 
 
 def AUC(ROT, TRA, MET, L):

@@ -249,6 +249,7 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
     mask = (erp_kp[:, 1] > crop_h) & (erp_kp[:, 1] < img.shape[1] - crop_h)
     erp_kp = erp_kp[mask]
     erp_desc = erp_desc[mask]
+    print(erp_kp)
 
     return erp_kp, erp_desc
 
@@ -270,32 +271,53 @@ def keypoint_cube(img, opt="orb", crop_degree=0):
     kp_list = []  # Stores keypoint coords
     desc_list = []  # Stores keypoint descriptors
 
-    pad_w = 50
+    pad_w = 2
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #print(img.cpu().numpy(), img.shape)
-    [back_img, bottom_img, front_img, left_img, right_img, top_img], cube_w = create_cube_imgs(img.permute(2, 1, 0).cpu().numpy())
-    #print(back_img.shape, cube_w, type(back_img))
-    cube_map_img = create_cube_map(back_img, bottom_img, front_img, left_img, right_img, top_img, cube_w)
-    cube_pad_img = padding_cube(cube_map_img, pad_w, device)
-    face_size = img.shape[1] // 4
+    [back_img, bottom_img, front_img, left_img, right_img, top_img], cube_w = create_cube_imgs(img.permute(1, 2, 0).cpu().numpy())
 
-    top_face = cube_pad_img.clone()[:face_size+pad_w*2, face_size:2*face_size+pad_w*2,:]
-    left_face = cube_pad_img.clone()[face_size:2*face_size+pad_w*2, 0:face_size+pad_w*2, :]
-    front_face = cube_pad_img.clone()[face_size:2*face_size+pad_w*2,face_size:2*face_size+pad_w*2,  :]
-    right_face = cube_pad_img.clone()[face_size:2*face_size+pad_w*2,2*face_size:3*face_size+pad_w*2,  :]
-    bottom_face = cube_pad_img.clone()[2*face_size:3*face_size+pad_w*2, face_size:2*face_size+pad_w*2, :]
-    back_face = cube_pad_img.clone()[face_size:2*face_size+pad_w*2, 3*face_size:4*face_size+pad_w*2, :]
+    #print("cube_width:", cube_w)
+    #print(back_img.shape, cube_w, type(back_img))
+    #cube_map_img = create_cube_map(back_img, bottom_img, front_img, left_img, right_img, top_img, cube_w)
+    #cube_pad_img = padding_cube(cube_map_img, pad_w, device)
+    #face_size = img.shape[1] // 4
+#
+    #top_face = cube_pad_img.clone()[:face_size+pad_w*2, face_size:2*face_size+pad_w*2,:]
+    #left_face = cube_pad_img.clone()[face_size:2*face_size+pad_w*2, 0:face_size+pad_w*2, :]
+    #front_face = cube_pad_img.clone()[face_size:2*face_size+pad_w*2,face_size:2*face_size+pad_w*2,  :]
+    #right_face = cube_pad_img.clone()[face_size:2*face_size+pad_w*2,2*face_size:3*face_size+pad_w*2,  :]
+    #bottom_face = cube_pad_img.clone()[2*face_size:3*face_size+pad_w*2, face_size:2*face_size+pad_w*2, :]
+    #back_face = cube_pad_img.clone()[face_size:2*face_size+pad_w*2, 3*face_size:4*face_size+pad_w*2, :]
 
     # 各面をクロップ
-    face_dict = {"top": top_face,
-                 "left": left_face,
-                 "front": front_face,
-                 "right": right_face,
-                 "bottom": bottom_face, 
-                 "back": back_face
+    #face_dict = {"top": top_face,
+    #             "left": left_face,
+    #             "front": front_face,
+    #             "right": right_face,
+    #             "bottom": bottom_face, 
+    #             "back": back_face
+    #}
+    face_dict = {"top": top_img,
+                 "left": left_img,
+                 "front": front_img,
+                 "right": right_img,
+                 "bottom": bottom_img, 
+                 "back": back_img
     }
+    print(type(top_img), top_img.shape)
+    cv2.imwrite("top.png", top_img)
+    cv2.imwrite("front.png", front_img)
+    cv2.imwrite("back.png", back_img)
+    cv2.imwrite("left.png", left_img)
+    cv2.imwrite("right.png", right_img)
+    cv2.imwrite("bottom.png", bottom_img)
+    cube_map_img = create_cube_map(back_img, bottom_img, front_img, left_img, right_img, top_img, cube_w)
+    cv2.imwrite("cubemap.png", cube_map_img)
+
+
     for idx, (face, img) in enumerate(face_dict.items()):
-        img = img.permute(2, 1, 0)
+        #img = img.copy()#.permute(2, 1, 0)
+        img = torch.from_numpy(img.astype(np.float32)).clone().permute(2, 1, 0)
+        #print(img.shape)
         if opt == 'superpoint':
             img = process_img(img)
             kp_details = computes_superpoint_keypoints(img, opt)
@@ -304,7 +326,6 @@ def keypoint_cube(img, opt="orb", crop_degree=0):
             kp_details = computes_sift_keypoints(img)
 
         if opt == 'orb':
-            print(img.shape, type(img))
             kp_details = computes_orb_keypoints(img)
 
         if opt == 'surf':
@@ -317,23 +338,33 @@ def keypoint_cube(img, opt="orb", crop_degree=0):
         if kp_details is not None:
             kp = kp_details[0]
             desc = kp_details[1]
-            for i in range(len(kp)):
-                kp_list.append(cube_to_equirectangular_coord(face, (kp[i][0], kp[i][1]), face_size))
-                desc_list.append(desc[i])
-    print(kp_list)
-    print()
+            new_coords = []
+            for row in kp:
+                x, y = row[:2].tolist()
+                new_x, new_y = cube_to_equirectangular_coord(face, (x, y), 128)
+                new_coords.append([new_x, new_y])
+            new_coords_tensor = torch.tensor(new_coords)
+            kp_converted = torch.cat((new_coords_tensor, kp[:, 2:]), dim=1)
+            kp_list.append(kp_converted)
+            desc_list.append(desc)
+    kp_list = torch.cat(kp_list, dim=0)
+    desc_list = torch.cat(desc_list, dim=0)
+    print(torch.min(kp_list,dim=0).values)
+    print(torch.max(kp_list,dim=0).values)
+    #print(kp_list)
+    #print()
     #print(desc_list)
 
 
 
 
     # If top top and bottom of image is padding
-    crop_h = compute_crop(img.shape[-2:], crop_degree)
+    #crop_h = compute_crop(img.shape[-2:], crop_degree)
 
     # Ignore keypoints along the stitching boundary
-    mask = (kp_list[:, 1] > crop_h) & (kp_list[:, 1] < img.shape[1] - crop_h)
-    kp_list = kp_list[mask]
-    desc_list = desc_list[mask]
+    #mask = (kp_list[:, 1] > crop_h) & (kp_list[:, 1] < img.shape[1] - crop_h)
+    #kp_list = kp_list[mask]
+    #desc_list = desc_list[mask]
 
     return kp_list, desc_list
 
