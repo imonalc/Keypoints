@@ -192,6 +192,11 @@ def keypoint_tangent_images(tex_image, base_order, sample_order, image_shape, op
 
             kp_list.append(visible_kp)
             desc_list.append(visible_desc)
+        
+        if i == 1:
+            print(kp_list)
+            print(kp_details[0][:, :2])
+            print(valid_mask)
 
     all_visible_kp = torch.cat(kp_list, 0).float()  # M x 4 (x, y, s, o)
     all_visible_desc = torch.cat(desc_list, 0).float()  # M x 128
