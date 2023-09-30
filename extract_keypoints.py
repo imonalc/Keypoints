@@ -127,10 +127,6 @@ def main():
                         pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
                         os.chdir('../')
 
-                    #print("1:", pts1)
-                    #print("2:", pts2)
-                    #print(np.min(pts2, axis=0))
-                    #print(np.max(pts2, axis=0))
 
                     depth = np.load("results/depth/"+data+".npy")
 
@@ -414,14 +410,20 @@ def get_descriptor(descriptor):
         return 'sift', 'erp', 512
     elif descriptor == 'tsift':
         return 'sift', 'tangent', 512
+    elif descriptor == 'csift':
+        return 'sift', 'cube', 512
     elif descriptor == 'orb':
         return 'orb', 'erp', 512
     elif descriptor == 'torb':
         return 'orb', 'tangent', 512
+    elif descriptor == 'corb':
+        return 'orb', 'cube', 512
     elif descriptor == 'spoint':
         return 'superpoint', 'erp', 512
     elif descriptor == 'tspoint':
         return 'superpoint', 'tangent', 512
+    elif descriptor == 'cspoint':
+        return 'superpoint', 'cube', 512
     elif descriptor == 'alike':
         return 'alike', 'erp', 512
     elif descriptor == 'talike':

@@ -101,9 +101,6 @@ def main():
     ax.imshow(img)
     ax.get_xaxis().set_ticks([])
     ax.get_yaxis().set_ticks([])
-    #ax.plot(erp_kp[:, 0], erp_kp[:, 1], 'r.', markersize=3.0)
-    #tangent_image_kp[(tangent_image_kp[:, [0]] >= img.shape[-2] - 1
-    #              ).expand_as(tangent_image_kp)] = float('nan')
     ax.plot(pts1[:, 0], pts1[:, 1], 'b.', markersize=3.0)
     plt.axis('off')
 
@@ -207,6 +204,8 @@ def get_descriptor(descriptor):
         return 'sift', 'erp', 512
     elif descriptor == 'tsift':
         return 'sift', 'tangent', 512
+    elif descriptor == 'csift':
+        return 'sift', 'cube', 512
     elif descriptor == 'orb':
         return 'orb', 'erp', 512
     elif descriptor == 'torb':
@@ -217,6 +216,8 @@ def get_descriptor(descriptor):
         return 'superpoint', 'erp', 512
     elif descriptor == 'tspoint':
         return 'superpoint', 'tangent', 512
+    elif descriptor == 'cspoint':
+        return 'superpoint', 'cube', 512
     elif descriptor == 'alike':
         return 'alike', 'erp', 512
     elif descriptor == 'talike':
