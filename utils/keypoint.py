@@ -250,7 +250,6 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
     mask = (erp_kp[:, 1] > crop_h) & (erp_kp[:, 1] < img.shape[1] - crop_h)
     erp_kp = erp_kp[mask]
     erp_desc = erp_desc[mask]
-    #print(erp_kp)
 
     return erp_kp, erp_desc
 
@@ -271,32 +270,9 @@ def keypoint_cube(img, opt="orb", crop_degree=0):
     # ----------------------------------------------
     kp_list = []  # Stores keypoint coords
     desc_list = []  # Stores keypoint descriptors
-    #[back_img, bottom_img, front_img, left_img, right_img, top_img], cube_w = create_cube_imgs(img.permute(1, 2, 0).cpu().numpy())
     pad_bool = True
     [back_img, bottom_img, front_img, left_img, right_img, top_img], cube_w = create_cube_imgs_pad(img.permute(1, 2, 0).cpu().numpy())
     face_h, face_w, face_c = back_img.shape
-    #pad_w = 100
-    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #cube_map_img = create_cube_map(back_img, bottom_img, front_img, left_img, right_img, top_img, cube_w)
-    #cube_pad_img = padding_cube(torch.tensor(cube_map_img), pad_w, device)
-    #face_size = img.shape[1] // 4
-    #print(torch.tensor(cube_map_img).shape)
-    #left_img_2 = cut_padding_cube(cube_pad_img, pad_w)
-    #cv2.imwrite("left.png", left_img_2.cpu().numpy())
-#
-    #top_img = cube_pad_img.clone()[:face_size+pad_w*2, face_size:2*face_size+pad_w*2, :]
-    #left_img = cube_pad_img.clone()[face_size:2*face_size+pad_w*2, 0:face_size+pad_w*2, :]
-    #front_img = cube_pad_img.clone()[face_size:2*face_size+pad_w*2,face_size:2*face_size+pad_w*2,  :]
-    #right_img = cube_pad_img.clone()[face_size:2*face_size+pad_w*2,2*face_size:3*face_size+pad_w*2,  :]
-    #bottom_img = cube_pad_img.clone()[2*face_size:3*face_size+pad_w*2, face_size:2*face_size+pad_w*2, :]
-    #back_img = cube_pad_img.clone()[face_size:2*face_size+pad_w*2, 3*face_size:4*face_size+pad_w*2, :]
-
-    #print(bottom_img.shape, bottom_img2.shape)
-    #cv2.imwrite("bottom.png", bottom_img)
-    #cv2.imwrite("top2.png", top_img)
-    #cv2.imwrite("cubemap.png", cube_map_img)
-    #cv2.imwrite("cubepad.png", cube_pad_img.cpu().numpy())
-
     face_dict = {"top": top_img,
                  "left": left_img,
                  "front": front_img,
@@ -304,7 +280,12 @@ def keypoint_cube(img, opt="orb", crop_degree=0):
                  "bottom": bottom_img, 
                  "back": back_img
     }
-
+    #cv2.imwrite("top.png", top_img)
+    #cv2.imwrite("back.png", back_img)
+    #cv2.imwrite("bottom.png", bottom_img)
+    #cv2.imwrite("front.png", front_img)
+    #cv2.imwrite("left.png", left_img)
+    #cv2.imwrite("right.png", right_img)
 
     for idx, (face, img) in enumerate(face_dict.items()):
         img = torch.from_numpy(img.astype(np.float32)).clone().permute(2, 1, 0)
@@ -323,14 +304,14 @@ def keypoint_cube(img, opt="orb", crop_degree=0):
 
         if opt == 'alike':
             kp_details = computes_alike_keypoints(img)
-
-        #print(face_h, face_w)
+   
         if kp_details is not None:
             kp = kp_details[0]
             desc = kp_details[1]
             new_coords = []
             new_kps = []
-            for row in kp:
+            new_desc = []
+            for jdx, row in enumerate(kp):
                 x, y = row[:2].tolist()
                 if pad_bool:
                     if x < face_w // 4 or face_w * 3 // 4 <= x:
@@ -342,11 +323,19 @@ def keypoint_cube(img, opt="orb", crop_degree=0):
                 new_x, new_y = cube_to_equirectangular_coord(face, (x, y), 128)
                 new_coords.append([new_x, new_y])
                 new_kps.append(row[2:])
+                new_desc.append(desc[jdx])
+            if len(new_coords) < 1:
+                continue
             new_coords_tensor = torch.tensor(new_coords)
             new_kps_tensor = torch.stack(new_kps)
+            new_desc_tensor = torch.stack(new_desc)
+            
             kp_converted = torch.cat((new_coords_tensor, new_kps_tensor), dim=1)
+            
             kp_list.append(kp_converted)
-            desc_list.append(desc)
+            desc_list.append(new_desc_tensor)
+            
+    
     kp_list = torch.cat(kp_list, dim=0)
     desc_list = torch.cat(desc_list, dim=0)
 
@@ -422,7 +411,6 @@ def process_image_to_keypoints(image_path, corners, scale_factor, base_order, sa
     if mode == "cube":
         image_kp, image_desc = keypoint_cube(img, opt)
 
-    print('aaa')
     #print(tangent_image_desc.shape)
     #print(np.transpose(tangent_image_desc,[1,0]).shape)
     return image_kp, np.transpose(image_desc,[1,0])

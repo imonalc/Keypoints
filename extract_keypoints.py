@@ -109,10 +109,9 @@ def main():
                         # ----------------------------------------------
                         # 80 baricenter points
                         corners = tangent_image_corners(base_order, sample_order)
-                        
 
                         pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
-                        print('aaa')
+
                         pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
 
                         pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
@@ -346,12 +345,10 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio'):
         s_desc2 = s_desc2.astype(np.uint8)
 
     if args_opt == "alike":
-        #print("aaaa")
         matches_idx = mnn_mather(s_desc1, s_desc2)
         matches = []
         for idx in matches_idx:
             matches.append((idx[0], idx[1]))
-        #print("aaa", matches_idx)
     elif match == '2-cross':
         if 'orb' in args_opt:
             bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
