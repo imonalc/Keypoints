@@ -54,7 +54,7 @@ def computes_superpoint_keypoints(img, opt, nms_dist=4, conf_thresh = 0.015, nn_
     return None
 
 
-def computes_alike_keypoints(img, model_nm="alike-n", device="cuda", top_k=-1, scores_th=0.2, n_limit=5000):
+def computes_alike_keypoints(img, model_nm="alike-n", device="cuda", top_k=-1, scores_th=0.2, n_limit=10000):
     model = ALike(**configs[model_nm],
         device=device,
         top_k=top_k,
@@ -76,6 +76,7 @@ def computes_alike_keypoints(img, model_nm="alike-n", device="cuda", top_k=-1, s
     kpt_details[:,3] = scores.squeeze()
 
     if len(kpts)>0:
+        #desc = np.transpose(desc, [1,0])
         return torch.from_numpy(kpt_details), torch.from_numpy(desc)
     return None
 
@@ -193,10 +194,6 @@ def keypoint_tangent_images(tex_image, base_order, sample_order, image_shape, op
             kp_list.append(visible_kp)
             desc_list.append(visible_desc)
         
-        if i == 1:
-            print(kp_list)
-            print(kp_details[0][:, :2])
-            print(valid_mask)
 
     all_visible_kp = torch.cat(kp_list, 0).float()  # M x 4 (x, y, s, o)
     all_visible_desc = torch.cat(desc_list, 0).float()  # M x 128
@@ -274,25 +271,31 @@ def keypoint_cube(img, opt="orb", crop_degree=0):
     # ----------------------------------------------
     kp_list = []  # Stores keypoint coords
     desc_list = []  # Stores keypoint descriptors
-
-    [back_img, bottom_img, front_img, left_img, right_img, top_img], cube_w = create_cube_imgs(img.permute(1, 2, 0).cpu().numpy())
-
-    #pad_w = 2
+    #[back_img, bottom_img, front_img, left_img, right_img, top_img], cube_w = create_cube_imgs(img.permute(1, 2, 0).cpu().numpy())
+    pad_bool = True
+    [back_img, bottom_img, front_img, left_img, right_img, top_img], cube_w = create_cube_imgs_pad(img.permute(1, 2, 0).cpu().numpy())
+    face_h, face_w, face_c = back_img.shape
+    #pad_w = 100
     #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     #cube_map_img = create_cube_map(back_img, bottom_img, front_img, left_img, right_img, top_img, cube_w)
-    #cube_pad_img = padding_cube(cube_map_img, pad_w, device)
+    #cube_pad_img = padding_cube(torch.tensor(cube_map_img), pad_w, device)
     #face_size = img.shape[1] // 4
+    #print(torch.tensor(cube_map_img).shape)
+    #left_img_2 = cut_padding_cube(cube_pad_img, pad_w)
+    #cv2.imwrite("left.png", left_img_2.cpu().numpy())
 #
-    #top_img = cube_pad_img.clone()[:face_size+pad_w*2, face_size:2*face_size+pad_w*2,:]
+    #top_img = cube_pad_img.clone()[:face_size+pad_w*2, face_size:2*face_size+pad_w*2, :]
     #left_img = cube_pad_img.clone()[face_size:2*face_size+pad_w*2, 0:face_size+pad_w*2, :]
     #front_img = cube_pad_img.clone()[face_size:2*face_size+pad_w*2,face_size:2*face_size+pad_w*2,  :]
     #right_img = cube_pad_img.clone()[face_size:2*face_size+pad_w*2,2*face_size:3*face_size+pad_w*2,  :]
     #bottom_img = cube_pad_img.clone()[2*face_size:3*face_size+pad_w*2, face_size:2*face_size+pad_w*2, :]
     #back_img = cube_pad_img.clone()[face_size:2*face_size+pad_w*2, 3*face_size:4*face_size+pad_w*2, :]
 
-    #cv2.imwrite("top.png", top_img)
-    #cube_map_img = create_cube_map(back_img, bottom_img, front_img, left_img, right_img, top_img, cube_w)
+    #print(bottom_img.shape, bottom_img2.shape)
+    #cv2.imwrite("bottom.png", bottom_img)
+    #cv2.imwrite("top2.png", top_img)
     #cv2.imwrite("cubemap.png", cube_map_img)
+    #cv2.imwrite("cubepad.png", cube_pad_img.cpu().numpy())
 
     face_dict = {"top": top_img,
                  "left": left_img,
@@ -321,34 +324,31 @@ def keypoint_cube(img, opt="orb", crop_degree=0):
         if opt == 'alike':
             kp_details = computes_alike_keypoints(img)
 
-
+        #print(face_h, face_w)
         if kp_details is not None:
             kp = kp_details[0]
             desc = kp_details[1]
             new_coords = []
+            new_kps = []
             for row in kp:
                 x, y = row[:2].tolist()
+                if pad_bool:
+                    if x < face_w // 4 or face_w * 3 // 4 <= x:
+                        continue
+                    if y < face_h // 4 or face_h * 3 // 4 <= y:
+                        continue
+                    x -= (face_w // 4)
+                    y -= (face_h // 4)
                 new_x, new_y = cube_to_equirectangular_coord(face, (x, y), 128)
                 new_coords.append([new_x, new_y])
+                new_kps.append(row[2:])
             new_coords_tensor = torch.tensor(new_coords)
-            kp_converted = torch.cat((new_coords_tensor, kp[:, 2:]), dim=1)
+            new_kps_tensor = torch.stack(new_kps)
+            kp_converted = torch.cat((new_coords_tensor, new_kps_tensor), dim=1)
             kp_list.append(kp_converted)
             desc_list.append(desc)
     kp_list = torch.cat(kp_list, dim=0)
     desc_list = torch.cat(desc_list, dim=0)
-    #print(torch.min(kp_list,dim=0).values)
-    #print(torch.max(kp_list,dim=0).values)
-    #print(kp_list)
-    #print()
-    #print(desc_list)
-
-    # If top top and bottom of image is padding
-    #crop_h = compute_crop(img.shape[-2:], crop_degree)
-
-    # Ignore keypoints along the stitching boundary
-    #mask = (kp_list[:, 1] > crop_h) & (kp_list[:, 1] < img.shape[1] - crop_h)
-    #kp_list = kp_list[mask]
-    #desc_list = desc_list[mask]
 
     return kp_list, desc_list
 
@@ -412,7 +412,7 @@ def process_image_to_keypoints(image_path, corners, scale_factor, base_order, sa
     # Resample the image to N tangent images (out: 3 x N x H x W)
     # N = 80, H, W depend of the sample_order( 2^(sample_order-1) = 512 )
     tex_image = create_tangent_images(img, base_order, sample_order).byte()
-
+    
     if mode == 'tangent':
         image_kp, image_desc = keypoint_tangent_images(tex_image, base_order, sample_order, img.shape[-2:], opt , 0)
 
@@ -422,7 +422,7 @@ def process_image_to_keypoints(image_path, corners, scale_factor, base_order, sa
     if mode == "cube":
         image_kp, image_desc = keypoint_cube(img, opt)
 
-
+    print('aaa')
     #print(tangent_image_desc.shape)
     #print(np.transpose(tangent_image_desc,[1,0]).shape)
     return image_kp, np.transpose(image_desc,[1,0])

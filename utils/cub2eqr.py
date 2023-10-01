@@ -34,28 +34,44 @@ def padding_cube(img, pad_w, device):
     canvas = torch.zeros((h+pad_w*2, w+pad_w*2, c), dtype=img_tensor.dtype, device=device)
     canvas[pad_w:-pad_w, pad_w:-pad_w,:] = img_tensor
     
-    # up    
     canvas[0:pad_w, cw+pad_w:2*cw+pad_w,:] = torch.rot90(img_tensor[cw:cw+pad_w, 3*cw:,:], 2, [0,1])
-    # bottom
     canvas[-pad_w:, cw+pad_w:2*cw+pad_w,:] = torch.rot90(img_tensor[2*cw-pad_w:2*cw, 3*cw:,:], 2, [0,1])
-    # left
     canvas[cw+pad_w:2*cw+pad_w, 0:pad_w,:] = img_tensor[cw:2*cw, -pad_w:,:]
-    # right
     canvas[cw+pad_w:2*cw+pad_w, -pad_w:,:] = img_tensor[cw:2*cw, 0:pad_w,:]
 
-    canvas[cw:cw+pad_w, :cw+pad_w,:] = torch.rot90(canvas[:cw+pad_w, cw+pad_w:cw+pad_w*2,:], 1, [0,1])
-    canvas[:cw+pad_w, cw:cw+pad_w,:] = torch.rot90(canvas[cw+pad_w:cw+pad_w*2, :cw+pad_w,:], 3, [0,1])
-    canvas[2*cw+pad_w:2*cw+pad_w*2, :cw+pad_w,:] = torch.rot90(canvas[2*cw+pad_w:, cw+pad_w:cw+pad_w*2,:], 3, [0,1])
-    canvas[2*cw+pad_w:, cw:cw+pad_w,:] = torch.rot90(canvas[2*cw:2*cw+pad_w, :cw+pad_w,:], 1, [0,1])
-    canvas[cw:cw+pad_w, 2*cw+pad_w:3*cw+pad_w*2,:] = torch.rot90(canvas[:cw+pad_w, 2*cw:2*cw+pad_w,:], 3, [0,1])
-    canvas[:cw+pad_w, 2*cw+pad_w:2*cw+pad_w*2,:] = torch.rot90(canvas[cw+pad_w:cw+pad_w*2, 2*cw+pad_w:3*cw+pad_w*2,:], 1, [0,1])
-    canvas[2*cw+pad_w:2*cw+pad_w*2, 2*cw+pad_w:3*cw+pad_w,:] = torch.rot90(canvas[2*cw+pad_w:-pad_w, 2*cw:2*cw+pad_w,:], 1, [0,1])
-    canvas[2*cw+pad_w:, 2*cw+pad_w:2*cw+pad_w*2,:] = torch.rot90(canvas[2*cw:2*cw+pad_w, 2*cw+pad_w:3*cw+pad_w*2,:], 3, [0,1])
+    #canvas[cw:cw+pad_w, :cw+pad_w,:] = torch.rot90(canvas[:cw+pad_w, cw+pad_w:cw+pad_w*2,:], 1, [0,1])
+    #canvas[:cw+pad_w, cw:cw+pad_w,:] = torch.rot90(canvas[cw+pad_w:cw+pad_w*2, :cw+pad_w,:], 3, [0,1])
 
-    canvas[cw:cw+pad_w, 3*cw+pad_w:4*cw+pad_w*2,:] = torch.rot90(canvas[0:pad_w, cw+pad_w:2*cw+pad_w*2,:], 2, [0,1])
-    canvas[2*cw+pad_w:2*cw+pad_w*2, 3*cw+pad_w:4*cw+pad_w*2,:] = torch.rot90(canvas[-pad_w:, cw+pad_w:2*cw+pad_w*2,:], 2, [0,1])
+    #canvas[2*cw+pad_w:2*cw+pad_w*2, :cw+pad_w,:] = torch.rot90(canvas[2*cw+pad_w:, cw+pad_w:cw+pad_w*2,:], 3, [0,1])
+    #canvas[2*cw+pad_w:, cw:cw+pad_w,:] = torch.rot90(canvas[2*cw:2*cw+pad_w, :cw+pad_w,:], 1, [0,1])
+
+    #canvas[cw:cw+pad_w, 2*cw+pad_w:3*cw+pad_w*2,:] = torch.rot90(canvas[:cw+pad_w, 2*cw:2*cw+pad_w,:], 3, [0,1])
+    #canvas[:cw+pad_w, 2*cw+pad_w:2*cw+pad_w*2,:] = torch.rot90(canvas[cw+pad_w:cw+pad_w*2, 2*cw+pad_w:3*cw+pad_w*2,:], 1, [0,1])
+    #canvas[2*cw+pad_w:2*cw+pad_w*2, 2*cw+pad_w:3*cw+pad_w,:] = torch.rot90(canvas[2*cw+pad_w:-pad_w, 2*cw:2*cw+pad_w,:], 1, [0,1])
+    #canvas[2*cw+pad_w:, 2*cw+pad_w:2*cw+pad_w*2,:] = torch.rot90(canvas[2*cw:2*cw+pad_w, 2*cw+pad_w:3*cw+pad_w*2,:], 3, [0,1])
+#
+    #canvas[cw:cw+pad_w, 3*cw+pad_w:4*cw+pad_w*2,:] = torch.rot90(canvas[0:pad_w, cw+pad_w:2*cw+pad_w*2,:], 2, [0,1])
+    #canvas[2*cw+pad_w:2*cw+pad_w*2, 3*cw+pad_w:4*cw+pad_w*2,:] = torch.rot90(canvas[-pad_w:, cw+pad_w:2*cw+pad_w*2,:], 2, [0,1])
     
     return canvas
+
+
+def cut_padding_cube(img_tensor, pad_w):
+    h, w, c = img_tensor.shape
+    cw = (w - 2*pad_w) // 4
+    left_img = torch.zeros(cw+pad_w*2, cw+pad_w*2, c)
+    left_img[pad_w:cw+pad_w, :, :] = img_tensor.clone()[cw+pad_w:2*cw+pad_w, :cw+pad_w*2, :]
+    left_img[:pad_w, :,:] = torch.rot90(img_tensor.clone()[:cw+pad_w*2, cw+pad_w:cw+pad_w*2,:], 1, [0,1])
+    left_img[cw+pad_w:cw+pad_w*2, :, :] = torch.rot90(img_tensor.clone()[2*cw:, cw+pad_w:cw+pad_w*2,:], 3, [0,1])
+
+    top_img = torch.zeros(cw+pad_w*2, cw+pad_w*2, c)
+    top_img[:,pad_w:cw+pad_w, :] = img_tensor.clone()[:cw+pad_w*2, cw+pad_w:cw*2+pad_w, :]
+    top_img[:,:pad_w,:] = torch.rot90(img_tensor.clone()[cw+pad_w:cw+pad_w*2, :cw+pad_w*2,:], 3, [0,1])
+    top_img[:, cw+pad_w:cw+pad_w*2, :] = torch.rot90(img_tensor.clone()[cw+pad_w:cw+pad_w*2, 2*cw+pad_w:3*cw+pad_w*3,:], 1, [0,1])
+
+
+
+    return top_img
 
 
 def cube_to_equirectangular_torch(img, width, pad_width, device):

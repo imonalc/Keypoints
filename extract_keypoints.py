@@ -91,7 +91,6 @@ def main():
 
 
                 try:
-
                     opt, mode, sphered = get_descriptor(descriptor)
 
                     base_order = 1  # Base sphere resolution
@@ -110,12 +109,14 @@ def main():
                         # ----------------------------------------------
                         # 80 baricenter points
                         corners = tangent_image_corners(base_order, sample_order)
+                        
 
                         pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
-
+                        print('aaa')
                         pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
 
                         pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
+                        
 
 
                     else:
@@ -144,6 +145,7 @@ def main():
                             #print(pts2.shape, desc2.shape)
                             #print(opt)
                             s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, option, opt, args.match)
+                            
                             
 
                             z_d = depth[(x1[:,1]*512/sphered).astype('int')%512,(x1[:,0]*512/sphered).astype('int')%1024]
