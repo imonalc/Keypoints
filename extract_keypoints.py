@@ -207,7 +207,7 @@ def main():
 
                             std.append(x1.shape[0])
                 except:
-                    print("Unexpected error")
+                    print("Unexpected error:",indicador, opt)
             #exit(0) ###
         #print(np.array(std).std())
 
@@ -316,9 +316,9 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 
     return pts1, pts2, desc1, desc2
 
-def mnn_mather(desc1, desc2):
+def mnn_mather(desc1, desc2, threshold):
     sim = desc1 @ desc2.transpose()
-    sim[sim < 0.3] = 0 ####
+    sim[sim < threshold] = 0 ####
     nn12 = np.argmax(sim, axis=1)
     nn21 = np.argmax(sim, axis=0)
     ids1 = np.arange(0, sim.shape[0])
@@ -326,8 +326,7 @@ def mnn_mather(desc1, desc2):
     matches = np.stack([ids1[mask], nn12[mask]])
     return matches.transpose()
 
-def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio'):
-
+def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_ransac=False):
 
     if opt[-1] == 'p':
         porce = int(opt[:-1])
@@ -344,18 +343,14 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio'):
         s_desc1 = s_desc1.astype(np.uint8)
         s_desc2 = s_desc2.astype(np.uint8)
 
-    if args_opt == "alike":
-        matches_idx = mnn_mather(s_desc1, s_desc2)
-        matches = []
-        for idx in matches_idx:
-            matches.append((idx[0], idx[1]))
-    elif match == '2-cross':
+    if match == '2-cross' or opt == "spoint" or opt == "ALIKE":
         if 'orb' in args_opt:
             bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         else:
             bf = cv2.BFMatcher(cv2.NORM_L2, True)
         matches = bf.match(s_desc1, s_desc2)
     elif match == 'ratio':
+        thresh = 0.9
         if 'orb' in args_opt:
             bf = cv2.BFMatcher(cv2.NORM_HAMMING, False)
         else:
@@ -363,22 +358,56 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio'):
         matches = bf.knnMatch(s_desc1,s_desc2, k=2)
         good = []
         for m,n in matches:
-            if m.distance < 0.75*n.distance:
+            if m.distance < thresh * n.distance:
                 good.append(m)
         matches = good
-
-
-    if args_opt == "alike":
-        M = np.array(matches).T
+    elif match == 'mnn':
+        thresh = 0.9
+        matches_idx = mnn_mather(s_desc1, s_desc2, thresh)
+        matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
     else:
-        M = np.zeros((2,len(matches)))
-        for ind, match in zip(np.arange(len(matches)),matches):
-            M[0,ind] = match.queryIdx
-            M[1,ind] = match.trainIdx
+        raise ValueError("Invalid matching method specified.")
 
-    num_M = M.shape[1]
+    M = np.zeros((2,len(matches)))
+    for ind, match in zip(np.arange(len(matches)),matches):
+        M[0,ind] = match.queryIdx
+        M[1,ind] = match.trainIdx
+
+    if use_ransac or opt == "spoint" or opt == "ALIKE":
+        ransac_initial_thresh = 5.0
+        src_pts = s_pts1[M[0,:].astype(int),:2]
+        dst_pts = s_pts2[M[1,:].astype(int),:2]
+
+        ransac_thresh = adaptive_ransac_threshold(src_pts, dst_pts, ransac_initial_thresh)
+
+        H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, ransac_thresh)
+
+        M = M[:, mask.ravel().astype(bool)]
 
     return s_pts1, s_pts2, s_pts1[M[0,:].astype(int),:3], s_pts2[M[1,:].astype(int),:3]
+
+
+def adaptive_ransac_threshold(src_pts, dst_pts, initial_thresh=5.0):
+    src_pts = src_pts.astype(np.float32)
+    dst_pts = dst_pts.astype(np.float32)
+    
+    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, initial_thresh)
+    
+    if H is None:
+        return initial_thresh
+    
+    transformed_pts = cv2.perspectiveTransform(src_pts.reshape(-1, 1, 2), H).reshape(-1, 2)
+    distances = np.linalg.norm(dst_pts - transformed_pts, axis=1)
+    
+    mad_value = compute_mad(distances)
+    
+    return mad_value
+
+
+def compute_mad(distances):
+    median_distance = np.median(distances)
+    mad = np.median(np.abs(distances - median_distance))
+    return mad
 
 
 def get_error(x1, x2, Rx, Tx):
