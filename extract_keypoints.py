@@ -210,6 +210,10 @@ def main():
                     print("Unexpected error:",indicador, opt)
             #exit(0) ###
         #print(np.array(std).std())
+        for indicador, descriptor in enumerate(DESCRIPTORS):
+            os.system('mkdir -p '+'results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver)
+            np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
+            np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
 
 
 
