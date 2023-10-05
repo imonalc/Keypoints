@@ -22,7 +22,7 @@ def read_csv_data(file_path):
     return data
 
 def main():     
-    base_path = "data/farm/output/"
+    base_path = "data/Farm/output"
     for descriptor in DESCRIPTORS:
         for method in METHODS:
             for param in PARAMS:
