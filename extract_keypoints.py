@@ -322,7 +322,7 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 
 def mnn_mather(desc1, desc2, threshold):
     sim = desc1 @ desc2.transpose()
-    sim[sim < threshold] = 0 ####
+    sim[sim < threshold] = 0
     nn12 = np.argmax(sim, axis=1)
     nn21 = np.argmax(sim, axis=0)
     ids1 = np.arange(0, sim.shape[0])
@@ -331,7 +331,6 @@ def mnn_mather(desc1, desc2, threshold):
     return matches.transpose()
 
 def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_ransac=False):
-
     if opt[-1] == 'p':
         porce = int(opt[:-1])
         n_key = int(porce/100 * pts1.shape[0])
@@ -343,32 +342,24 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_r
     s_desc1 = desc1.copy().astype('float32')[:n_key,:]
     s_desc2 = desc2.copy().astype('float32')[:n_key,:]
 
-    if  'orb' in args_opt:
+    if 'orb' in args_opt:
         s_desc1 = s_desc1.astype(np.uint8)
         s_desc2 = s_desc2.astype(np.uint8)
-
-    if match == '2-cross' or opt == "spoint" or opt == "ALIKE":
-        if 'orb' in args_opt:
-            bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
-        else:
-            bf = cv2.BFMatcher(cv2.NORM_L2, True)
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
+    elif match == 'mnn' or args_opt == "superpoint":
+        thresh = 0.1
+        matches_idx = mnn_mather(s_desc1, s_desc2, thresh)
+        matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
     elif match == 'ratio':
-        thresh = 0.9
-        if 'orb' in args_opt:
-            bf = cv2.BFMatcher(cv2.NORM_HAMMING, False)
-        else:
-            bf = cv2.BFMatcher(cv2.NORM_L2, False)
+        thresh = 0.75
+        bf = cv2.BFMatcher(cv2.NORM_L2, False)
         matches = bf.knnMatch(s_desc1,s_desc2, k=2)
         good = []
         for m,n in matches:
             if m.distance < thresh * n.distance:
                 good.append(m)
         matches = good
-    elif match == 'mnn':
-        thresh = 0.9
-        matches_idx = mnn_mather(s_desc1, s_desc2, thresh)
-        matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
     else:
         raise ValueError("Invalid matching method specified.")
 
@@ -377,25 +368,25 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_r
         M[0,ind] = match.queryIdx
         M[1,ind] = match.trainIdx
 
-    if use_ransac or opt == "spoint" or opt == "ALIKE":
+    if use_ransac:
         ransac_initial_thresh = 5.0
         src_pts = s_pts1[M[0,:].astype(int),:2]
         dst_pts = s_pts2[M[1,:].astype(int),:2]
 
         ransac_thresh = adaptive_ransac_threshold(src_pts, dst_pts, ransac_initial_thresh)
 
-        H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, ransac_thresh)
+        H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, ransac_thresh, confidence=0.9999)
 
         M = M[:, mask.ravel().astype(bool)]
 
     return s_pts1, s_pts2, s_pts1[M[0,:].astype(int),:3], s_pts2[M[1,:].astype(int),:3]
 
 
-def adaptive_ransac_threshold(src_pts, dst_pts, initial_thresh=5.0):
+def adaptive_ransac_threshold(src_pts, dst_pts, initial_thresh=10.0):
     src_pts = src_pts.astype(np.float32)
     dst_pts = dst_pts.astype(np.float32)
     
-    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, initial_thresh)
+    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, initial_thresh, confidence=0.9999)
     
     if H is None:
         return initial_thresh
