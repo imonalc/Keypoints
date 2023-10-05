@@ -41,7 +41,7 @@ import build1.sphorb_cpp as sphorb
 def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
-    parser.add_argument('--points', type=int, default = 12000)
+    parser.add_argument('--points', type=int, default = 1000)
     parser.add_argument('--match', default="ratio")
     parser.add_argument('--g_metrics',default="False")
     parser.add_argument('--solver', default="None")
@@ -108,9 +108,8 @@ def main():
                     #print('bbb', end="")
                     pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
                     pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
-                    #print(len(pts1), end="")
-                    pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
-                    #print("ddd")
+                    pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points) 
+
 
                 else:
                     os.chdir('SPHORB-master/')
@@ -118,7 +117,8 @@ def main():
                     pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
                     os.chdir('../')
                     #print('aaa', end="")
-                 
+
+                
 
                 num_keypoints[indicador].append(len(pts1))
                 num_keypoints[indicador].append(len(pts1))
@@ -233,7 +233,7 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 
 def mnn_mather(desc1, desc2, threshold):
     sim = desc1 @ desc2.transpose()
-    sim[sim < threshold] = 0 ####
+    sim[sim < threshold] = 0
     nn12 = np.argmax(sim, axis=1)
     nn21 = np.argmax(sim, axis=0)
     ids1 = np.arange(0, sim.shape[0])
@@ -242,7 +242,6 @@ def mnn_mather(desc1, desc2, threshold):
     return matches.transpose()
 
 def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_ransac=False):
-
     if opt[-1] == 'p':
         porce = int(opt[:-1])
         n_key = int(porce/100 * pts1.shape[0])
@@ -254,32 +253,24 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_r
     s_desc1 = desc1.copy().astype('float32')[:n_key,:]
     s_desc2 = desc2.copy().astype('float32')[:n_key,:]
 
-    if  'orb' in args_opt:
+    if 'orb' in args_opt:
         s_desc1 = s_desc1.astype(np.uint8)
         s_desc2 = s_desc2.astype(np.uint8)
-
-    if match == '2-cross' or opt == "spoint" or opt == "ALIKE":
-        if 'orb' in args_opt:
-            bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
-        else:
-            bf = cv2.BFMatcher(cv2.NORM_L2, True)
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
+    elif match == 'mnn' or args_opt == "superpoint":
+        thresh = 0.2
+        matches_idx = mnn_mather(s_desc1, s_desc2, thresh)
+        matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
     elif match == 'ratio':
-        thresh = 0.9
-        if 'orb' in args_opt:
-            bf = cv2.BFMatcher(cv2.NORM_HAMMING, False)
-        else:
-            bf = cv2.BFMatcher(cv2.NORM_L2, False)
+        thresh = 0.75
+        bf = cv2.BFMatcher(cv2.NORM_L2, False)
         matches = bf.knnMatch(s_desc1,s_desc2, k=2)
         good = []
         for m,n in matches:
             if m.distance < thresh * n.distance:
                 good.append(m)
         matches = good
-    elif match == 'mnn':
-        thresh = 0.9
-        matches_idx = mnn_mather(s_desc1, s_desc2, thresh)
-        matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
     else:
         raise ValueError("Invalid matching method specified.")
 
@@ -288,7 +279,7 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_r
         M[0,ind] = match.queryIdx
         M[1,ind] = match.trainIdx
 
-    if use_ransac or opt == "spoint" or opt == "ALIKE":
+    if use_ransac or args_opt == "superpoint":
         ransac_initial_thresh = 5.0
         src_pts = s_pts1[M[0,:].astype(int),:2]
         dst_pts = s_pts2[M[1,:].astype(int),:2]
@@ -302,7 +293,7 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_r
     return s_pts1, s_pts2, s_pts1[M[0,:].astype(int),:3], s_pts2[M[1,:].astype(int),:3]
 
 
-def adaptive_ransac_threshold(src_pts, dst_pts, initial_thresh=5.0):
+def adaptive_ransac_threshold(src_pts, dst_pts, initial_thresh=10.0):
     src_pts = src_pts.astype(np.float32)
     dst_pts = dst_pts.astype(np.float32)
     
@@ -408,6 +399,7 @@ def get_kd(array):
     D = A[delimiter:].reshape(-1,32)
     return K,D
 
+#python3 Accuracy_verification.py --descriptors orb torb sift tsift spoint tspoint sphorb --pose pose1 --solver GSM_SK --inliers 5PA
 
 if __name__ == '__main__':
     main()
