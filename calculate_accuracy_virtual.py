@@ -26,7 +26,7 @@ def read_csv_data(file_path):
     return data
 
 def main():     
-    base_path = "tmp/values"
+    base_path = "tmp5001000/values"
     for param in PARAMS:
         for loc in ["in", "out"]:
             if loc == "in":
@@ -36,7 +36,7 @@ def main():
             plt.figure(figsize=(10, 6))
             plt.xlabel('Threshold')
             plt.ylabel('Ratio of Values ≤ Threshold')
-            plt.title('Ratio of Values Below Each Threshold')
+            plt.title(f'Ratio of Values Below Each Threshold_{loc}_{param}')
             thresholds = np.arange(0, 3.1, 0.1)
             for descriptor in DESCRIPTORS:
                 for method in METHODS:

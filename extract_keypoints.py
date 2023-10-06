@@ -368,14 +368,14 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_r
         M[0,ind] = match.queryIdx
         M[1,ind] = match.trainIdx
 
-    if use_ransac:
+    if use_ransac  or args_opt == "superpoint":
         ransac_initial_thresh = 5.0
         src_pts = s_pts1[M[0,:].astype(int),:2]
         dst_pts = s_pts2[M[1,:].astype(int),:2]
 
         ransac_thresh = adaptive_ransac_threshold(src_pts, dst_pts, ransac_initial_thresh)
 
-        H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, ransac_thresh, confidence=0.9999)
+        H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, ransac_thresh)
 
         M = M[:, mask.ravel().astype(bool)]
 
@@ -386,7 +386,7 @@ def adaptive_ransac_threshold(src_pts, dst_pts, initial_thresh=10.0):
     src_pts = src_pts.astype(np.float32)
     dst_pts = dst_pts.astype(np.float32)
     
-    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, initial_thresh, confidence=0.9999)
+    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, initial_thresh)
     
     if H is None:
         return initial_thresh
