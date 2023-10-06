@@ -63,10 +63,11 @@ def main():
     # ----------------------------------------------
 
     NUM = 0
-    R_ERROR, T_ERROR = [], []
+    R_ERROR, T_ERROR, TIMES = [], [], []
     for i in range(len(DESCRIPTORS)):
         R_ERROR.append([])
         T_ERROR.append([])
+        TIMES.append([])
 
     if args.g_metrics == "False":
         METRICS = np.zeros((len(DESCRIPTORS),2))
@@ -76,7 +77,7 @@ def main():
         metrics = ['Matched','Keypoint','Pmr','Pr','R','Ms','E']
 
     data = get_data(DATAS)
-    TIMES = []
+    #TIMES = []
     for data in DATAS:
 
         mypath = os.path.join('data/data_100',data)
@@ -101,6 +102,7 @@ def main():
 
                     path_o = path + '/O.png'
                     path_r = path + '/R.png'
+                    t_start = time.time()
 
                     if opt != 'sphorb':
 
@@ -187,18 +189,20 @@ def main():
                                     E, can = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                                 elif args.solver == 'GSM_SK':
                                     E, can = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-
+                                
                                 fin = time.time()
-                                TIMES.append(fin-inicio)
+                                #TIMES.append(fin-inicio)
                                 R1_,R2_,T1_,T2_ = decomposeE(E.T)
                                 R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
 
                                 #R_error, T_error = get_error(x1, x2, Rx, Tx)
                                 R_error, T_error = r_error(Rx,R_), t_error(Tx,T_)
                                 #print(R_error, T_error)
+                            t_end = time.time()
 
                             R_ERROR[indicador].append(R_error)
                             T_ERROR[indicador].append(T_error)
+                            TIMES[indicador].append(t_end - t_start)
 
                             if args.g_metrics == "False":
                                 METRICS[indicador,:] = METRICS[indicador,:] + [x1.shape[0], (s_pts1.shape[0]+s_pts2.shape[1])/2]
@@ -206,14 +210,17 @@ def main():
                                 METRICS[indicador,:] = METRICS[indicador,:] + [x1.shape[0], (s_pts1.shape[0]+s_pts2.shape[1])/2,pmr,Pr,r,ms,En]
 
                             std.append(x1.shape[0])
-                except:
+                except:     
                     print("Unexpected error:",indicador, opt)
             #exit(0) ###
         #print(np.array(std).std())
+        #
+        # print(TIMES)
         for indicador, descriptor in enumerate(DESCRIPTORS):
             os.system('mkdir -p '+'results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver)
             np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
             np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
+            np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES.csv',np.array(TIMES[indicador]),delimiter=",")
 
 
 

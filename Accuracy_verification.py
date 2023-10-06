@@ -259,7 +259,7 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_r
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
     elif match == 'mnn' or args_opt == "superpoint":
-        thresh = 0.2
+        thresh = 0.1
         matches_idx = mnn_mather(s_desc1, s_desc2, thresh)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
     elif match == 'ratio':
@@ -279,7 +279,7 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_r
         M[0,ind] = match.queryIdx
         M[1,ind] = match.trainIdx
 
-    if use_ransac or args_opt == "superpoint":
+    if use_ransac  or args_opt == "superpoint":
         ransac_initial_thresh = 5.0
         src_pts = s_pts1[M[0,:].astype(int),:2]
         dst_pts = s_pts2[M[1,:].astype(int),:2]
@@ -314,6 +314,7 @@ def compute_mad(distances):
     median_distance = np.median(distances)
     mad = np.median(np.abs(distances - median_distance))
     return mad
+
 
 
 def get_error(x1, x2, Rx, Tx):

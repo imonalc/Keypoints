@@ -7,6 +7,7 @@ THRESHOLDS = [0.1, 0.2, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0, 20.0]
 DESCRIPTORS = ["orb", "sift", "spoint", "sphorb"]
 METHODS = ["", "t"]
 PARAMS = ["R", "T"]
+ALL_LOCS = ["Classroom", "Room", "Realistic", "Interior1", "Interior2", "Urban1", "Urban2", "Urban3", "Urban4"]
 INDOORS = ["Classroom", "Room", "Realistic", "Interior1", "Interior2"]
 OUTDOORS = ["Urban1", "Urban2", "Urban3", "Urban4"]
 
@@ -34,9 +35,10 @@ def main():
             else:
                 locs = OUTDOORS
             plt.figure(figsize=(10, 6))
+            plt.rcParams["font.size"] = 22
             plt.xlabel('Threshold')
             plt.ylabel('Ratio of Values ≤ Threshold')
-            plt.title(f'Ratio of Values Below Each Threshold_{loc}_{param}')
+            #plt.title(f'Ratio of Values Below Each Threshold_{loc}_{param}')
             thresholds = np.arange(0, 3.1, 0.1)
             for descriptor in DESCRIPTORS:
                 for method in METHODS:
@@ -47,8 +49,6 @@ def main():
                         file_path = f"{base_path}/{scene}_{method}{descriptor}_5PA_GSM_wRT/{param}_ERRORS.csv"
                         error_data = read_csv_data(file_path)
                         all_error_data.extend(error_data)
-                    #print(method, descriptor, param)
-                    #calculate_ratio(all_error_data)
                     ratios = []
                     for threshold in thresholds:
                         count = np.sum(all_error_data <= threshold)
@@ -59,7 +59,17 @@ def main():
             plt.grid(True)
             plt.tight_layout()
             plt.show()
-
+    
+    for descriptor in DESCRIPTORS:
+        for method in METHODS:
+            if descriptor == "sphorb" and method == "t":
+                continue
+            all_time_data = []
+            for scene in ALL_LOCS:
+                file_path = f"{base_path}/{scene}_{method}{descriptor}_5PA_GSM_wRT/TIMES.csv"
+                time_data = read_csv_data(file_path)
+                all_time_data.extend(time_data)
+            print(method, descriptor, np.mean(all_time_data))
 
 
 if __name__ == '__main__':
