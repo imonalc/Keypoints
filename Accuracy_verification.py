@@ -92,9 +92,9 @@ def main():
 
 
             try:
-                opt, mode, sphered = get_descriptor(descriptor)
+                opt, mode, sphered, use_our_method = get_descriptor(descriptor)
 
-                base_order = 1  # Base sphere resolution
+                base_order = 0  # Base sphere resolution
                 sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
                 scale_factor = 1.0  # How much to scale input equirectangular image by
                 dim = np.array([2*sphered, sphered])
@@ -129,7 +129,7 @@ def main():
                     pts2 = pts2.reshape(1,-1)
 
                 if pts1.shape[0] > 0 or pts2.shape[0] >0:
-                    s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, '100p', opt, args.match)
+                    s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, '100p', opt, args.match, use_new_method=use_our_method)
                     
                     x1,x2 = coord_3d(x1, dim), coord_3d(x2, dim)
                     s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
@@ -241,7 +241,7 @@ def mnn_mather(desc1, desc2, threshold):
     matches = np.stack([ids1[mask], nn12[mask]])
     return matches.transpose()
 
-def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_ransac=False):
+def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_new_method=False):
     if opt[-1] == 'p':
         porce = int(opt[:-1])
         n_key = int(porce/100 * pts1.shape[0])
@@ -258,7 +258,7 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_r
         s_desc2 = s_desc2.astype(np.uint8)
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
-    elif match == 'mnn' or args_opt == "superpoint":
+    elif match == 'mnn' or use_new_method:
         thresh = 0.1
         matches_idx = mnn_mather(s_desc1, s_desc2, thresh)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
@@ -279,7 +279,7 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_r
         M[0,ind] = match.queryIdx
         M[1,ind] = match.trainIdx
 
-    if use_ransac  or args_opt == "superpoint":
+    if use_new_method:
         ransac_initial_thresh = 5.0
         src_pts = s_pts1[M[0,:].astype(int),:2]
         dst_pts = s_pts2[M[1,:].astype(int),:2]
@@ -340,39 +340,43 @@ def get_error(x1, x2, Rx, Tx):
 
 def get_descriptor(descriptor):
     if descriptor == 'sphorb':
-        return 'sphorb', 'erp', 640
+        return 'sphorb', 'erp', 640, False
     elif descriptor == 'sift':
-        return 'sift', 'erp', 512
+        return 'sift', 'erp', 512, False
     elif descriptor == 'tsift':
-        return 'sift', 'tangent', 512
+        return 'sift', 'tangent', 512, False
     elif descriptor == 'csift':
-        return 'sift', 'cube', 512
+        return 'sift', 'cube', 512, False
     elif descriptor == 'cpsift':
-        return 'sift', 'cubepad', 512
+        return 'sift', 'cubepad', 512, False
     elif descriptor == 'orb':
-        return 'orb', 'erp', 512
+        return 'orb', 'erp', 512, False
     elif descriptor == 'torb':
-        return 'orb', 'tangent', 512
+        return 'orb', 'tangent', 512, False
     elif descriptor == 'corb':
-        return 'orb', 'cube', 512
+        return 'orb', 'cube', 512, False
     elif descriptor == 'cporb':
-        return 'orb', 'cubepad', 512
+        return 'orb', 'cubepad', 512, False
     elif descriptor == 'spoint':
-        return 'superpoint', 'erp', 512
+        return 'superpoint', 'erp', 512, False
     elif descriptor == 'tspoint':
-        return 'superpoint', 'tangent', 512
+        return 'superpoint', 'tangent', 512, False
     elif descriptor == 'cspoint':
-        return 'superpoint', 'cube', 512
+        return 'superpoint', 'cube', 512, False
     elif descriptor == 'cpspoint':
-        return 'superpoint', 'cubepad', 512
+        return 'superpoint', 'cubepad', 512, False
     elif descriptor == 'alike':
-        return 'alike', 'erp', 512
+        return 'alike', 'erp', 512, False
     elif descriptor == 'talike':
-        return 'alike', 'tangent', 512
+        return 'alike', 'tangent', 512, False
     elif descriptor == 'calike':
-        return 'alike', 'cube', 512
+        return 'alike', 'cube', 512, False
     elif descriptor == 'cpalike':
-        return 'alike', 'cubepad', 512
+        return 'alike', 'cubepad', 512, False
+    elif descriptor == 'Nspoint':
+        return 'superpoint', 'erp', 512, True
+    elif descriptor == 'Ntspoint':
+        return 'superpoint', 'erp', 512, True
 
 
 def AUC(ROT, TRA, MET, L):

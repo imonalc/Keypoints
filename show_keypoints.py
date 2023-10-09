@@ -91,6 +91,7 @@ def main():
 
 
     img = torch2numpy(img.byte())
+    print(img.shape)
 
 
 

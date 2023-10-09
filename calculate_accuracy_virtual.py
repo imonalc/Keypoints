@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 THRESHOLDS = [0.1, 0.2, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0, 20.0]
-DESCRIPTORS = ["orb", "sift", "spoint", "sphorb"]
+DESCRIPTORS = ["orb", "sift", "spoint", "sphorb", "alike", "Ntspoint"]
 METHODS = ["", "t"]
 PARAMS = ["R", "T"]
 ALL_LOCS = ["Classroom", "Room", "Realistic", "Interior1", "Interior2", "Urban1", "Urban2", "Urban3", "Urban4"]
@@ -27,7 +27,7 @@ def read_csv_data(file_path):
     return data
 
 def main():     
-    base_path = "tmp5001000/values"
+    base_path = "result_500_alluse/values"#"tmp5001000/values"
     for param in PARAMS:
         for loc in ["in", "out"]:
             if loc == "in":
@@ -42,7 +42,7 @@ def main():
             thresholds = np.arange(0, 3.1, 0.1)
             for descriptor in DESCRIPTORS:
                 for method in METHODS:
-                    if descriptor == "sphorb" and method == "t":
+                    if descriptor in ["sphorb", "Ntspoint", "spoint"] and method == "t":
                         continue
                     all_error_data = []
                     for scene in locs:
@@ -55,14 +55,14 @@ def main():
                         ratio = count / len(all_error_data)
                         ratios.append(ratio)
                     plt.plot(thresholds, ratios, marker='.', linestyle='-', label=f"{method}{descriptor}")
-            plt.legend(loc="lower right")
+            plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
             plt.grid(True)
             plt.tight_layout()
             plt.show()
     
     for descriptor in DESCRIPTORS:
         for method in METHODS:
-            if descriptor == "sphorb" and method == "t":
+            if descriptor in ["sphorb", "Ntspoint", "spoint"] and method == "t":
                 continue
             all_time_data = []
             for scene in ALL_LOCS:

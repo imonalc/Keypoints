@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 THRESHOLDS = [0.1, 0.2, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0, 20.0]
-DESCRIPTORS = ["orb", "sift", "spoint", "sphorb"]
+DESCRIPTORS = ["orb", "sift", "spoint", "sphorb", "alike", "Ntspoint"]
 METHODS = ["", "t"]
 PARAMS = ["R", "T"]
 
@@ -33,7 +33,7 @@ def main():
         thresholds = np.arange(0, 8.1, 0.1)
         for descriptor in DESCRIPTORS:
             for method in METHODS:
-                if descriptor == "sphorb" and method == "t":
+                if descriptor in ["sphorb", "Ntspoint"] and method == "t":
                     continue
                 all_error_data = []
                 for idx in range(1, 6):
