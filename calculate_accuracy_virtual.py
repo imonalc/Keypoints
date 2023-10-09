@@ -27,7 +27,7 @@ def read_csv_data(file_path):
     return data
 
 def main():     
-    base_path = "result_500_alluse/values"#"tmp5001000/values"
+    base_path = "result_500/values"#"tmp5001000/values"
     for param in PARAMS:
         for loc in ["in", "out"]:
             if loc == "in":

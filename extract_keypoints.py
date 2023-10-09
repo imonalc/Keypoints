@@ -329,8 +329,12 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 
     return pts1, pts2, desc1, desc2
 
-def mnn_mather(desc1, desc2, threshold):
+def mnn_mather(desc1, desc2, method="mean_std"):
     sim = desc1 @ desc2.transpose()
+    if method == "mean_std":
+        k = 2.0
+        threshold = sim.mean() + k * sim.std()
+    
     sim[sim < threshold] = 0
     nn12 = np.argmax(sim, axis=1)
     nn21 = np.argmax(sim, axis=0)
@@ -358,7 +362,7 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
         matches = bf.match(s_desc1, s_desc2)
     elif match == 'mnn' or use_new_method:
         thresh = 0.5
-        matches_idx = mnn_mather(s_desc1, s_desc2, thresh)
+        matches_idx = mnn_mather(s_desc1, s_desc2)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
     elif match == 'ratio':
         thresh = 0.75

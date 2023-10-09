@@ -40,7 +40,7 @@ import build1.sphorb_cpp as sphorb
 def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
-    parser.add_argument('--points', type=int, default = 12000)
+    parser.add_argument('--points', type=int, default = 500)
     parser.add_argument('--match', default="ratio")
     parser.add_argument('--g_metrics',default="False")
     parser.add_argument('--solver', default="None")
@@ -97,15 +97,15 @@ def main():
 
     print(s_pts1.shape, x1.shape, x2.shape)
     match_true = np.zeros(x1.shape[0])
-    #for idx in range(x1.shape[0]):
-    #    match_true[idx] = 1
-    #    vis_img = plot_matches2(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], match_true)
-    #    cv2.imshow("aaa", vis_img)
-    #    c = cv2.waitKey()
-    #    match_true[idx] = 0
-    vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2])
-    cv2.imshow("aaa", vis_img)
-    c = cv2.waitKey()
+    for idx in range(x1.shape[0]):
+        match_true[idx] = 1
+        vis_img = plot_matches2(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], match_true)
+        cv2.imshow("aaa", vis_img)
+        c = cv2.waitKey()
+        match_true[idx] = 0
+    #vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2])
+    #cv2.imshow("aaa", vis_img)
+    #c = cv2.waitKey()
 
 
 def plot_matches2(image0,
@@ -253,8 +253,12 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 
     return pts1, pts2, desc1, desc2
 
-def mnn_mather(desc1, desc2, threshold):
+def mnn_mather(desc1, desc2, method="mean_std"):
     sim = desc1 @ desc2.transpose()
+    if method == "mean_std":
+        k = 2.0
+        threshold = sim.mean() + k * sim.std()
+    
     sim[sim < threshold] = 0
     nn12 = np.argmax(sim, axis=1)
     nn21 = np.argmax(sim, axis=0)
@@ -281,8 +285,7 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
     elif match == 'mnn' or use_new_method:
-        thresh = 0.5
-        matches_idx = mnn_mather(s_desc1, s_desc2, thresh)
+        matches_idx = mnn_mather(s_desc1, s_desc2)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
     elif match == 'ratio':
         thresh = 0.75
