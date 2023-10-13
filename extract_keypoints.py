@@ -93,8 +93,6 @@ def main():
 
                 try:
                     opt, mode, sphered, use_our_method = get_descriptor(descriptor)
-                    if opt != "orb":
-                        use_our_method = True
 
                     base_order = 0  # Base sphere resolution
                     sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
@@ -213,7 +211,7 @@ def main():
 
                             std.append(x1.shape[0])
                 except:     
-                    print("Unexpected error:",indicador, opt)
+                    print("Unexpected error:",indicador, opt, use_our_method)
             #exit(0) ###
         #print(np.array(std).std())
         #
@@ -226,7 +224,7 @@ def main():
 
 
 
-        print(np.mean(np.array(TIMES)))
+        #print(np.mean(np.array(TIMES)))
     print('ALL:')
     print(np.mean(np.array(TIMES)))
     N_ARRAY = np.zeros((len(DESCRIPTORS),1))
@@ -332,7 +330,7 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 def mnn_mather(desc1, desc2, method="mean_std"):
     sim = desc1 @ desc2.transpose()
     if method == "mean_std":
-        k = 2.0
+        k = 3
         threshold = sim.mean() + k * sim.std()
     
     sim[sim < threshold] = 0
@@ -343,7 +341,7 @@ def mnn_mather(desc1, desc2, method="mean_std"):
     matches = np.stack([ids1[mask], nn12[mask]])
     return matches.transpose()
 
-def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_new_method=False):
+def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_new_method=0):
     if opt[-1] == 'p':
         porce = int(opt[:-1])
         n_key = int(porce/100 * pts1.shape[0])
@@ -360,8 +358,7 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
         s_desc2 = s_desc2.astype(np.uint8)
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
-    elif match == 'mnn' or use_new_method:
-        thresh = 0.5
+    elif match == 'mnn' or use_new_method in [1, 4]:
         matches_idx = mnn_mather(s_desc1, s_desc2)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
     elif match == 'ratio':
@@ -373,15 +370,26 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
             if m.distance < thresh * n.distance:
                 good.append(m)
         matches = good
+    elif use_new_method in [3]:
+        matches_idx = mnn_mather(s_desc1, s_desc2)
+        matches = [(cv2.DMatch(i, j1, 0), cv2.DMatch(i, j2, 0)) for i, j1, j2 in matches_idx]
+        good = []
+        thresh = 0.75
+        for m, n in matches:
+            if m.distance < thresh * n.distance:
+                good.append(m)
+        matches = [m for m, _ in good]
     else:
         raise ValueError("Invalid matching method specified.")
+    
+
 
     M = np.zeros((2,len(matches)))
     for ind, match in zip(np.arange(len(matches)),matches):
         M[0,ind] = match.queryIdx
         M[1,ind] = match.trainIdx
 
-    if use_new_method:
+    if use_new_method in [2, 4]:
         ransac_initial_thresh = 5.0
         src_pts = s_pts1[M[0,:].astype(int),:2]
         dst_pts = s_pts2[M[1,:].astype(int),:2]
@@ -441,43 +449,49 @@ def get_error(x1, x2, Rx, Tx):
 
 def get_descriptor(descriptor):
     if descriptor == 'sphorb':
-        return 'sphorb', 'erp', 640, False
+        return 'sphorb', 'erp', 640, 0
     elif descriptor == 'sift':
-        return 'sift', 'erp', 512, False
+        return 'sift', 'erp', 512, 0
     elif descriptor == 'tsift':
-        return 'sift', 'tangent', 512, False
+        return 'sift', 'tangent', 512, 0
     elif descriptor == 'csift':
-        return 'sift', 'cube', 512, False
+        return 'sift', 'cube', 512, 0
     elif descriptor == 'cpsift':
-        return 'sift', 'cubepad', 512, False
+        return 'sift', 'cubepad', 512, 0
     elif descriptor == 'orb':
-        return 'orb', 'erp', 512, False
+        return 'orb', 'erp', 512, 0
     elif descriptor == 'torb':
-        return 'orb', 'tangent', 512, False
+        return 'orb', 'tangent', 512, 0
     elif descriptor == 'corb':
-        return 'orb', 'cube', 512, False
+        return 'orb', 'cube', 512, 0
     elif descriptor == 'cporb':
-        return 'orb', 'cubepad', 512, False
+        return 'orb', 'cubepad', 512, 0
     elif descriptor == 'spoint':
-        return 'superpoint', 'erp', 512, False
+        return 'superpoint', 'erp', 512, 0
     elif descriptor == 'tspoint':
-        return 'superpoint', 'tangent', 512, False
+        return 'superpoint', 'tangent', 512, 0
     elif descriptor == 'cspoint':
-        return 'superpoint', 'cube', 512, False
+        return 'superpoint', 'cube', 512, 0
     elif descriptor == 'cpspoint':
-        return 'superpoint', 'cubepad', 512, False
+        return 'superpoint', 'cubepad', 512, 0
     elif descriptor == 'alike':
-        return 'alike', 'erp', 512, False
+        return 'alike', 'erp', 512, 0
     elif descriptor == 'talike':
-        return 'alike', 'tangent', 512, False
+        return 'alike', 'tangent', 512, 0
     elif descriptor == 'calike':
-        return 'alike', 'cube', 512, False
+        return 'alike', 'cube', 512, 0
     elif descriptor == 'cpalike':
-        return 'alike', 'cubepad', 512, False
+        return 'alike', 'cubepad', 512, 0
     elif descriptor == 'Nspoint':
-        return 'superpoint', 'erp', 512, True
-    elif descriptor == 'Ntspoint':
-        return 'superpoint', 'erp', 512, True
+        return 'superpoint', 'erp', 512, 1
+    elif descriptor == 'Mtspoint':
+        return 'superpoint', 'erp', 512, 1
+    elif descriptor == 'Rtspoint':
+        return 'superpoint', 'erp', 512, 2
+    elif descriptor == 'MLtspoint':
+        return 'superpoint', 'erp', 512, 3
+    elif descriptor == 'Proposed':
+        return 'superpoint', 'erp', 512, 4
 
 
 def AUC(ROT, TRA, MET, L):

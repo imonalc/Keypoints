@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 THRESHOLDS = [0.1, 0.2, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0, 20.0]
-DESCRIPTORS = ["orb", "sift", "spoint", "sphorb", "alike", "Ntspoint"]
+DESCRIPTORS = ["orb", "sift", "spoint", "sphorb", "alike", "Mtspoint", "Rtspoint", "MLtspoint", "Proposed"]
 METHODS = ["", "t"]
 PARAMS = ["R", "T"]
 ALL_LOCS = ["Classroom", "Room", "Realistic", "Interior1", "Interior2", "Urban1", "Urban2", "Urban3", "Urban4"]
@@ -42,7 +42,7 @@ def main():
             thresholds = np.arange(0, 3.1, 0.1)
             for descriptor in DESCRIPTORS:
                 for method in METHODS:
-                    if descriptor in ["sphorb", "Ntspoint", "spoint"] and method == "t":
+                    if descriptor in ["sphorb", "Mtspoint", "Rtspoint", "MLtspoint", "Proposed"] and method == "t":
                         continue
                     all_error_data = []
                     for scene in locs:
@@ -62,7 +62,7 @@ def main():
     
     for descriptor in DESCRIPTORS:
         for method in METHODS:
-            if descriptor in ["sphorb", "Ntspoint", "spoint"] and method == "t":
+            if descriptor in ["sphorb", "Mtspoint", "Rtspoint", "MLtspoint", "Proposed"] and method == "t":
                 continue
             all_time_data = []
             for scene in ALL_LOCS:
