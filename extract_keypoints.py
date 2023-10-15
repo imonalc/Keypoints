@@ -330,7 +330,7 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 def mnn_mather(desc1, desc2, method="mean_std"):
     sim = desc1 @ desc2.transpose()
     if method == "mean_std":
-        k = 3
+        k = 2
         threshold = sim.mean() + k * sim.std()
     
     sim[sim < threshold] = 0
@@ -361,6 +361,26 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
     elif match == 'mnn' or use_new_method in [1, 4]:
         matches_idx = mnn_mather(s_desc1, s_desc2)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
+    elif use_new_method in [3]:
+        thresh = 0.75
+        bf = cv2.BFMatcher(cv2.NORM_L2, False)
+        matches1 = bf.knnMatch(s_desc1,s_desc2, k=2)
+        matches2 = bf.knnMatch(s_desc2,s_desc1, k=2)
+        good1 = []
+        for m, n in matches1:
+            if m.distance < thresh * n.distance:
+                good1.append(m)
+        good2 = []
+        for m, n in matches2:
+            if m.distance < thresh * n.distance:
+                good2.append(m)
+        good = []
+        for m1 in good1:
+            for m2 in good2:
+                if m1.queryIdx == m2.trainIdx and m1.trainIdx == m2.queryIdx:
+                    good.append(m1)
+                    break
+        matches = good
     elif match == 'ratio':
         thresh = 0.75
         bf = cv2.BFMatcher(cv2.NORM_L2, False)
@@ -370,15 +390,6 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
             if m.distance < thresh * n.distance:
                 good.append(m)
         matches = good
-    elif use_new_method in [3]:
-        matches_idx = mnn_mather(s_desc1, s_desc2)
-        matches = [(cv2.DMatch(i, j1, 0), cv2.DMatch(i, j2, 0)) for i, j1, j2 in matches_idx]
-        good = []
-        thresh = 0.75
-        for m, n in matches:
-            if m.distance < thresh * n.distance:
-                good.append(m)
-        matches = [m for m, _ in good]
     else:
         raise ValueError("Invalid matching method specified.")
     
@@ -482,16 +493,14 @@ def get_descriptor(descriptor):
         return 'alike', 'cube', 512, 0
     elif descriptor == 'cpalike':
         return 'alike', 'cubepad', 512, 0
-    elif descriptor == 'Nspoint':
-        return 'superpoint', 'erp', 512, 1
-    elif descriptor == 'Mtspoint':
-        return 'superpoint', 'erp', 512, 1
-    elif descriptor == 'Rtspoint':
-        return 'superpoint', 'erp', 512, 2
-    elif descriptor == 'MLtspoint':
-        return 'superpoint', 'erp', 512, 3
     elif descriptor == 'Proposed':
-        return 'superpoint', 'erp', 512, 4
+        return 'superpoint', 'erp', 512, 1
+    #elif descriptor == 'Rtspoint':
+    #    return 'superpoint', 'erp', 512, 2
+    elif descriptor == 'Ltspoint':
+        return 'superpoint', 'erp', 512, 3
+    #elif descriptor == 'Proposed':
+    #    return 'superpoint', 'erp', 512, 4
 
 
 def AUC(ROT, TRA, MET, L):

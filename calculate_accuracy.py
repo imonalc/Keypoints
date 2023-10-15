@@ -3,18 +3,11 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-THRESHOLDS = [0.1, 0.2, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0, 20.0]
-DESCRIPTORS = ["orb", "sift", "spoint", "sphorb", "alike", "Ntspoint"]
+
+DESCRIPTORS = ["orb", "sift", "spoint", "sphorb", "alike", "Ltspoint", "Proposed"]
 METHODS = ["", "t"]
 PARAMS = ["R", "T"]
 
-def calculate_ratio(arr):
-    for i, threshold in enumerate(THRESHOLDS):
-        cnt = 0
-        for j in range(len(arr)):
-            if arr[j] < threshold:
-                cnt += 1
-        print(f"{threshold}:{cnt}, {len(arr)}, {cnt / len(arr)}")
 
 
 def read_csv_data(file_path):
@@ -33,7 +26,7 @@ def main():
         thresholds = np.arange(0, 8.1, 0.1)
         for descriptor in DESCRIPTORS:
             for method in METHODS:
-                if descriptor in ["sphorb", "Ntspoint"] and method == "t":
+                if descriptor in ["sphorb", "Ltspoint", "Proposed"] and method == "t":
                     continue
                 all_error_data = []
                 for idx in range(1, 6):

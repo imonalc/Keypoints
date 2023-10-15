@@ -3,21 +3,12 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-THRESHOLDS = [0.1, 0.2, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0, 20.0]
-DESCRIPTORS = ["orb", "sift", "spoint", "sphorb", "alike", "Mtspoint", "Rtspoint", "MLtspoint", "Proposed"]
+DESCRIPTORS = ["orb", "sphorb", "sift", "spoint", "alike", "Ltspoint", "Proposed"]
 METHODS = ["", "t"]
 PARAMS = ["R", "T"]
 ALL_LOCS = ["Classroom", "Room", "Realistic", "Interior1", "Interior2", "Urban1", "Urban2", "Urban3", "Urban4"]
 INDOORS = ["Classroom", "Room", "Realistic", "Interior1", "Interior2"]
 OUTDOORS = ["Urban1", "Urban2", "Urban3", "Urban4"]
-
-def calculate_ratio(arr):
-    for i, threshold in enumerate(THRESHOLDS):
-        cnt = 0
-        for j in range(len(arr)):
-            if arr[j] < threshold:
-                cnt += 1
-        print(f"{threshold}:{cnt}, {len(arr)}, {cnt / len(arr)}")
 
 
 def read_csv_data(file_path):
@@ -27,7 +18,7 @@ def read_csv_data(file_path):
     return data
 
 def main():     
-    base_path = "result_500/values"#"tmp5001000/values"
+    base_path = "result_final/values"#"tmp5001000/values"
     for param in PARAMS:
         for loc in ["in", "out"]:
             if loc == "in":
@@ -42,7 +33,7 @@ def main():
             thresholds = np.arange(0, 3.1, 0.1)
             for descriptor in DESCRIPTORS:
                 for method in METHODS:
-                    if descriptor in ["sphorb", "Mtspoint", "Rtspoint", "MLtspoint", "Proposed"] and method == "t":
+                    if descriptor in ["sphorb", "Ltspoint", "Proposed"] and method == "t":
                         continue
                     all_error_data = []
                     for scene in locs:
@@ -62,7 +53,7 @@ def main():
     
     for descriptor in DESCRIPTORS:
         for method in METHODS:
-            if descriptor in ["sphorb", "Mtspoint", "Rtspoint", "MLtspoint", "Proposed"] and method == "t":
+            if descriptor in ["sphorb", "Ltspoint", "Proposed"] and method == "t":
                 continue
             all_time_data = []
             for scene in ALL_LOCS:
