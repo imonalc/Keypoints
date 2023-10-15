@@ -253,6 +253,7 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 
     return pts1, pts2, desc1, desc2
 
+
 def mnn_mather(desc1, desc2, method="mean_std"):
     sim = desc1 @ desc2.transpose()
     if method == "mean_std":
@@ -284,15 +285,29 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
         s_desc2 = s_desc2.astype(np.uint8)
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
-    elif match == 'mnn' or use_new_method in [1, 3, 4]:
+    elif match == 'mnn' or use_new_method == 1:
         matches_idx = mnn_mather(s_desc1, s_desc2)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
-        if use_new_method == 3:
-            thresh = 0.75
-            for m,n in matches:
-                if m.distance < thresh * n.distance:
-                    good.append(m)
-            matches = good
+    elif use_new_method == 3:
+        thresh = 0.75
+        bf = cv2.BFMatcher(cv2.NORM_L2, False)
+        matches1 = bf.knnMatch(s_desc1,s_desc2, k=2)
+        matches2 = bf.knnMatch(s_desc2,s_desc1, k=2)
+        good1 = []
+        for m, n in matches1:
+            if m.distance < thresh * n.distance:
+                good1.append(m)
+        good2 = []
+        for m, n in matches2:
+            if m.distance < thresh * n.distance:
+                good2.append(m)
+        good = []
+        for m1 in good1:
+            for m2 in good2:
+                if m1.queryIdx == m2.trainIdx and m1.trainIdx == m2.queryIdx:
+                    good.append(m1)
+                    break
+        matches = good
     elif match == 'ratio':
         thresh = 0.75
         bf = cv2.BFMatcher(cv2.NORM_L2, False)
@@ -312,41 +327,8 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
         M[0,ind] = match.queryIdx
         M[1,ind] = match.trainIdx
 
-    if use_new_method in [2, 4]:
-        ransac_initial_thresh = 5.0
-        src_pts = s_pts1[M[0,:].astype(int),:2]
-        dst_pts = s_pts2[M[1,:].astype(int),:2]
-
-        ransac_thresh = adaptive_ransac_threshold(src_pts, dst_pts, ransac_initial_thresh)
-
-        H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, ransac_thresh)
-
-        M = M[:, mask.ravel().astype(bool)]
 
     return s_pts1, s_pts2, s_pts1[M[0,:].astype(int),:3], s_pts2[M[1,:].astype(int),:3]
-
-
-def adaptive_ransac_threshold(src_pts, dst_pts, initial_thresh=10.0):
-    src_pts = src_pts.astype(np.float32)
-    dst_pts = dst_pts.astype(np.float32)
-    
-    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, initial_thresh)
-    
-    if H is None:
-        return initial_thresh
-    
-    transformed_pts = cv2.perspectiveTransform(src_pts.reshape(-1, 1, 2), H).reshape(-1, 2)
-    distances = np.linalg.norm(dst_pts - transformed_pts, axis=1)
-    
-    mad_value = compute_mad(distances)
-    
-    return mad_value
-
-
-def compute_mad(distances):
-    median_distance = np.median(distances)
-    mad = np.median(np.abs(distances - median_distance))
-    return mad
 
 
 def get_error(x1, x2, Rx, Tx):
@@ -405,16 +387,10 @@ def get_descriptor(descriptor):
         return 'alike', 'cube', 512, 0
     elif descriptor == 'cpalike':
         return 'alike', 'cubepad', 512, 0
-    elif descriptor == 'Nspoint':
-        return 'superpoint', 'erp', 512, 1
-    elif descriptor == 'Mtspoint':
-        return 'superpoint', 'erp', 512, 1
-    elif descriptor == 'Rtspoint':
-        return 'superpoint', 'erp', 512, 2
-    elif descriptor == 'MLtspoint':
-        return 'superpoint', 'erp', 512, 3
     elif descriptor == 'Proposed':
-        return 'superpoint', 'erp', 512, 4
+        return 'superpoint', 'erp', 512, 1
+    elif descriptor == 'Ltspoint':
+        return 'superpoint', 'erp', 512, 3
 
 def get_error(x1, x2, Rx, Tx):
 

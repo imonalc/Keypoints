@@ -2,12 +2,16 @@ import csv
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import math
 
-
-DESCRIPTORS = ["orb", "sift", "spoint", "sphorb", "alike", "Ltspoint", "Proposed"]
+DESCRIPTORS = ["Proposed", "orb", "sphorb", "sift", "alike", ]
+SPDESCRIPTORS = ["Proposed", "spoint", "Ltspoint",]
 METHODS = ["", "t"]
 PARAMS = ["R", "T"]
-
+PARAMS_DICT = {"R": "Rotation", "T": "Translation"}
+ALL_LOCS = ["Classroom", "Room", "Realistic", "Interior1", "Interior2", "Urban1", "Urban2", "Urban3", "Urban4"]
+INDOORS = ["Classroom", "Room", "Realistic", "Interior1", "Interior2"]
+OUTDOORS = ["Urban1", "Urban2", "Urban3", "Urban4"]
 
 
 def read_csv_data(file_path):
@@ -17,35 +21,60 @@ def read_csv_data(file_path):
     return data
 
 def main():     
-    base_path = "data/Farm/output"
-    for param in PARAMS:
-        plt.figure(figsize=(10, 6))
-        plt.xlabel('Threshold')
-        plt.ylabel('Ratio of Values ≤ Threshold')
-        plt.title('Ratio of Values Below Each Threshold')
-        thresholds = np.arange(0, 8.1, 0.1)
-        for descriptor in DESCRIPTORS:
-            for method in METHODS:
-                if descriptor in ["sphorb", "Ltspoint", "Proposed"] and method == "t":
-                    continue
-                all_error_data = []
-                for idx in range(1, 6):
-                    file_path = f"{base_path}/{method}{descriptor}/pose{idx}/{param}_errors.csv"
-                    error_data = read_csv_data(file_path)
-                    all_error_data.extend(error_data)
-                #print(method, descriptor, param)
-                #calculate_ratio(all_error_data)
-                ratios = []
-                for threshold in thresholds:
-                    count = np.sum(all_error_data <= threshold)
-                    ratio = count / len(all_error_data)
-                    ratios.append(ratio)
-                plt.plot(thresholds, ratios, marker='.', linestyle='-', label=f"{method}{descriptor}")
-        plt.legend(loc="lower right")
-        plt.grid(True)
-        plt.tight_layout()
-        plt.show()
+    base_path = "result_final/values"#"tmp5001000/values"
+    fig, axes = plt.subplots(2, 2, figsize=(14, 12), sharex=True, sharey=True)
+    plt.rcParams["font.size"] = 20
+    for i, param in enumerate(PARAMS):
+        for j, loc in enumerate(["indoor", "outdoor"]):
+            if loc == "indoor":
+                locs = INDOORS
+            else:
+                locs = OUTDOORS
+            ax = axes[i, j]
+            #ax.set_xlabel('Threshold')
+            #ax.set_ylabel('Ratio of Values ≤ Threshold')
+            #plt.title(f'Ratio of Values Below Each Threshold_{loc}_{param}')
+            thresholds = np.arange(0, 20.1, 0.1)
+            for descriptor in SPDESCRIPTORS:
+                for method in METHODS:
+                    if descriptor in ["sphorb", "Ltspoint", "Proposed"] and method == "t":
+                        continue
+                    all_error_data = []
+                    for scene in locs:
+                        file_path = f"{base_path}/{scene}_{method}{descriptor}_5PA_GSM_wRT/{param}_ERRORS.csv"
+                        error_data = read_csv_data(file_path)
+                        all_error_data.extend(error_data)
+                    ratios = []
+                    for threshold in thresholds:
+                        count = np.sum(all_error_data <= threshold * math.pi / 180)
+                        ratio = count / len(all_error_data)
+                        ratios.append(ratio)
+                    ax.plot(thresholds, ratios, linestyle='-', label=f"{method}{descriptor}")
+                    ax.set_title(f"{PARAMS_DICT[param]} {loc}")
+                    ax.grid(True)
+                    if i == 0 and j == 1:
+                        ax.legend(loc='upper left', bbox_to_anchor=(1.05, 1))
 
+    for ax in axes[:,0]:
+        ax.set_ylabel('Ratio of Values ≤ Threshold', fontsize=20)
+    for ax in axes[1]:
+        ax.set_xlabel('Threshold', fontsize=20)
+    
+    #handles, labels = axes[-1, -1].get_legend_handles_labels()
+    plt.tight_layout()
+    #plt.legend(loc='upper left', bbox_to_anchor=(1.05, 1))
+    plt.show()
+    
+    for descriptor in SPDESCRIPTORS:
+        for method in METHODS:
+            if descriptor in ["sphorb", "Ltspoint", "Proposed"] and method == "t":
+                continue
+            all_time_data = []
+            for scene in ALL_LOCS:
+                file_path = f"{base_path}/{scene}_{method}{descriptor}_5PA_GSM_wRT/TIMES.csv"
+                time_data = read_csv_data(file_path)
+                all_time_data.extend(time_data)
+            print(method, descriptor, np.mean(all_time_data))
 
 
 if __name__ == '__main__':

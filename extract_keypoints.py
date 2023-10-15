@@ -330,7 +330,7 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 def mnn_mather(desc1, desc2, method="mean_std"):
     sim = desc1 @ desc2.transpose()
     if method == "mean_std":
-        k = 2
+        k = 4
         threshold = sim.mean() + k * sim.std()
     
     sim[sim < threshold] = 0
