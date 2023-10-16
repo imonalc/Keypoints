@@ -96,16 +96,20 @@ def main():
     img_r = torch2numpy(img_r.byte())
 
     print(s_pts1.shape, x1.shape, x2.shape)
-    match_true = np.zeros(x1.shape[0])
-    for idx in range(x1.shape[0]):
-        match_true[idx] = 1
-        vis_img = plot_matches2(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], match_true)
+
+    vis_bool = 0
+    if vis_bool:
+        match_true = np.zeros(x1.shape[0])
+        for idx in range(x1.shape[0]):
+            match_true[idx] = 1
+            vis_img = plot_matches2(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], match_true)
+            cv2.imshow("aaa", vis_img)
+            c = cv2.waitKey()
+            match_true[idx] = 0
+    else:
+        vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2])
         cv2.imshow("aaa", vis_img)
         c = cv2.waitKey()
-        match_true[idx] = 0
-    #vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2])
-    #cv2.imshow("aaa", vis_img)
-    #c = cv2.waitKey()
 
 
 def plot_matches2(image0,
@@ -168,11 +172,19 @@ def plot_matches(image0,
     #1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 1,
     #]
 
-    match_true = [1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 
-                  0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 
-                  1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 
-                  1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 
-                  1, 
+    #match_true = [1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 
+    #              0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 
+    #              1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 
+    #              1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 
+    #              1, 
+    #]
+
+    match_true = [1, 1, 1, 1, 1,   1, 0, 1, 1, 1,   1, 1, 0, 1, 0,   1, 1, 1, 0, 1, 
+                  1, 1, 1, 0, 0,   1, 0, 0, 1, 0,   1, 1, 0, 1, 1,   1, 1, 1, 0, 1, 
+                  1, 1, 0, 0, 0,   1, 0, 1, 0, 1,   1, 1, 1, 1, 1,   0, 0, 1, 1, 1, 
+                  1, 1, 0, 1, 0,   1, 0, 1, 0, 0,   0, 0, 0, 0, 0,   1, 0, 0, 1, 1, 
+                  1, 1, 1, 1, 0,   1, 1, 0, 1, 0,   1, 1, 0, 1, 1,   1, 1, 1, 1, 1, 
+                  1, 1, 1, 1, 0,   0, 1, 1, 1, 1,   0, 1, 
     ]
     
 
@@ -191,16 +203,24 @@ def plot_matches(image0,
     mkpts0, mkpts1 = x1, x2
     mkpts0 = np.round(mkpts0).astype(int)
     mkpts1 = np.round(mkpts1).astype(int)
-    i = 0
+    i = -1
     for kpt0, kpt1 in zip(mkpts0, mkpts1):
         (x0, y0), (x1, y1) = kpt0, kpt1
-        if match_true[i]:
-            mcolor=(0, 255, 0)
-        else:
-            #i += 1
-            #continue
-            mcolor=(0, 0, 255)
         i += 1
+        mcolor=(0, 0, 255)
+        if match_true[i]:
+            continue
+        cv2.line(out, (x0, y0), (x1 + W0, y1),
+                     color=mcolor,
+                     thickness=1,
+                     lineType=cv2.LINE_AA)
+    i = -1
+    for kpt0, kpt1 in zip(mkpts0, mkpts1):
+        (x0, y0), (x1, y1) = kpt0, kpt1
+        mcolor=(0, 255, 0)
+        i += 1
+        if not match_true[i]:
+            continue
         cv2.line(out, (x0, y0), (x1 + W0, y1),
                      color=mcolor,
                      thickness=1,
