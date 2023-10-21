@@ -21,7 +21,7 @@ def read_csv_data(file_path):
     return data
 
 def main():     
-    base_path = "result_final/values"#"tmp5001000/values"
+    base_path = "result_time2/values"#"tmp5001000/values"
     fig, axes = plt.subplots(2, 2, figsize=(14, 12), sharex=True, sharey=True)
     plt.rcParams["font.size"] = 20
     for i, param in enumerate(PARAMS):
@@ -31,11 +31,12 @@ def main():
             else:
                 locs = OUTDOORS
             ax = axes[i, j]
+            ax.tick_params(axis='both', labelsize=20)
             #ax.set_xlabel('Threshold')
             #ax.set_ylabel('Ratio of Values ≤ Threshold')
             #plt.title(f'Ratio of Values Below Each Threshold_{loc}_{param}')
             thresholds = np.arange(0, 20.1, 0.1)
-            for descriptor in SPDESCRIPTORS:
+            for descriptor in DESCRIPTORS:
                 for method in METHODS:
                     if descriptor in ["sphorb", "Ltspoint", "Proposed"] and method == "t":
                         continue
@@ -58,7 +59,7 @@ def main():
     for ax in axes[:,0]:
         ax.set_ylabel('Ratio of Values ≤ Threshold', fontsize=20)
     for ax in axes[1]:
-        ax.set_xlabel('Threshold', fontsize=20)
+        ax.set_xlabel('Angle Threshold (°)', fontsize=20)
     
     #handles, labels = axes[-1, -1].get_legend_handles_labels()
     plt.tight_layout()

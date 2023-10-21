@@ -63,11 +63,13 @@ def main():
     # ----------------------------------------------
 
     NUM = 0
-    R_ERROR, T_ERROR, TIMES = [], [], []
+    R_ERROR, T_ERROR, TIMES_FP, TIMES_MC, TIMES_PE = [], [], [], [], []
     for i in range(len(DESCRIPTORS)):
         R_ERROR.append([])
         T_ERROR.append([])
-        TIMES.append([])
+        TIMES_FP.append([])
+        TIMES_MC.append([])
+        TIMES_PE.append([])
 
     if args.g_metrics == "False":
         METRICS = np.zeros((len(DESCRIPTORS),2))
@@ -111,9 +113,9 @@ def main():
                         # ----------------------------------------------
                         # 80 baricenter points
                         corners = tangent_image_corners(base_order, sample_order)
-
+                        t_featurepoint_b = time.time()
                         pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
-
+                        t_featurepoint_a = time.time()
                         pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
 
                         pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
@@ -124,8 +126,9 @@ def main():
                         
                         #os.system('mogrify -format jpg '+path+'/*.png')
                         os.chdir('SPHORB-master/')
-
+                        t_featurepoint_b = time.time()
                         pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
+                        t_featurepoint_a = time.time()
                         pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
                         os.chdir('../')
 
@@ -145,8 +148,9 @@ def main():
                             #print(pts1.shape, desc1.shape)
                             #print(pts2.shape, desc2.shape)
                             #print(opt)
+                            t_matching_b = time.time()
                             s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, option, opt, args.match, use_new_method=use_our_method)
-                            
+                            t_matching_a = time.time()
                             
 
                             z_d = depth[(x1[:,1]*512/sphered).astype('int')%512,(x1[:,0]*512/sphered).astype('int')%1024]
@@ -173,10 +177,11 @@ def main():
                                 ms  = np.sum(d<0.1)/(s_pts1.shape[0]+EPS)
                                 En  = calc_entropy(x1)
 
-
+                            
                             if x1.shape[0] < 8:
                                 R_error, T_error = 3.14, 3.14
                             else:
+                                t_poseestimate_b = time.time()
                                 inicio = time.time()
                                 #time.sleep(1)
                                 if args.solver   == 'None':
@@ -189,7 +194,7 @@ def main():
                                     E, can = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                                 elif args.solver == 'GSM_SK':
                                     E, can = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-                                
+                                t_poseestimate_a = time.time()
                                 fin = time.time()
                                 #TIMES.append(fin-inicio)
                                 R1_,R2_,T1_,T2_ = decomposeE(E.T)
@@ -202,7 +207,9 @@ def main():
 
                             R_ERROR[indicador].append(R_error)
                             T_ERROR[indicador].append(T_error)
-                            TIMES[indicador].append(t_end - t_start)
+                            TIMES_FP[indicador].append(t_featurepoint_a-t_featurepoint_b)
+                            TIMES_MC[indicador].append(t_matching_a-t_matching_b)
+                            TIMES_PE[indicador].append(t_poseestimate_a-t_poseestimate_b)
 
                             if args.g_metrics == "False":
                                 METRICS[indicador,:] = METRICS[indicador,:] + [x1.shape[0], (s_pts1.shape[0]+s_pts2.shape[1])/2]
@@ -220,13 +227,15 @@ def main():
             os.system('mkdir -p '+'results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver)
             np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
             np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
-            np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES.csv',np.array(TIMES[indicador]),delimiter=",")
+            np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_FP.csv',np.array(TIMES_FP[indicador]),delimiter=",")
+            np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_MC.csv',np.array(TIMES_MC[indicador]),delimiter=",")
+            np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_PE.csv',np.array(TIMES_PE[indicador]),delimiter=",")
 
 
 
         #print(np.mean(np.array(TIMES)))
     print('ALL:')
-    print(np.mean(np.array(TIMES)))
+    #print(np.mean(np.array(TIMES)))
     N_ARRAY = np.zeros((len(DESCRIPTORS),1))
     for indice, _ in enumerate(DESCRIPTORS):
         N_ARRAY[indice,0] = len(R_ERROR[indice])
@@ -463,9 +472,9 @@ def get_descriptor(descriptor):
     elif descriptor == 'cpalike':
         return 'alike', 'cubepad', 512, 0
     elif descriptor == 'Proposed':
-        return 'superpoint', 'erp', 512, 1
+        return 'superpoint', 'tangent', 512, 1
     elif descriptor == 'Ltspoint':
-        return 'superpoint', 'erp', 512, 3
+        return 'superpoint', 'tangent', 512, 3
 
 
 def AUC(ROT, TRA, MET, L):
