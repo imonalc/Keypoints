@@ -40,7 +40,7 @@ import build1.sphorb_cpp as sphorb
 def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
-    parser.add_argument('--points', type=int, default = 12000)
+    parser.add_argument('--points', type=int, default = 500)
     parser.add_argument('--descriptor', default = 'sift')
     parser.add_argument('--path', default = "./data/data_100/Room/0/")
     args = parser.parse_args()
@@ -65,6 +65,7 @@ def main():
         corners = tangent_image_corners(base_order, sample_order)
 
         pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
+        pts1, desc1 = sort_key(pts1, desc1, args.points)
 
     else:
                         
@@ -108,30 +109,23 @@ def main():
     plt.show()
 
 
-def sort_key(pts1, pts2, desc1, desc2, points):
+def sort_key(pts1, desc1, points):
 
     ind1 = np.argsort(pts1[:,2].numpy(),axis = 0)[::-1]
-    ind2 = np.argsort(pts2[:,2].numpy(),axis = 0)[::-1]
 
     max1 = np.min([points,ind1.shape[0]])
-    max2 = np.min([points,ind2.shape[0]])
 
     ind1 = ind1[:max1]
-    ind2 = ind2[:max2]
 
     pts1 = pts1[ind1.copy(),:]
-    pts2 = pts2[ind2.copy(),:]
 
     desc1 = desc1[:,ind1.copy()]
-    desc2 = desc2[:,ind2.copy()]
 
     pts1 = np.concatenate((pts1[:,:2], np.ones((pts1.shape[0],1))), axis = 1 )
-    pts2 = np.concatenate((pts2[:,:2], np.ones((pts2.shape[0],1))), axis = 1 )
 
     desc1 = np.transpose(desc1,[1,0]).numpy()
-    desc2 = np.transpose(desc2,[1,0]).numpy()
 
-    return pts1, pts2, desc1, desc2
+    return pts1, desc1
 
 def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio'):
 
