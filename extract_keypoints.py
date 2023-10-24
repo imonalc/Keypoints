@@ -191,9 +191,9 @@ def main():
                                 elif args.solver == 'GSM':
                                     E, can = get_cam_pose_by_ransac_GSM(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                                 elif args.solver == 'GSM_wRT':
-                                    E, can = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+                                    E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                                 elif args.solver == 'GSM_SK':
-                                    E, can = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+                                    E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                                 t_poseestimate_a = time.time()
                                 fin = time.time()
                                 #TIMES.append(fin-inicio)
@@ -203,6 +203,7 @@ def main():
                                 #R_error, T_error = get_error(x1, x2, Rx, Tx)
                                 R_error, T_error = r_error(Rx,R_), t_error(Tx,T_)
                                 #print(R_error, T_error)
+                                print(inlier_idx)
                             t_end = time.time()
 
                             R_ERROR[indicador].append(R_error)

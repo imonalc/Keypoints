@@ -63,14 +63,28 @@ def main():
 
     path_o = args.path + '/O.png'
     path_r = args.path + '/R.png'
+    img_o = load_torch_img(path_o)[:3, ...].float()
+    img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+    img_r = load_torch_img(path_r)[:3, ...].float()
+    img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+
+
+
+
+    img_o = torch2numpy(img_o.byte())
+    img_r = torch2numpy(img_r.byte())
+    print(img_o.shape)
+
+    img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
+    img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
 
     print(path_o)
     if opt != 'sphorb':
         corners = tangent_image_corners(base_order, sample_order)
         pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
         pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
-        pts1[pts1[:,0] > 1024, 0] -= 1024
-        pts2[pts2[:,0] > 1024, 0] -= 1024
+        pts1[pts1[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
+        pts2[pts2[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
         pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
 
     else:
@@ -86,23 +100,17 @@ def main():
 
     print(len(pts1))
     s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
-    img_o = load_torch_img(path_o)[:3, ...].float()
-    img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-    img_r = load_torch_img(path_r)[:3, ...].float()
-    img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
 
-
-    img_o = torch2numpy(img_o.byte())
-    img_r = torch2numpy(img_r.byte())
 
     print(s_pts1.shape, x1.shape, x2.shape)
 
-    vis_bool = 0
+    vis_bool = 1
     if vis_bool:
         match_true = np.zeros(x1.shape[0])
         for idx in range(x1.shape[0]):
             match_true[idx] = 1
             vis_img = plot_matches2(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], match_true)
+            vis_img = cv2.resize(vis_img,dsize=(1600, 400))
             cv2.imshow("aaa", vis_img)
             c = cv2.waitKey()
             match_true[idx] = 0
@@ -148,7 +156,7 @@ def plot_matches2(image0,
         i += 1
         cv2.line(out, (x0, y0), (x1 + W0, y1),
                      color=mcolor,
-                     thickness=1,
+                     thickness=5,
                      lineType=cv2.LINE_AA)
     return out
 
@@ -204,9 +212,18 @@ def plot_matches(image0,
     #]
 
     # LTspoint
-    match_true = [1, 1, 1, 1, 1,   1, 1, 1, 1, 1,  
+    #match_true = [1, 1, 1, 1, 1,   1, 1, 1, 1, 1,  
+#
+    #]
 
-    ]
+    ##FFarm
+    #Ltspoint
+    match_true = [1, 1, 1, 1, 1,   1, 1, 1, 1, 1,   1, 1, 1, 1, 1,   1, 1, 1, 1, 1, 
+                  1, 1, 1, 1, 1,   1, 1, 1, 1, 1,   1, 1, 1, 1, 1,   1, 1, 1, 1, 1, 
+                  1, 1, 1, 1, 1,   1, 1, 1, 1, 1,   1, 1, 1, 1, 1,   1, 1, 1, 1, 1, 
+                  1, 1, 1, 1, 1,   1, 1, 1, 1, 1,   1, 1, 1, 1, 
+    ]   
+
 
 
     out0 = plot_keypoints(image0, kpts0, radius, color)
@@ -228,7 +245,7 @@ def plot_matches(image0,
         (x0, y0), (x1, y1) = kpt0, kpt1
         i += 1
         mcolor=(0, 0, 255)
-        if match_true[i]:
+        if match_true[i] in [1, 2]:
             continue
         cv2.line(out, (x0, y0), (x1 + W0, y1),
                      color=mcolor,
@@ -239,7 +256,7 @@ def plot_matches(image0,
         (x0, y0), (x1, y1) = kpt0, kpt1
         mcolor=(0, 255, 0)
         i += 1
-        if not match_true[i]:
+        if match_true[i] in [0, 2]:
             continue
         cv2.line(out, (x0, y0), (x1 + W0, y1),
                      color=mcolor,
@@ -262,7 +279,7 @@ def plot_keypoints(image, kpts, radius=2, color=(0, 0, 255)):
 
     for kpt in kpts:
         x0, y0 = kpt
-        cv2.circle(out, (x0, y0), radius, color, -1, lineType=cv2.LINE_4)
+        cv2.circle(out, (x0, y0), 10, color, -1, lineType=cv2.LINE_4)
     return out
 
 

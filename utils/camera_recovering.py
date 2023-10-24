@@ -272,16 +272,16 @@ def get_cam_pose_by_ransac_GSM_const_wRT(x1, x2, get_E = False, I="8PA"):
     elif I == "5PA":
         ransac.min_super_set = 5
     if get_E == False:
-        cam_final = ransac.get_cam_pose(
+        cam_final, inlier_idx = ransac.get_cam_pose(
             bearings_1=x1,
             bearings_2=x2
         )
-        return cam_final
+        return cam_final, inlier_idx
     else:
-        E, cam_final = ransac.get_cam_pose(
+        E, cam_final, inlier_idx = ransac.get_cam_pose(
             bearings_1=x1,
             bearings_2=x2, get_E = True)
-        return E, cam_final
+        return E, cam_final, inlier_idx
 
 
 def get_cam_pose_by_ransac_GSM_const_wSK(x1, x2, get_E = False, I="8PA"):
@@ -293,16 +293,16 @@ def get_cam_pose_by_ransac_GSM_const_wSK(x1, x2, get_E = False, I="8PA"):
     elif I == "5PA":
         ransac.min_super_set = 5
     if get_E == False:
-        cam_final = ransac.get_cam_pose(
+        cam_final, inlier_idx = ransac.get_cam_pose(
             bearings_1=x1,
             bearings_2=x2
         )
-        return cam_final
+        return cam_final, inlier_idx
     else:
-        E, cam_final = ransac.get_cam_pose(
+        E, cam_final, inlier_idx = ransac.get_cam_pose(
             bearings_1=x1,
             bearings_2=x2, get_E = True)
-        return E, cam_final
+        return E, cam_final, inlier_idx
 
 def main():
     x1 = np.ones((3,10))

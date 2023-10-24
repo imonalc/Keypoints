@@ -123,9 +123,9 @@ class RANSAC_8PA:
             x2=bearings_2[:, self.best_inliers]
         )
         if get_E == False:
-            return cam_pose
+            return cam_pose, self.best_inliers
         else:
-            return self.best_model, cam_pose
+            return self.best_model, cam_pose, self.best_inliers
 
     def _dynamic_max_trials(self):
         if self.best_inliers_num == 0:
