@@ -203,7 +203,7 @@ def main():
                                 #R_error, T_error = get_error(x1, x2, Rx, Tx)
                                 R_error, T_error = r_error(Rx,R_), t_error(Tx,T_)
                                 #print(R_error, T_error)
-                                print(inlier_idx)
+
                             t_end = time.time()
 
                             R_ERROR[indicador].append(R_error)
