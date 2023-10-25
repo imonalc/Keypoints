@@ -52,6 +52,7 @@ def main():
 
     print('X')
 
+    t0 = time.time()
     descriptor = args.descriptor
 
     opt, mode, sphered, use_our_method = get_descriptor(descriptor)
@@ -68,9 +69,6 @@ def main():
     img_r = load_torch_img(path_r)[:3, ...].float()
     img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
 
-
-
-
     img_o = torch2numpy(img_o.byte())
     img_r = torch2numpy(img_r.byte())
     print(img_o.shape)
@@ -79,23 +77,15 @@ def main():
     img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
     height_threshold = 0.7 * img_o.shape[0]
     print(path_o)
+    t1 = time.time()
+    print("image:", t1-t0)
+
     if opt != 'sphorb':
         corners = tangent_image_corners(base_order, sample_order)
         pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
         pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
-        print(pts1)
         pts1[pts1[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
         pts2[pts2[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
-        print(pts1)
-
-
-        valid_idx1 = pts1[:, 1] < height_threshold
-        pts1 =  pts1[valid_idx1]
-        desc1 = desc1[:, valid_idx1]
-        valid_idx2 = pts2[:, 1] < height_threshold
-        pts2 =  pts2[valid_idx2]
-        desc2 = desc2[:, valid_idx2]
-        pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
 
     else:
                         
@@ -104,18 +94,30 @@ def main():
         pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
         os.chdir('../')
 
-    
+    valid_idx1 = pts1[:, 1] < height_threshold
+    pts1 =  pts1[valid_idx1]
+    desc1 = desc1[:, valid_idx1]
+    valid_idx2 = pts2[:, 1] < height_threshold
+    pts2 =  pts2[valid_idx2]
+    desc2 = desc2[:, valid_idx2]
+    pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
+
+    t2 = time.time()
+    print("detection:", t2-t1)
+
     if len(pts1.shape) == 1:
         pts1 = pts1.reshape(1,-1)
 
     s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
-    #x1,x2 = coord_3d(x1, dim), coord_3d(x2, dim)
-    #s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
+    t3 = time.time()
+    print("matching:", t3-t2)
+
     E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+    t4 = time.time()
+    print("pose:", t4-t3)
     print(s_pts1)
     print(s_pts1.shape, x1.shape, x2.shape)
-
-
+    
     vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], inlier_idx)
     vis_img = cv2.resize(vis_img,dsize=(1600, 400))
     cv2.imshow("aaa", vis_img)
@@ -331,7 +333,7 @@ def get_descriptor(descriptor):
     elif descriptor == 'cspoint':
         return 'superpoint', 'cube', 512, 0
     elif descriptor == 'cpspoint':
-        return 'superpoint', 'cubepad', 512, 0
+        return 'superpoint', 'cubepad', 512, 1
     elif descriptor == 'alike':
         return 'alike', 'erp', 512, 0
     elif descriptor == 'talike':
