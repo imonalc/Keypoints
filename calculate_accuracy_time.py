@@ -13,6 +13,14 @@ ALL_LOCS = ["Classroom", "Room", "Realistic", "Interior1", "Interior2", "Urban1"
 INDOORS = ["Classroom", "Room", "Realistic", "Interior1", "Interior2"]
 OUTDOORS = ["Urban1", "Urban2", "Urban3", "Urban4"]
 TIME_CATEGORYS = ["FP", "MC", "PE"]
+DESCRIPTORS_DICT = {"Proposed": "Proposed",
+                    "orb": "ORB", 
+                    "sphorb": "SPHORB",
+                    "sift": "SIFT",
+                    "alike": "ALIKE",
+                    "spoint": "SPoint",
+                    "Ltspoint": "TSPoint+L"}
+METHODS_DICT = {"t": "T", "":""}
 
 
 def read_csv_data(file_path):
@@ -57,7 +65,7 @@ def main():
                             count = np.sum(all_error_data <= threshold * math.pi / 180)
                             ratio = count / len(all_error_data)
                             ratios.append(ratio)
-                        ax.plot(thresholds, ratios, linestyle='-', label=f"{method}{descriptor}")
+                        ax.plot(thresholds, ratios, linestyle='-', label=f"{METHODS_DICT[method]}{DESCRIPTORS_DICT[descriptor]}")
 
 
                         if i == 0 and j == 1:
