@@ -145,9 +145,6 @@ def main():
 
                     for indice, option in enumerate(['100p']):
                         if pts1.shape[0] > 0 or pts2.shape[0] >0:
-                            #print(pts1.shape, desc1.shape)
-                            #print(pts2.shape, desc2.shape)
-                            #print(opt)
                             t_matching_b = time.time()
                             s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, option, opt, args.match, use_new_method=use_our_method)
                             t_matching_a = time.time()
@@ -225,12 +222,12 @@ def main():
         #
         # print(TIMES)
         for indicador, descriptor in enumerate(DESCRIPTORS):
-            os.system('mkdir -p '+'results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver)
-            np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
-            np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
-            np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_FP.csv',np.array(TIMES_FP[indicador]),delimiter=",")
-            np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_MC.csv',np.array(TIMES_MC[indicador]),delimiter=",")
-            np.savetxt('results/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_PE.csv',np.array(TIMES_PE[indicador]),delimiter=",")
+            os.system('mkdir -p '+f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver)
+            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
+            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
+            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_FP.csv',np.array(TIMES_FP[indicador]),delimiter=",")
+            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_MC.csv',np.array(TIMES_MC[indicador]),delimiter=",")
+            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_PE.csv',np.array(TIMES_PE[indicador]),delimiter=",")
 
 
 
@@ -284,31 +281,6 @@ def main():
         print('GENERIC METRICS')
         print(MET)
 
-#        fig, ax = plt.subplots(1,figsize=(8,6))
-#
-#        for i in range(len(P)):
-#            ax.plot(L,ROT[i,:],'-o',linewidth=2,label = P[i])
-#
-#        plt.xlabel('degree')
-#        plt.ylabel('accuracy')
-#        ax.legend(loc="lower right")
-#
-#        plt.savefig('results/metrics/'+data+'_'+file+'_'+args.inliers+'_'+args.solver+'/Rotation.png')
-#
-#        plt.clf()
-#
-#
-#        fig, ax = plt.subplots(1,figsize=(8,6))
-#
-#        for i in range(len(P)):
-#            ax.plot(L,TRA[i,:],'-o',linewidth=2,label = P[i])
-#
-#        plt.xlabel('degree')
-#        plt.ylabel('accuracy')
-#        ax.legend(loc="lower right")
-#
-#        plt.savefig('results/metrics/'+data+'_'+file+'_'+args.inliers+'_'+args.solver+'/Translation.png')
-#
 
 
 
@@ -368,10 +340,10 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
         s_desc2 = s_desc2.astype(np.uint8)
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
-    elif match == 'mnn' or use_new_method == 1:
+    elif use_new_method == 1:
         matches_idx = mnn_mather(s_desc1, s_desc2)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
-    elif use_new_method == 3:
+    elif use_new_method == 2:
         thresh = 0.75
         bf = cv2.BFMatcher(cv2.NORM_L2, False)
         matches1 = bf.knnMatch(s_desc1,s_desc2, k=2)
@@ -390,6 +362,18 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
                 if m1.queryIdx == m2.trainIdx and m1.trainIdx == m2.queryIdx:
                     good.append(m1)
                     break
+        matches = good
+    elif use_new_method == 3:
+        thresh = 0.75
+        FLANN_INDEX_KDTREE = 1
+        index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+        search_params = dict(checks = 50)
+        flann = cv2.FlannBasedMatcher(index_params, search_params)
+        matches = flann.knnMatch(s_desc1, s_desc2, k=2)
+        good = []
+        for m,n in matches:
+            if m.distance < thresh * n.distance:
+                good.append(m)
         matches = good
     elif match == 'ratio':
         thresh = 0.75
@@ -444,37 +428,23 @@ def get_descriptor(descriptor):
         return 'sift', 'erp', 512, 0
     elif descriptor == 'tsift':
         return 'sift', 'tangent', 512, 0
-    elif descriptor == 'csift':
-        return 'sift', 'cube', 512, 0
-    elif descriptor == 'cpsift':
-        return 'sift', 'cubepad', 512, 0
     elif descriptor == 'orb':
         return 'orb', 'erp', 512, 0
     elif descriptor == 'torb':
         return 'orb', 'tangent', 512, 0
-    elif descriptor == 'corb':
-        return 'orb', 'cube', 512, 0
-    elif descriptor == 'cporb':
-        return 'orb', 'cubepad', 512, 0
     elif descriptor == 'spoint':
         return 'superpoint', 'erp', 512, 0
     elif descriptor == 'tspoint':
         return 'superpoint', 'tangent', 512, 0
-    elif descriptor == 'cspoint':
-        return 'superpoint', 'cube', 512, 0
-    elif descriptor == 'cpspoint':
-        return 'superpoint', 'cubepad', 512, 0
     elif descriptor == 'alike':
         return 'alike', 'erp', 512, 0
     elif descriptor == 'talike':
         return 'alike', 'tangent', 512, 0
-    elif descriptor == 'calike':
-        return 'alike', 'cube', 512, 0
-    elif descriptor == 'cpalike':
-        return 'alike', 'cubepad', 512, 0
     elif descriptor == 'Proposed':
         return 'superpoint', 'tangent', 512, 1
     elif descriptor == 'Ltspoint':
+        return 'superpoint', 'tangent', 512, 2
+    elif descriptor == 'Ftspoint':
         return 'superpoint', 'tangent', 512, 3
 
 

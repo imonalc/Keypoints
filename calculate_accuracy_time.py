@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import math
 
 COMPARE_DESCRIPTORS = ["Proposed", "orb", "sphorb", "sift", "alike", ]
-ABLATION_DESCRIPTORS = ["Proposed", "spoint", "Ltspoint",]
+ABLATION_DESCRIPTORS = ["Proposed", "spoint", "Ltspoint", "Ftspoint"]
 METHODS = ["", "t"]
 PARAMS = ["R", "T"]
 PARAMS_DICT = {"R": "Rotation", "T": "Translation"}
@@ -19,7 +19,9 @@ DESCRIPTORS_DICT = {"Proposed": "Proposed",
                     "sift": "SIFT",
                     "alike": "ALIKE",
                     "spoint": "SPoint",
-                    "Ltspoint": "TSPoint+L"}
+                    "Ltspoint": "TSPoint+L",
+                    "Ftspoint": "TSPoint+F"
+                    }
 METHODS_DICT = {"t": "T", "":""}
 
 
@@ -30,7 +32,7 @@ def read_csv_data(file_path):
     return data
 
 def main():     
-    base_path = "results_unlimited/values"
+    base_path = "results/FP_10000/values"
     for tgt in ["compare", "ablation"]:
         if tgt == "compare":
             descriptors = COMPARE_DESCRIPTORS
@@ -53,7 +55,7 @@ def main():
                 thresholds = np.arange(0, 20.1, 0.1)
                 for descriptor in descriptors:
                     for method in METHODS:
-                        if descriptor in ["sphorb", "Ltspoint", "Proposed"] and method == "t":
+                        if descriptor in ["sphorb", "Ltspoint", "Proposed", "Ftspoint"] and method == "t":
                             continue
                         all_error_data = []
                         for scene in locs:
@@ -78,7 +80,7 @@ def main():
             print(time_category)
             for descriptor in descriptors:
                 for method in METHODS:
-                    if descriptor in ["sphorb", "Ltspoint", "Proposed"] and method == "t":
+                    if descriptor in ["sphorb", "Ltspoint", "Proposed", "Ftspoint"] and method == "t":
                         continue
                     all_time_data = []
                     for scene in ALL_LOCS:

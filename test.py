@@ -46,13 +46,12 @@ def main():
     parser.add_argument('--solver', default="None")
     parser.add_argument('--inliers', default="8PA")
     parser.add_argument('--descriptor', default = 'sift')
-    parser.add_argument('--path', default = "./data/data_100/Room/0/")
+    parser.add_argument('--path', default = "./data/data_100/Room/0")
     args = parser.parse_args()
 
 
     print('X')
 
-    t0 = time.time()
     descriptor = args.descriptor
 
     opt, mode, sphered, use_our_method = get_descriptor(descriptor)
@@ -69,23 +68,26 @@ def main():
     img_r = load_torch_img(path_r)[:3, ...].float()
     img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
 
+
+
+
     img_o = torch2numpy(img_o.byte())
     img_r = torch2numpy(img_r.byte())
     print(img_o.shape)
 
     img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
     img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
-    height_threshold = 0.7 * img_o.shape[0]
-    print(path_o)
-    t1 = time.time()
-    print("image:", t1-t0)
 
+    print(path_o)
+    Rx = np.load(args.path+"/R.npy")
+    Tx = np.load(args.path+"/T.npy")
     if opt != 'sphorb':
         corners = tangent_image_corners(base_order, sample_order)
         pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
         pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
         pts1[pts1[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
         pts2[pts2[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
+        pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
 
     else:
                         
@@ -94,34 +96,69 @@ def main():
         pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
         os.chdir('../')
 
-    valid_idx1 = pts1[:, 1] < height_threshold
-    pts1 =  pts1[valid_idx1]
-    desc1 = desc1[:, valid_idx1]
-    valid_idx2 = pts2[:, 1] < height_threshold
-    pts2 =  pts2[valid_idx2]
-    desc2 = desc2[:, valid_idx2]
-    pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
-
-    t2 = time.time()
-    print("detection:", t2-t1)
-
+    depth = np.load("results/depth/"+"Room"+".npy")
+    
     if len(pts1.shape) == 1:
         pts1 = pts1.reshape(1,-1)
 
+    print(len(pts1))
     s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
-    t3 = time.time()
-    print("matching:", t3-t2)
 
-    E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-    t4 = time.time()
-    print("pose:", t4-t3)
-    print(s_pts1)
-    print(s_pts1.shape, x1.shape, x2.shape)
-    
-    vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], inlier_idx)
-    vis_img = cv2.resize(vis_img,dsize=(1600, 400))
-    cv2.imshow("aaa", vis_img)
-    c = cv2.waitKey()
+    print(s_pts1[:5])
+    print(x1[:5])
+    z_d = depth[(x1[:,1]*512/sphered).astype('int')%512,(x1[:,0]*512/sphered).astype('int')%1024]
+    z_d2 = depth[(s_pts1[:,1]*512/sphered).astype('int')%512,(s_pts1[:,0]*512/sphered).astype('int')%1024]
+    x1,x2 = coord_3d(x1, dim), coord_3d(x2, dim)
+    x2_ = (x1.copy()*z_d.reshape(-1,1))@Rx.T + Tx
+    x2_ = x2_/np.linalg.norm(x2_,axis=1).reshape(-1,1)
+    s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
+    s_pts2_ = (s_pts1.copy()*z_d2.reshape(-1,1))@Rx.T + Tx
+    s_pts2_ = s_pts2_/np.linalg.norm(s_pts2_,axis=1).reshape(-1,1)
+
+    print(s_pts1[:5])
+    print(x1[:5])
+
+
+def plot_matches2(image0,
+                 image1,
+                 kpts0,
+                 kpts1,
+                 x1,
+                 x2,
+                 match_true,
+                 radius=2,
+                 color=(255, 0, 0)):
+
+
+
+    out0 = plot_keypoints(image0, kpts0, radius, color)
+    out1 = plot_keypoints(image1, kpts1, radius, color)
+    H0, W0 = image0.shape[0], image0.shape[1]
+    H1, W1 = image1.shape[0], image1.shape[1]
+    H, W = max(H0, H1), W0 + W1
+    out = 255 * np.ones((H, W, 3), np.uint8)
+    out[:H0, :W0, :] = out0
+    out[:H1, W0:, :] = out1
+    mkpts0, mkpts1 = x1, x2
+    mkpts0 = np.round(mkpts0).astype(int)
+    mkpts1 = np.round(mkpts1).astype(int)
+    i = 0
+    for kpt0, kpt1 in zip(mkpts0, mkpts1):
+        (x0, y0), (x1, y1) = kpt0, kpt1
+        if match_true[i]:
+            mcolor=(0, 255, 0)
+            print(i)
+        else:
+            i += 1
+            continue
+            mcolor=(0, 0, 255)
+        i += 1
+        cv2.line(out, (x0, y0), (x1 + W0, y1),
+                     color=mcolor,
+                     thickness=5,
+                     lineType=cv2.LINE_AA)
+    return out
+
 
 
 def plot_matches(image0,
@@ -130,14 +167,20 @@ def plot_matches(image0,
                  kpts1,
                  x1,
                  x2,
-                 inlier_idx,
-                 radius=2):
+                 radius=2,
+                 color=(255, 0, 0)):
     
-    # Convert the bool list of inlier_idx to integer values.
-    match_true = np.array(inlier_idx, dtype=int)
-  
-    out0 = plot_keypoints(image0, kpts0, radius, (255, 0, 0))
-    out1 = plot_keypoints(image1, kpts1, radius, (255, 0, 0))
+    match_true = np.zeros(x1.shape[0])
+    match_true = [1, 1, 1, 1, 1,   1, 1, 1, 1, 1,   1, 1, 1, 1, 1,   1, 1, 1, 1, 1, 
+                  1, 1, 1, 1, 1,   1, 1, 1, 1, 1,   1, 1, 1, 1, 1,   1, 1, 1, 1, 1, 
+                  1, 1, 1, 1, 1,   1, 1, 1, 1, 1,   1, 1, 1, 1, 1,   1, 1, 1, 1, 1, 
+                  1, 1, 1, 1, 1,   1, 1, 1, 1, 1,   1, 1, 1, 1, 
+    ]   
+
+
+
+    out0 = plot_keypoints(image0, kpts0, radius, color)
+    out1 = plot_keypoints(image1, kpts1, radius, color)
 
     H0, W0 = image0.shape[0], image0.shape[1]
     H1, W1 = image1.shape[0], image1.shape[1]
@@ -150,18 +193,30 @@ def plot_matches(image0,
     mkpts0, mkpts1 = x1, x2
     mkpts0 = np.round(mkpts0).astype(int)
     mkpts1 = np.round(mkpts1).astype(int)
-    
-    for kpt0, kpt1, mt in zip(mkpts0, mkpts1, match_true):
+    i = -1
+    for kpt0, kpt1 in zip(mkpts0, mkpts1):
         (x0, y0), (x1, y1) = kpt0, kpt1
-        mcolor = (0, 0, 255) if mt == 0 else (0, 255, 0)  # Red for outliers, Green for inliers
+        i += 1
+        mcolor=(0, 0, 255)
+        if match_true[i] in [1, 2]:
+            continue
         cv2.line(out, (x0, y0), (x1 + W0, y1),
-                 color=mcolor,
-                 thickness=5,
-                 lineType=cv2.LINE_AA)
+                     color=mcolor,
+                     thickness=1,
+                     lineType=cv2.LINE_AA)
+    i = -1
+    for kpt0, kpt1 in zip(mkpts0, mkpts1):
+        (x0, y0), (x1, y1) = kpt0, kpt1
+        mcolor=(0, 255, 0)
+        i += 1
+        if match_true[i] in [0, 2]:
+            continue
+        cv2.line(out, (x0, y0), (x1 + W0, y1),
+                     color=mcolor,
+                     thickness=1,
+                     lineType=cv2.LINE_AA)
 
     return out
-
-
 
 
 def plot_keypoints(image, kpts, radius=2, color=(0, 0, 255)):
@@ -240,10 +295,10 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
         s_desc2 = s_desc2.astype(np.uint8)
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
-    elif use_new_method == 1:
+    elif match == 'mnn' or use_new_method == 1:
         matches_idx = mnn_mather(s_desc1, s_desc2)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
-    elif use_new_method == 2:
+    elif use_new_method == 3:
         thresh = 0.75
         bf = cv2.BFMatcher(cv2.NORM_L2, False)
         matches1 = bf.knnMatch(s_desc1,s_desc2, k=2)
@@ -262,18 +317,6 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
                 if m1.queryIdx == m2.trainIdx and m1.trainIdx == m2.queryIdx:
                     good.append(m1)
                     break
-        matches = good
-    elif use_new_method == 3:
-        thresh = 0.75
-        FLANN_INDEX_KDTREE = 1
-        index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
-        search_params = dict(checks = 50)
-        flann = cv2.FlannBasedMatcher(index_params, search_params)
-        matches = flann.knnMatch(s_desc1, s_desc2, k=2)
-        good = []
-        for m,n in matches:
-            if m.distance < thresh * n.distance:
-                good.append(m)
         matches = good
     elif match == 'ratio':
         thresh = 0.75
@@ -326,23 +369,37 @@ def get_descriptor(descriptor):
         return 'sift', 'erp', 512, 0
     elif descriptor == 'tsift':
         return 'sift', 'tangent', 512, 0
+    elif descriptor == 'csift':
+        return 'sift', 'cube', 512, 0
+    elif descriptor == 'cpsift':
+        return 'sift', 'cubepad', 512, 0
     elif descriptor == 'orb':
         return 'orb', 'erp', 512, 0
     elif descriptor == 'torb':
         return 'orb', 'tangent', 512, 0
+    elif descriptor == 'corb':
+        return 'orb', 'cube', 512, 0
+    elif descriptor == 'cporb':
+        return 'orb', 'cubepad', 512, 0
     elif descriptor == 'spoint':
         return 'superpoint', 'erp', 512, 0
     elif descriptor == 'tspoint':
         return 'superpoint', 'tangent', 512, 0
+    elif descriptor == 'cspoint':
+        return 'superpoint', 'cube', 512, 0
+    elif descriptor == 'cpspoint':
+        return 'superpoint', 'cubepad', 512, 0
     elif descriptor == 'alike':
         return 'alike', 'erp', 512, 0
     elif descriptor == 'talike':
         return 'alike', 'tangent', 512, 0
+    elif descriptor == 'calike':
+        return 'alike', 'cube', 512, 0
+    elif descriptor == 'cpalike':
+        return 'alike', 'cubepad', 512, 0
     elif descriptor == 'Proposed':
         return 'superpoint', 'tangent', 512, 1
     elif descriptor == 'Ltspoint':
-        return 'superpoint', 'tangent', 512, 2
-    elif descriptor == 'Ftspoint':
         return 'superpoint', 'tangent', 512, 3
 
 def get_error(x1, x2, Rx, Tx):
@@ -414,5 +471,3 @@ def get_kd(array):
 
 if __name__ == '__main__':
     main()
-
-
