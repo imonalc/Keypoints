@@ -3,7 +3,7 @@ import numpy as np
 from utils.general_epipolar_constraint import EightPointAlgorithmGeneralGeometry as G8PA
 from liegroups.numpy import SE3
 from scipy.stats import norm
-from utils.ransac1 import RANSAC_POSE_ESTIMATOR
+from utils.ransac_pose_estimator import RANSAC_POSE_ESTIMATOR
 
 g8p = G8PA()
 
