@@ -3,7 +3,7 @@ import numpy as np
 from utils.general_epipolar_constraint import EightPointAlgorithmGeneralGeometry as G8PA
 from liegroups.numpy import SE3
 from scipy.stats import norm
-from utils.ransac1 import RANSAC_8PA
+from utils.ransac1 import RANSAC_POSE_ESTIMATOR
 
 g8p = G8PA()
 
@@ -198,8 +198,8 @@ def get_cam_pose_by_GSM_const_wRT(x1, x2):
     return cam_final
 
 
-def get_cam_pose_by_ransac_8pa(x1, x2, get_E = False, I = "8PA"):
-    ransac = RANSAC_8PA()
+def get_cam_pose_by_ransac(x1, x2, get_E = False, I = "8PA"):
+    ransac = RANSAC_POSE_ESTIMATOR()
     ransac.post_function_evaluation = get_cam_pose_by_8pa
     ransac.I = I
     if I == "8PA":
@@ -220,7 +220,7 @@ def get_cam_pose_by_ransac_8pa(x1, x2, get_E = False, I = "8PA"):
 
 
 def get_cam_pose_by_ransac_opt_SK(x1, x2, get_E=False, I = "8PA"):
-    ransac = RANSAC_8PA()
+    ransac = RANSAC_POSE_ESTIMATOR()
     ransac.post_function_evaluation = get_cam_pose_by_opt_SK
     ransac.I = I
     if I == "8PA":
@@ -242,7 +242,7 @@ def get_cam_pose_by_ransac_opt_SK(x1, x2, get_E=False, I = "8PA"):
 
 
 def get_cam_pose_by_ransac_GSM(x1, x2, get_E = False, I = "8PA"):
-    ransac = RANSAC_8PA()
+    ransac = RANSAC_POSE_ESTIMATOR()
     ransac.post_function_evaluation = get_cam_pose_by_GSM
     ransac.I = I
     if I == "8PA":
@@ -264,7 +264,7 @@ def get_cam_pose_by_ransac_GSM(x1, x2, get_E = False, I = "8PA"):
 
 
 def get_cam_pose_by_ransac_GSM_const_wRT(x1, x2, get_E = False, I="8PA"):
-    ransac = RANSAC_8PA()
+    ransac = RANSAC_POSE_ESTIMATOR()
     ransac.post_function_evaluation = get_cam_pose_by_GSM_const_wRT
     ransac.I = I
     if I == "8PA":
@@ -285,7 +285,7 @@ def get_cam_pose_by_ransac_GSM_const_wRT(x1, x2, get_E = False, I="8PA"):
 
 
 def get_cam_pose_by_ransac_GSM_const_wSK(x1, x2, get_E = False, I="8PA"):
-    ransac = RANSAC_8PA()
+    ransac = RANSAC_POSE_ESTIMATOR()
     ransac.post_function_evaluation = get_cam_pose_by_GSM_const_wSK
     ransac.I = I
     if I == "8PA":

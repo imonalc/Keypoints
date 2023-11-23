@@ -148,7 +148,7 @@ def main():
                             t_poseestimate_b = time.time()
 
                             if args.solver   == 'None':
-                                E, cam = get_cam_pose_by_ransac_8pa(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+                                E, cam = get_cam_pose_by_ransac(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                             elif args.solver == 'SK':
                                 E, can = get_cam_pose_by_ransac_opt_SK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                             elif args.solver == 'GSM':
@@ -169,7 +169,7 @@ def main():
                         TIMES_MC[indicador].append(t_matching_a-t_matching_b)
                         TIMES_PE[indicador].append(t_poseestimate_a-t_poseestimate_b)
                         METRICS[indicador,:] = METRICS[indicador,:] + [x1.shape[0], (s_pts1.shape[0]+s_pts2.shape[1])/2]
-                        
+
                         std.append(x1.shape[0])
                 except:     
                     print("Unexpected error:",indicador, opt, use_our_method)

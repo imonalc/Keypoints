@@ -10,7 +10,7 @@ def get_ransac_iterations(p_success=0.99,
         np.log(1 - p_success) / np.log(1 - (1 - outliers) ** min_constraint)) + 1
 
 
-class RANSAC_8PA:
+class RANSAC_POSE_ESTIMATOR:
 
     def __init__(self):
         self.residual_threshold = 1e-1

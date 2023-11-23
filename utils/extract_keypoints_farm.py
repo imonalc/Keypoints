@@ -139,7 +139,7 @@ def main():
                     else:
                         inicio = time.time()
                         if args.solver   == 'None':
-                            E, cam = get_cam_pose_by_ransac_8pa(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+                            E, cam = get_cam_pose_by_ransac(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                         elif args.solver == 'SK':
                             E, can = get_cam_pose_by_ransac_opt_SK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                         elif args.solver == 'GSM':
