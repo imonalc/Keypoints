@@ -46,7 +46,7 @@ def main():
     parser.add_argument('--solver', default="None")
     parser.add_argument('--inliers', default="8PA")
     parser.add_argument('--descriptor', default = 'sift')
-    parser.add_argument('--path', default = "./data/data_100/Room/0/")
+    parser.add_argument('--path', default = "./data/data_100/Room/0")
     args = parser.parse_args()
 
 
@@ -100,6 +100,8 @@ def main():
     valid_idx2 = pts2[:, 1] < height_threshold
     pts2 =  pts2[valid_idx2]
     desc2 = desc2[:, valid_idx2]
+    print(desc1.shape)
+
     pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
 
     t2 = time.time()
