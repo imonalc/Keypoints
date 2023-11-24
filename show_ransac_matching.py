@@ -123,6 +123,22 @@ def main():
     cv2.imshow("aaa", vis_img)
     c = cv2.waitKey()
 
+    vis_bool = 1
+    if False:
+        if vis_bool:
+            match_true = np.zeros(x1.shape[0])
+            for idx in range(x1.shape[0]):
+                match_true[idx] = 1
+                vis_img = plot_matches2(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], match_true)
+                vis_img = cv2.resize(vis_img,dsize=(1600, 400))
+                cv2.imshow("aaa", vis_img)
+                c = cv2.waitKey()
+                match_true[idx] = 0
+        else:
+            vis_img = plot_matches3(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2])
+            cv2.imshow("aaa", vis_img)
+            c = cv2.waitKey()
+
 
 def plot_matches(image0,
                  image1,
@@ -158,6 +174,98 @@ def plot_matches(image0,
                  color=mcolor,
                  thickness=5,
                  lineType=cv2.LINE_AA)
+
+    return out
+
+
+def plot_matches2(image0,
+                 image1,
+                 kpts0,
+                 kpts1,
+                 x1,
+                 x2,
+                 match_true,
+                 radius=2,
+                 color=(255, 0, 0)):
+
+
+
+    out0 = plot_keypoints(image0, kpts0, radius, color)
+    out1 = plot_keypoints(image1, kpts1, radius, color)
+    H0, W0 = image0.shape[0], image0.shape[1]
+    H1, W1 = image1.shape[0], image1.shape[1]
+    H, W = max(H0, H1), W0 + W1
+    out = 255 * np.ones((H, W, 3), np.uint8)
+    out[:H0, :W0, :] = out0
+    out[:H1, W0:, :] = out1
+    mkpts0, mkpts1 = x1, x2
+    mkpts0 = np.round(mkpts0).astype(int)
+    mkpts1 = np.round(mkpts1).astype(int)
+    i = 0
+    for kpt0, kpt1 in zip(mkpts0, mkpts1):
+        (x0, y0), (x1, y1) = kpt0, kpt1
+        if match_true[i]:
+            mcolor=(0, 255, 0)
+            print(i)
+        else:
+            i += 1
+            continue
+            mcolor=(0, 0, 255)
+        i += 1
+        cv2.line(out, (x0, y0), (x1 + W0, y1),
+                     color=mcolor,
+                     thickness=5,
+                     lineType=cv2.LINE_AA)
+    return out
+
+
+
+def plot_matches3(image0,
+                 image1,
+                 kpts0,
+                 kpts1,
+                 x1,
+                 x2,
+                 radius=2,
+                 color=(255, 0, 0)):
+    
+    match_true = np.zeros(x1.shape[0]) 
+    out0 = plot_keypoints(image0, kpts0, radius, color)
+    out1 = plot_keypoints(image1, kpts1, radius, color)
+
+    H0, W0 = image0.shape[0], image0.shape[1]
+    H1, W1 = image1.shape[0], image1.shape[1]
+
+    H, W = max(H0, H1), W0 + W1
+    out = 255 * np.ones((H, W, 3), np.uint8)
+    out[:H0, :W0, :] = out0
+    out[:H1, W0:, :] = out1
+
+    mkpts0, mkpts1 = x1, x2
+    mkpts0 = np.round(mkpts0).astype(int)
+    mkpts1 = np.round(mkpts1).astype(int)
+    i = -1
+    for kpt0, kpt1 in zip(mkpts0, mkpts1):
+        (x0, y0), (x1, y1) = kpt0, kpt1
+        i += 1
+        mcolor=(0, 0, 255)
+        if match_true[i] in [1, 2]:
+            continue
+        cv2.line(out, (x0, y0), (x1 + W0, y1),
+                     color=mcolor,
+                     thickness=1,
+                     lineType=cv2.LINE_AA)
+    i = -1
+    for kpt0, kpt1 in zip(mkpts0, mkpts1):
+        (x0, y0), (x1, y1) = kpt0, kpt1
+        mcolor=(0, 255, 0)
+        i += 1
+        if match_true[i] in [0, 2]:
+            continue
+        cv2.line(out, (x0, y0), (x1 + W0, y1),
+                     color=mcolor,
+                     thickness=1,
+                     lineType=cv2.LINE_AA)
 
     return out
 
