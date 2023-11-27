@@ -32,7 +32,7 @@ def read_csv_data(file_path):
     return data
 
 def main():     
-    base_path = "results/FP_10000/values"
+    base_path = "results/FP_500/values"
     for tgt in ["compare", "ablation"]:
         if tgt == "compare":
             descriptors = COMPARE_DESCRIPTORS

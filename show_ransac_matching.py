@@ -100,7 +100,7 @@ def main():
     valid_idx2 = pts2[:, 1] < height_threshold
     pts2 =  pts2[valid_idx2]
     desc2 = desc2[:, valid_idx2]
-    print(desc1.shape)
+    #print(desc1.shape)
 
     pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
 
@@ -115,9 +115,10 @@ def main():
     print("matching:", t3-t2)
 
     E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+    print("True:", sum(inlier_idx), len(inlier_idx), ", ratio:", sum(inlier_idx) / len(inlier_idx))
     t4 = time.time()
     print("pose:", t4-t3)
-    print(s_pts1)
+    #print(s_pts1)
     print(s_pts1.shape, x1.shape, x2.shape)
     
     vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], inlier_idx)
