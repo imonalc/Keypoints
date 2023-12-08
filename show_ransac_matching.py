@@ -320,10 +320,13 @@ def sort_key(pts1, pts2, desc1, desc2, points):
     return pts1, pts2, desc1, desc2
 
 
+
+
 def mnn_mather(desc1, desc2, method="mean_std"):
     sim = desc1 @ desc2.transpose()
+    sim = (sim - np.mean(sim))/np.std(sim)
     if method == "mean_std":
-        k = 4
+        k = 3.89
         threshold = sim.mean() + k * sim.std()
     
     sim[sim < threshold] = 0
@@ -333,6 +336,7 @@ def mnn_mather(desc1, desc2, method="mean_std"):
     mask = (ids1 == nn21[nn12])
     matches = np.stack([ids1[mask], nn12[mask]])
     return matches.transpose()
+
 
 def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_new_method=0):
     if opt[-1] == 'p':
