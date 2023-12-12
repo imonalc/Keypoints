@@ -64,7 +64,6 @@ def main():
 
     path_o = args.path + '/O.png'
     path_r = args.path + '/R.png'
-    print(path_o)
     img_o = load_torch_img(path_o)[:3, ...].float()
     img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
     img_r = load_torch_img(path_r)[:3, ...].float()
@@ -101,7 +100,6 @@ def main():
     valid_idx2 = pts2[:, 1] < height_threshold
     pts2 =  pts2[valid_idx2]
     desc2 = desc2[:, valid_idx2]
-    #print(desc1.shape)
 
     pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
 
@@ -111,37 +109,45 @@ def main():
     if len(pts1.shape) == 1:
         pts1 = pts1.reshape(1,-1)
 
+    TF_list = []
+
     s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
+    len(x1)
     t3 = time.time()
     print("matching:", t3-t2)
+    print(len(x1))
 
     E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
     print("True:", sum(inlier_idx), len(inlier_idx), ", ratio:", sum(inlier_idx) / len(inlier_idx))
     t4 = time.time()
     print("pose:", t4-t3)
-    #print(s_pts1)
+    print(s_pts1.shape, x1.shape, x2.shape)
+    
+
+    match_true = np.zeros(x1.shape[0])
+    match_TF_list = []
+    for idx in range(x1.shape[0]):
+        match_true[idx] = 1
+        vis_img = plot_matches2(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], match_true)
+        vis_img = cv2.resize(vis_img,dsize=(1600, 400))
+        cv2.imshow("aaa", vis_img)
+        input_key = cv2.waitKey()
+        match_TF_list.append(input_key-49)
+        match_true[idx] = 0
+    print(match_TF_list)
+
+    match_TF_list_bool = np.array(match_TF_list, dtype=bool)
+    x1, x2 = x1[match_TF_list_bool], x2[match_TF_list_bool]
+    E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+    print("True:", sum(inlier_idx), len(inlier_idx), ", ratio:", sum(inlier_idx) / len(inlier_idx))
+    t4 = time.time()
+    print("pose:", t4-t3)
     print(s_pts1.shape, x1.shape, x2.shape)
     
     vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], inlier_idx)
     vis_img = cv2.resize(vis_img,dsize=(1600, 400))
     cv2.imshow("aaa", vis_img)
     c = cv2.waitKey()
-
-    vis_bool = 1
-    if False:
-        if vis_bool:
-            match_true = np.zeros(x1.shape[0])
-            for idx in range(x1.shape[0]):
-                match_true[idx] = 1
-                vis_img = plot_matches2(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], match_true)
-                vis_img = cv2.resize(vis_img,dsize=(1600, 400))
-                cv2.imshow("aaa", vis_img)
-                c = cv2.waitKey()
-                match_true[idx] = 0
-        else:
-            vis_img = plot_matches3(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2])
-            cv2.imshow("aaa", vis_img)
-            c = cv2.waitKey()
 
 
 def plot_matches(image0,

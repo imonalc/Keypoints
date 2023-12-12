@@ -215,12 +215,24 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 
     return pts1, pts2, desc1, desc2
 
-def mnn_mather(desc1, desc2, method="mean_std"):
+def mnn_mather(desc1, desc2, use_new_method):
     sim = desc1 @ desc2.transpose()
-    sim = (sim - np.mean(sim))/np.std(sim)
-    if method == "mean_std":
-        k = 3.89
-        threshold = sim.mean() + k * sim.std()
+    sim = (sim - np.min(sim))/ (np.max(sim) - np.min(sim))
+    if use_new_method == 1:
+        dec = 5
+    elif use_new_method == 4:
+        dec = 0.1
+    elif use_new_method == 5:
+        dec = 0.3
+    elif use_new_method == 6:
+        dec = 0.5
+    elif use_new_method == 7:
+        dec = 1
+    elif use_new_method == 8:
+        dec = 3
+    elif use_new_method == 9:
+        dec = 100
+    threshold = np.percentile(sim, 100-dec)
     
     sim[sim < threshold] = 0
     nn12 = np.argmax(sim, axis=1)
@@ -247,8 +259,8 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
         s_desc2 = s_desc2.astype(np.uint8)
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
-    elif use_new_method == 1:
-        matches_idx = mnn_mather(s_desc1, s_desc2)
+    elif use_new_method in [1, 4, 5, 6, 7, 8]:
+        matches_idx = mnn_mather(s_desc1, s_desc2, use_new_method)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
     elif use_new_method == 2:
         thresh = 0.75
@@ -353,6 +365,19 @@ def get_descriptor(descriptor):
         return 'superpoint', 'tangent', 512, 2
     elif descriptor == 'Ftspoint':
         return 'superpoint', 'tangent', 512, 3
+    elif descriptor == 'Proposed01':
+        return 'superpoint', 'tangent', 512, 4
+    elif descriptor == 'Proposed03':
+        return 'superpoint', 'tangent', 512, 5
+    elif descriptor == 'Proposed05':
+        return 'superpoint', 'tangent', 512, 6
+    elif descriptor == 'Proposed1':
+        return 'superpoint', 'tangent', 512, 7
+    elif descriptor == 'Proposed3':
+        return 'superpoint', 'tangent', 512, 8
+    elif descriptor == 'Proposed_un':
+        return 'superpoint', 'tangent', 512, 9
+    
 
 
 def AUC(ROT, TRA, MET, L):

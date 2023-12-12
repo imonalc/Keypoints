@@ -325,10 +325,9 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 
 def mnn_mather(desc1, desc2, method="mean_std"):
     sim = desc1 @ desc2.transpose()
-    sim = (sim - np.mean(sim))/np.std(sim)
-    if method == "mean_std":
-        k = 3.89
-        threshold = sim.mean() + k * sim.std()
+    sim = (sim - np.min(sim))/ (np.max(sim) - np.min(sim))
+    threshold = np.percentile(sim, 99.5)
+    print("threshold", threshold)
     
     sim[sim < threshold] = 0
     nn12 = np.argmax(sim, axis=1)

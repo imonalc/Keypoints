@@ -4,8 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 
-COMPARE_DESCRIPTORS = ["Proposed", "orb", "sphorb", "sift", "alike", ]
-ABLATION_DESCRIPTORS = ["Proposed", "spoint", "Ltspoint", "Ftspoint"]
+COMPARE_DESCRIPTORS = ["Proposed", "orb", "sphorb", "sift", "spoint", "alike", ]
+ABLATION_DESCRIPTORS = ["Proposed","Proposed01", "Proposed1",  "Proposed_un", "Ltspoint", "Ftspoint"]
 METHODS = ["", "t"]
 PARAMS = ["R", "T"]
 PARAMS_DICT = {"R": "Rotation", "T": "Translation"}
@@ -13,7 +13,13 @@ ALL_LOCS = ["Classroom", "Room", "Realistic", "Interior1", "Interior2", "Urban1"
 INDOORS = ["Classroom", "Room", "Realistic", "Interior1", "Interior2"]
 OUTDOORS = ["Urban1", "Urban2", "Urban3", "Urban4"]
 TIME_CATEGORYS = ["FP", "MC", "PE"]
-DESCRIPTORS_DICT = {"Proposed": "Proposed",
+DESCRIPTORS_DICT = {"Proposed1": "Proposed (1%)",
+                    "Proposed01": "Proposed (0.1%)",
+                    "Proposed03": "Proposed (0.3%)",
+                    "Proposed05": "Proposed (0.5%)",
+                    "Proposed3": "Proposed (3%)",
+                    "Proposed": "Proposed (5%)",
+                    "Proposed_un": "MNN (No Filter)",
                     "orb": "ORB", 
                     "sphorb": "SPHORB",
                     "sift": "SIFT",
@@ -32,7 +38,7 @@ def read_csv_data(file_path):
     return data
 
 def main():     
-    base_path = "results/FP_10000/values"
+    base_path = "results/FP_500/values"
     for tgt in ["compare", "ablation"]:
         if tgt == "compare":
             descriptors = COMPARE_DESCRIPTORS
@@ -55,7 +61,7 @@ def main():
                 thresholds = np.arange(0, 20.1, 0.1)
                 for descriptor in descriptors:
                     for method in METHODS:
-                        if descriptor in ["sphorb", "Ltspoint", "Proposed", "Ftspoint"] and method == "t":
+                        if descriptor in ["sphorb", "Ltspoint", "Proposed01", "Proposed03", "Proposed05", "Proposed1", "Proposed3", "Proposed", "Proposed_un", "Ftspoint"] and method == "t":
                             continue
                         all_error_data = []
                         for scene in locs:
@@ -80,7 +86,7 @@ def main():
             print(time_category)
             for descriptor in descriptors:
                 for method in METHODS:
-                    if descriptor in ["sphorb", "Ltspoint", "Proposed", "Ftspoint"] and method == "t":
+                    if descriptor in ["sphorb", "Ltspoint","Proposed01", "Proposed03", "Proposed05", "Proposed1","Proposed3","Proposed", "Proposed_un", "Ftspoint"] and method == "t":
                         continue
                     all_time_data = []
                     for scene in ALL_LOCS:
