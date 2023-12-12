@@ -232,6 +232,10 @@ def mnn_mather(desc1, desc2, use_new_method):
         dec = 3
     elif use_new_method == 9:
         dec = 100
+    elif use_new_method == 10:
+        dec = 10
+    elif use_new_method == 11:
+        dec = 20
     threshold = np.percentile(sim, 100-dec)
     
     sim[sim < threshold] = 0
@@ -377,6 +381,10 @@ def get_descriptor(descriptor):
         return 'superpoint', 'tangent', 512, 8
     elif descriptor == 'Proposed_un':
         return 'superpoint', 'tangent', 512, 9
+    elif descriptor == 'Proposed10':
+        return 'superpoint', 'tangent', 512, 10
+    elif descriptor == 'Proposed20':
+        return 'superpoint', 'tangent', 512, 11
     
 
 

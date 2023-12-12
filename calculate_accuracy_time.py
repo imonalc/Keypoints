@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import math
 
 COMPARE_DESCRIPTORS = ["Proposed", "orb", "sphorb", "sift", "spoint", "alike", ]
-ABLATION_DESCRIPTORS = ["Proposed","Proposed01", "Proposed1",  "Proposed_un", "Ltspoint", "Ftspoint"]
+ABLATION_DESCRIPTORS = ["Proposed","Proposed01", "Proposed1", "Proposed10", "Ltspoint", "Ftspoint"] # "Proposed20",  
 METHODS = ["", "t"]
 PARAMS = ["R", "T"]
 PARAMS_DICT = {"R": "Rotation", "T": "Translation"}
@@ -19,6 +19,8 @@ DESCRIPTORS_DICT = {"Proposed1": "Proposed (1%)",
                     "Proposed05": "Proposed (0.5%)",
                     "Proposed3": "Proposed (3%)",
                     "Proposed": "Proposed (5%)",
+                    "Proposed10": "Proposed (10%)",
+                    "Proposed20": "Proposed (20%)",
                     "Proposed_un": "MNN (No Filter)",
                     "orb": "ORB", 
                     "sphorb": "SPHORB",
@@ -61,7 +63,7 @@ def main():
                 thresholds = np.arange(0, 20.1, 0.1)
                 for descriptor in descriptors:
                     for method in METHODS:
-                        if descriptor in ["sphorb", "Ltspoint", "Proposed01", "Proposed03", "Proposed05", "Proposed1", "Proposed3", "Proposed", "Proposed_un", "Ftspoint"] and method == "t":
+                        if descriptor in ["sphorb", "Ltspoint", "Proposed01", "Proposed03", "Proposed05", "Proposed1", "Proposed3", "Proposed", "Proposed10", "Proposed20", "Proposed_un", "Ftspoint"] and method == "t":
                             continue
                         all_error_data = []
                         for scene in locs:
@@ -86,7 +88,7 @@ def main():
             print(time_category)
             for descriptor in descriptors:
                 for method in METHODS:
-                    if descriptor in ["sphorb", "Ltspoint","Proposed01", "Proposed03", "Proposed05", "Proposed1","Proposed3","Proposed", "Proposed_un", "Ftspoint"] and method == "t":
+                    if descriptor in ["sphorb", "Ltspoint","Proposed01", "Proposed03", "Proposed05", "Proposed1","Proposed3","Proposed", "Proposed10", "Proposed20", "Proposed_un", "Ftspoint"] and method == "t":
                         continue
                     all_time_data = []
                     for scene in ALL_LOCS:
