@@ -50,6 +50,7 @@ def main():
         plt.rcParams["font.size"] = 20
         for i, param in enumerate(PARAMS):
             for j, loc in enumerate(["indoor", "outdoor"]):
+                print(loc)
                 if loc == "indoor":
                     locs = INDOORS
                 else:
@@ -70,6 +71,8 @@ def main():
                             file_path = f"{base_path}/{scene}_{method}{descriptor}_5PA_GSM_wRT/{param}_ERRORS.csv"
                             error_data = read_csv_data(file_path)
                             all_error_data.extend(error_data)
+                        print(f"{METHODS_DICT[method]}{DESCRIPTORS_DICT[descriptor]}")
+                        print(f"MAE: {np.mean(all_error_data):.3f}, MSE: {np.mean(np.array(all_error_data) ** 2):.3f}")
                         ratios = []
                         for threshold in thresholds:
                             count = np.sum(all_error_data <= threshold * math.pi / 180)
@@ -80,7 +83,8 @@ def main():
 
                         if i == 0 and j == 1:
                             ax.legend(loc='upper left', bbox_to_anchor=(1.05, 1))
-
+                        
+        print()
         plt.tight_layout()
         plt.show()
 
