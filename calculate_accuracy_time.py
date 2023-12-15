@@ -40,7 +40,8 @@ def read_csv_data(file_path):
     return data
 
 def main():     
-    base_path = "results/FP_500/values"
+    base_path = "results/FP_10000/values"
+    value_dict = {}
     for tgt in ["compare", "ablation"]:
         if tgt == "compare":
             descriptors = COMPARE_DESCRIPTORS
@@ -71,14 +72,15 @@ def main():
                             file_path = f"{base_path}/{scene}_{method}{descriptor}_5PA_GSM_wRT/{param}_ERRORS.csv"
                             error_data = read_csv_data(file_path)
                             all_error_data.extend(error_data)
-                        print(f"{METHODS_DICT[method]}{DESCRIPTORS_DICT[descriptor]}")
+                        method_tmp = f"{METHODS_DICT[method]}{DESCRIPTORS_DICT[descriptor]}"
+                        print(method_tmp)
                         print(f"MAE: {np.mean(all_error_data):.3f}, MSE: {np.mean(np.array(all_error_data) ** 2):.3f}")
                         ratios = []
                         for threshold in thresholds:
                             count = np.sum(all_error_data <= threshold * math.pi / 180)
                             ratio = count / len(all_error_data)
                             ratios.append(ratio)
-                        ax.plot(thresholds, ratios, linestyle='-', label=f"{METHODS_DICT[method]}{DESCRIPTORS_DICT[descriptor]}")
+                        ax.plot(thresholds, ratios, linestyle='-', label=method_tmp)
 
 
                         if i == 0 and j == 1:
