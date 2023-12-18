@@ -106,10 +106,10 @@ def main():
                         # ----------------------------------------------
                         # 80 baricenter points
                         corners = tangent_image_corners(base_order, sample_order)
-                        t_featurepoint_b = time.time()
+                        t_featurepoint_b = time.perf_counter()
                         pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
-                        t_featurepoint_a = time.time()
                         pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
+                        t_featurepoint_a = time.perf_counter()
 
                         pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
                         
@@ -117,9 +117,9 @@ def main():
 
                     else:
                         os.chdir('SPHORB-master/')
-                        t_featurepoint_b = time.time()
+                        t_featurepoint_b = time.perf_counter()
                         pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
-                        t_featurepoint_a = time.time()
+                        t_featurepoint_a = time.perf_counter()
                         pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
                         os.chdir('../')
 
@@ -134,9 +134,9 @@ def main():
 
 
                     if pts1.shape[0] > 0 or pts2.shape[0] >0:
-                        t_matching_b = time.time()
+                        t_matching_b = time.perf_counter()
                         s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
-                        t_matching_a = time.time()
+                        t_matching_a = time.perf_counter()
 
                         x1,x2 = coord_3d(x1, dim), coord_3d(x2, dim)
 
@@ -145,7 +145,7 @@ def main():
                         if x1.shape[0] < 8:
                             R_error, T_error = 3.14, 3.14
                         else:
-                            t_poseestimate_b = time.time()
+                            t_poseestimate_b = time.perf_counter()
 
                             if args.solver   == 'None':
                                 E, cam = get_cam_pose_by_ransac(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
@@ -158,14 +158,14 @@ def main():
                             elif args.solver == 'GSM_SK':
                                 E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
 
-                            t_poseestimate_a = time.time()
+                            t_poseestimate_a = time.perf_counter()
                             R1_,R2_,T1_,T2_ = decomposeE(E.T)
                             R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
                             R_error, T_error = r_error(Rx,R_), t_error(Tx,T_)
 
                         R_ERROR[indicador].append(R_error)
                         T_ERROR[indicador].append(T_error)
-                        TIMES_FP[indicador].append(t_featurepoint_a-t_featurepoint_b)
+                        TIMES_FP[indicador].append((t_featurepoint_a-t_featurepoint_b)/2)
                         TIMES_MC[indicador].append(t_matching_a-t_matching_b)
                         TIMES_PE[indicador].append(t_poseestimate_a-t_poseestimate_b)
                         METRICS[indicador,:] = METRICS[indicador,:] + [x1.shape[0], (s_pts1.shape[0]+s_pts2.shape[1])/2]
