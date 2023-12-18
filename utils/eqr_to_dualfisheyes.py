@@ -5,7 +5,7 @@ import numpy as np
 import argparse
 
 
-def eqr2dualfisheye(img, output_size=(3840, 1920), side="right"):
+def eqr2dualfisheye(img, output_size=(1000, 500), side="right"):
     img_resized = cv2.resize(img, output_size)
     if side == "right":
         img_eqr = cut_leftside(img_resized)
@@ -81,26 +81,20 @@ def cut_leftside(img):
 
 
 
-#def main():
-#    parser = argparse.ArgumentParser(description = 'Tangent Plane')
-#    parser.add_argument('--path', default = "./data/test_farm/0/O.png")
-#    args = parser.parse_args()
-#
-#    #path = args.path
-#    #print(path)
-#    #resized_img = image_resize.image_resize(path, rows=5376, cols=2688)
-#    #print(resized_img.shape)
-#    #cv2.imwrite("data/test_farm/0/O2.png", resized_img)
-#    #print(args.path + "/O2.png")
-#    #dual_fisheye_image = eqr2dualfisheye("data/test_farm/0/O2.png")
-#    img_eqr = cv2.imread(args.path)
-#    dual_fisheye_image = eqr2dualfisheye(img_eqr)
-#    h_dual_fisheye_image, w_dual_fisheye_image = dual_fisheye_image.shape[:2]
-#    right_fisheye_image = dual_fisheye_image[:, w_dual_fisheye_image //2:w_dual_fisheye_image]
-#    ###
-#    cv2.imshow('Dual Fisheye Image', right_fisheye_image)
-#    cv2.waitKey(0)
-#    cv2.destroyAllWindows()
-#
-#if __name__ == '__main__':
-#    main()
+def main():
+    parser = argparse.ArgumentParser(description = 'Tangent Plane')
+    parser.add_argument('--path', default = "./data/test_farm/0/O.png")
+    args = parser.parse_args()
+
+    img_eqr = cv2.imread(args.path)
+    dual_fisheye_image = eqr2dualfisheye(img_eqr)
+    h_dual_fisheye_image, w_dual_fisheye_image = dual_fisheye_image.shape[:2]
+    right_fisheye_image = dual_fisheye_image[:, w_dual_fisheye_image //2:w_dual_fisheye_image]
+    ###
+    cv2.imwrite("aaa.png", dual_fisheye_image)
+    cv2.imshow('Dual Fisheye Image', right_fisheye_image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+if __name__ == '__main__':
+    main()
