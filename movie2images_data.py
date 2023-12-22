@@ -1,39 +1,12 @@
 import sys
 import os
-sys.path.append(os.getcwd()+'/fivepoint')
-import build.fivep as f
-
-import time
-import torch
-import torch.nn.functional as F
-from spherical_distortion.functional import create_tangent_images, unresample
-from spherical_distortion.util import *
-import matplotlib.pyplot as plt
-from skimage import io
 import os
 import cv2
 
 import sys
 import pandas as pd
 import numpy as np
-import _spherical_distortion_ext._mesh as _mesh
 import argparse
-
-from random import sample
-import imageio
-from scipy.spatial.transform import Rotation as Rot
-
-from utils.coord    import coord_3d
-from utils.ransac   import *
-from utils.keypoint import *
-from utils.metrics  import *
-from utils.eqr_to_dualfisheyes import *
-from utils.camera_recovering import *
-
-from os import listdir
-from os.path import isfile, join, isdir
-from tqdm import tqdm
-from scipy.spatial.transform import Rotation
 
 def extract_frames(video_path, output_path, frame_interval, name):
     # 動画ファイルを開く
@@ -59,7 +32,7 @@ def extract_frames(video_path, output_path, frame_interval, name):
             cv2.imwrite(output_filename, frame)
         
         # フレームカウンタをインクリメント
-        if frame_count // frame_interval >=49:
+        if frame_count // frame_interval >=99:
             break
         frame_count += 1
     # メモリを解放し、ファイルを閉じる
@@ -73,18 +46,18 @@ def main():
     args = parser.parse_args()
 
 
-    video_path = os.path.join(os.getcwd(), "data", args.data, "O.MP4")
-    output_path = os.path.join(os.getcwd(), "data", args.data)    # 出力画像の保存先ディレクトリパス
-    frame_interval = 30               # 画像を切り出すフレーム間隔
+    video_path = os.path.join(args.data, "O.MP4")
+    output_path = os.path.join(args.data)    # 出力画像の保存先ディレクトリパス
+    frame_interval = 29            # 画像を切り出すフレーム間隔
 
     print(video_path)
     print(output_path)
 
     extract_frames(video_path, output_path, frame_interval, "O")
 
-    video_path = os.path.join(os.getcwd(), "data", args.data, "R.MP4")
-    output_path = os.path.join(os.getcwd(), "data", args.data)    # 出力画像の保存先ディレクトリパス
-    frame_interval = 30               # 画像を切り出すフレーム間隔
+    video_path = os.path.join(args.data, "R.MP4")
+    output_path = os.path.join(args.data)    # 出力画像の保存先ディレクトリパス
+    frame_interval = 29       # 画像を切り出すフレーム間隔
 
     print(video_path)
     print(output_path)
