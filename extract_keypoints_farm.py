@@ -44,7 +44,7 @@ def main():
     parser.add_argument('--points', type=int, default = 500)
     parser.add_argument('--match', default="ratio")
     parser.add_argument('--g_metrics',default="False")
-    parser.add_argument('--solver', default="None")
+    parser.add_argument('--solver', default="GSM_wRT")
     parser.add_argument('--inliers', default="8PA")
     parser.add_argument('--pose'      , default="pose_test")
     parser.add_argument('--descriptors', nargs='+')
@@ -56,32 +56,27 @@ def main():
     # ----------------------------------------------
 
     NUM = 0
-    R_errors, T_errors = [], []
-    num_keypoints = []
-    TIMES_feature = []
+    R_ERROR, T_ERROR, TIMES_FP, TIMES_MC, TIMES_PE = [], [], [], [], []
     for i in range(len(DESCRIPTORS)):
-        R_errors.append([])
-        T_errors.append([])
-        num_keypoints.append([])
-        TIMES_feature.append([])
+        R_ERROR.append([])
+        T_ERROR.append([])
+        TIMES_FP.append([])
+        TIMES_MC.append([])
+        TIMES_PE.append([])
 
-    if args.g_metrics == "False":
-        METRICS = np.zeros((len(DESCRIPTORS),2))
-        metrics = ['Matched','Keypoint']
-    else:
-        METRICS = np.zeros((len(DESCRIPTORS),7))
-        metrics = ['Matched','Keypoint','Pmr','Pr','R','Ms','E']
+
+    METRICS = np.zeros((len(DESCRIPTORS),2))
 
     pose = args.pose
     TIMES = []
     st = time.time()
-    path_true_value = os.path.join(os.getcwd(), "data/Farm/Calibration/", pose)
+    path_true_value = os.path.join("./data/Farm/new/Calibration/", pose)
     RQ_true_value = np.genfromtxt(path_true_value + "/RQ_true_value.csv", delimiter=',')
     T_true_value = np.genfromtxt(path_true_value + "/T_true_value.csv", delimiter=',')
 
-    mypath = os.path.join('data/Farm',pose)
-    paths  = [os.path.join(os.getcwd(),'data/Farm',pose,f) for f in listdir('data/Farm/'+pose) if isdir(join(mypath, f))]
-    print(os.path.join(os.getcwd(),'data/Farm',pose))
+    mypath = os.path.join('./data/Farm/new',pose)
+    paths  = [os.path.join('./data/Farm/new/',pose,f) for f in listdir('./data/Farm/new/'+pose) if isdir(join(mypath, f))]
+    print(os.path.join('./data/Farm/new',pose))
     NUM = NUM + len(paths)
     print(paths)
 
@@ -91,53 +86,69 @@ def main():
         for indicador, descriptor in enumerate(DESCRIPTORS):
 
 
-            try:
+            #try:
                 opt, mode, sphered, use_our_method = get_descriptor(descriptor)
-
                 base_order = 0  # Base sphere resolution
                 sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
                 scale_factor = 1.0  # How much to scale input equirectangular image by
+                save_ply = False  # Whether to save the PLY visualizations too
                 dim = np.array([2*sphered, sphered])
-
-                path_o = path + '/O.jpg'
-                path_r = path + '/R.jpg'
-
-                st = time.time()
+                path_o = path + '/O.png'
+                path_r = path + '/R.png'
                 if opt != 'sphorb':
+                    # ----------------------------------------------
+                    # Compute necessary data
+                    # ----------------------------------------------
+                    # 80 baricenter points
                     corners = tangent_image_corners(base_order, sample_order)
-                    #print('bbb', end="")
+                    t_featurepoint_b = time.perf_counter()
                     pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
                     pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
-                    pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points) 
-
-
+                    t_featurepoint_a = time.perf_counter()
+                    pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
+                    
                 else:
                     os.chdir('SPHORB-master/')
+                    t_featurepoint_b = time.perf_counter()
                     pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
                     pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
+                    t_featurepoint_a = time.perf_counter()
                     os.chdir('../')
-                    #print('aaa', end="")
-
                 
 
-                num_keypoints[indicador].append(len(pts1))
-                num_keypoints[indicador].append(len(pts1))
+                height_threshold = 1024*0.9
+                cond1_1 = (pts1[:, 1] < height_threshold)
+                cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 840))  & (pts1[:, 1] > 400))
+                cond1_3 = ~(((680 < pts1[:, 0]) &(pts1[:, 0] < 800)) & ((220< pts1[:, 1])&(pts1[:, 1] < 420)))
+                valid_idx1 = cond1_1 &  cond1_2 &cond1_3
+                pts1 =  pts1[valid_idx1]
+                desc1 = desc1[valid_idx1]
+
+                cond2_1 = (pts2[:, 1] < height_threshold)
+                cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 350))
+                cond2_3 = ~(((220 < pts2[:, 0]) &(pts2[:, 0] < 320)) & ((250< pts2[:, 1])&(pts2[:, 1] < 400)))
+                valid_idx2 = cond2_1 &  cond2_2 &cond2_3
+                pts2 =  pts2[valid_idx2]
+                desc2 = desc2[valid_idx2]
+
 
                 if len(pts1.shape) == 1:
                     pts1 = pts1.reshape(1,-1)
                 if len(pts2.shape) == 1:
                     pts2 = pts2.reshape(1,-1)
 
+
                 if pts1.shape[0] > 0 or pts2.shape[0] >0:
-                    s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, '100p', opt, args.match, use_new_method=use_our_method)
-                    
+                    t_matching_b = time.perf_counter()
+                    s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
+                    t_matching_a = time.perf_counter()
                     x1,x2 = coord_3d(x1, dim), coord_3d(x2, dim)
                     s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
-
+                    
                     if x1.shape[0] < 8:
                         R_error, T_error = 3.14, 3.14
                     else:
-                        inicio = time.time()
+                        t_poseestimate_b = time.perf_counter()
                         if args.solver   == 'None':
                             E, cam = get_cam_pose_by_ransac(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                         elif args.solver == 'SK':
@@ -145,49 +156,37 @@ def main():
                         elif args.solver == 'GSM':
                             E, can = get_cam_pose_by_ransac_GSM(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                         elif args.solver == 'GSM_wRT':
-                            E, can = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+                            E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                         elif args.solver == 'GSM_SK':
-                            E, can = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-                        fin = time.time()
-                        TIMES.append(fin-inicio)
+                        
+                            E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+                        t_poseestimate_a = time.perf_counter()
                         R1_,R2_,T1_,T2_ = decomposeE(E.T)
                         R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
 
                         RQ = mat2quat(R_)
                         T_norm = T_ / np.linalg.norm(T_)
                     
-                    gl = time.time()
-                    
                     R_error = 2 * np.arccos(np.dot(RQ, RQ_true_value))
                     T_error = math.acos(np.dot(T_norm, T_true_value))
 
-                    R_errors[indicador].append(R_error)
-                    T_errors[indicador].append(T_error)
-                    TIMES_feature[indicador].append(gl - st)
-                    
-
+                    R_ERROR[indicador].append(R_error)
+                    T_ERROR[indicador].append(T_error)
+                    TIMES_FP[indicador].append((t_featurepoint_a-t_featurepoint_b)/2)
+                    TIMES_MC[indicador].append(t_matching_a-t_matching_b)
+                    TIMES_PE[indicador].append(t_poseestimate_a-t_poseestimate_b)
                     METRICS[indicador,:] = METRICS[indicador,:] + [x1.shape[0], (s_pts1.shape[0]+s_pts2.shape[1])/2]
-
                     std.append(x1.shape[0])
-            except:
-                print("Unexpected error:",indicador, opt)
-    gl = time.time()
-    print(descriptor, gl - st)
-
-
-    #print('ALL:')
-    #print(np.mean(np.array(TIMES)))
-
-    print(R_errors)
-    print(T_errors)
-    print(num_keypoints)
-    for i, descriptor in enumerate(DESCRIPTORS):
-        np.savetxt(os.path.join(os.getcwd(),'data/Farm', "output", DESCRIPTORS[i], pose, 'R_errors.csv'), R_errors[i], delimiter=',')
-        np.savetxt(os.path.join(os.getcwd(),'data/Farm', "output", DESCRIPTORS[i], pose, 'T_errors.csv'), T_errors[i], delimiter=',')
-        np.savetxt(os.path.join(os.getcwd(),'data/Farm', "output", DESCRIPTORS[i], pose, 'num_keypoints.csv'), num_keypoints[i], delimiter=',')
-        np.savetxt(os.path.join(os.getcwd(),'data/Farm', "output", DESCRIPTORS[i], pose, 'calculate_time.csv'), TIMES_feature[i], delimiter=',')
-
-    return
+            #except:     
+                #print("Unexpected error:",indicador, opt, use_our_method)
+    for indicador, descriptor in enumerate(DESCRIPTORS):
+        os.system('mkdir -p '+f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver)
+        np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
+        np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
+        np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_FP.csv',np.array(TIMES_FP[indicador]),delimiter=",")
+        np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_MC.csv',np.array(TIMES_MC[indicador]),delimiter=",")
+        np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_PE.csv',np.array(TIMES_PE[indicador]),delimiter=",")
+print('finish')
 
 
 

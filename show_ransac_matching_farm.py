@@ -76,10 +76,8 @@ def main():
 
     img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
     img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
-    height_threshold = 0.7 * img_o.shape[0]
+    height_threshold = 0.9 * img_o.shape[0]
     print(path_o)
-    t1 = time.time()
-    print("image:", t1-t0)
 
     if opt != 'sphorb':
         corners = tangent_image_corners(base_order, sample_order)
@@ -95,53 +93,36 @@ def main():
         pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
         os.chdir('../')
 
-    valid_idx1 = pts1[:, 1] < height_threshold
+    cond1_1 = (pts1[:, 1] < height_threshold)
+    cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 840))  & (pts1[:, 1] > 400))
+    cond1_3 = ~(((680 < pts1[:, 0]) &(pts1[:, 0] < 800)) & ((220< pts1[:, 1])&(pts1[:, 1] < 420)))
+    valid_idx1 = cond1_1 &  cond1_2 &cond1_3
     pts1 =  pts1[valid_idx1]
     desc1 = desc1[:, valid_idx1]
-    valid_idx2 = pts2[:, 1] < height_threshold
+
+    cond2_1 = (pts2[:, 1] < height_threshold)
+    cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 350))
+    cond2_3 = ~(((220 < pts2[:, 0]) &(pts2[:, 0] < 320)) & ((250< pts2[:, 1])&(pts2[:, 1] < 400)))
+    valid_idx2 = cond2_1 &  cond2_2 &cond2_3
+    print(valid_idx2)
     pts2 =  pts2[valid_idx2]
     desc2 = desc2[:, valid_idx2]
-    #print(desc1.shape)
+
 
     pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
-
-    t2 = time.time()
-    print("detection:", t2-t1)
 
     if len(pts1.shape) == 1:
         pts1 = pts1.reshape(1,-1)
 
     s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
-    t3 = time.time()
-    print("matching:", t3-t2)
 
     E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
     print("True:", sum(inlier_idx), len(inlier_idx), ", ratio:", sum(inlier_idx) / len(inlier_idx))
-    t4 = time.time()
-    print("pose:", t4-t3)
-    #print(s_pts1)
-    print(s_pts1.shape, x1.shape, x2.shape)
     
     vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], inlier_idx)
-    vis_img = cv2.resize(vis_img,dsize=(1600, 400))
+    vis_img = cv2.resize(vis_img,dsize=(512,512))
     cv2.imshow("aaa", vis_img)
     c = cv2.waitKey()
-
-    vis_bool = 1
-    if False:
-        if vis_bool:
-            match_true = np.zeros(x1.shape[0])
-            for idx in range(x1.shape[0]):
-                match_true[idx] = 1
-                vis_img = plot_matches2(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], match_true)
-                vis_img = cv2.resize(vis_img,dsize=(1600, 400))
-                cv2.imshow("aaa", vis_img)
-                c = cv2.waitKey()
-                match_true[idx] = 0
-        else:
-            vis_img = plot_matches3(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2])
-            cv2.imshow("aaa", vis_img)
-            c = cv2.waitKey()
 
 
 def plot_matches(image0,
@@ -162,117 +143,26 @@ def plot_matches(image0,
     H0, W0 = image0.shape[0], image0.shape[1]
     H1, W1 = image1.shape[0], image1.shape[1]
 
-    H, W = max(H0, H1), W0 + W1
+    H, W = H0 + H1, max(W0, W1)
     out = 255 * np.ones((H, W, 3), np.uint8)
     out[:H0, :W0, :] = out0
-    out[:H1, W0:, :] = out1
+    out[H0:H0+H1, :W1, :] = out1
 
     mkpts0, mkpts1 = x1, x2
     mkpts0 = np.round(mkpts0).astype(int)
     mkpts1 = np.round(mkpts1).astype(int)
+
+    mkpts1[:, 1] += H0
     
     for kpt0, kpt1, mt in zip(mkpts0, mkpts1, match_true):
         (x0, y0), (x1, y1) = kpt0, kpt1
         mcolor = (0, 0, 255) if mt == 0 else (0, 255, 0)  # Red for outliers, Green for inliers
-        cv2.line(out, (x0, y0), (x1 + W0, y1),
+        cv2.line(out, (x0, y0), (x1, y1),
                  color=mcolor,
-                 thickness=5,
+                 thickness=2,
                  lineType=cv2.LINE_AA)
 
     return out
-
-
-def plot_matches2(image0,
-                 image1,
-                 kpts0,
-                 kpts1,
-                 x1,
-                 x2,
-                 match_true,
-                 radius=2,
-                 color=(255, 0, 0)):
-
-
-
-    out0 = plot_keypoints(image0, kpts0, radius, color)
-    out1 = plot_keypoints(image1, kpts1, radius, color)
-    H0, W0 = image0.shape[0], image0.shape[1]
-    H1, W1 = image1.shape[0], image1.shape[1]
-    H, W = max(H0, H1), W0 + W1
-    out = 255 * np.ones((H, W, 3), np.uint8)
-    out[:H0, :W0, :] = out0
-    out[:H1, W0:, :] = out1
-    mkpts0, mkpts1 = x1, x2
-    mkpts0 = np.round(mkpts0).astype(int)
-    mkpts1 = np.round(mkpts1).astype(int)
-    i = 0
-    for kpt0, kpt1 in zip(mkpts0, mkpts1):
-        (x0, y0), (x1, y1) = kpt0, kpt1
-        if match_true[i]:
-            mcolor=(0, 255, 0)
-            print(i)
-        else:
-            i += 1
-            continue
-            mcolor=(0, 0, 255)
-        i += 1
-        cv2.line(out, (x0, y0), (x1 + W0, y1),
-                     color=mcolor,
-                     thickness=5,
-                     lineType=cv2.LINE_AA)
-    return out
-
-
-
-def plot_matches3(image0,
-                 image1,
-                 kpts0,
-                 kpts1,
-                 x1,
-                 x2,
-                 radius=2,
-                 color=(255, 0, 0)):
-    
-    match_true = np.zeros(x1.shape[0]) 
-    out0 = plot_keypoints(image0, kpts0, radius, color)
-    out1 = plot_keypoints(image1, kpts1, radius, color)
-
-    H0, W0 = image0.shape[0], image0.shape[1]
-    H1, W1 = image1.shape[0], image1.shape[1]
-
-    H, W = max(H0, H1), W0 + W1
-    out = 255 * np.ones((H, W, 3), np.uint8)
-    out[:H0, :W0, :] = out0
-    out[:H1, W0:, :] = out1
-
-    mkpts0, mkpts1 = x1, x2
-    mkpts0 = np.round(mkpts0).astype(int)
-    mkpts1 = np.round(mkpts1).astype(int)
-    i = -1
-    for kpt0, kpt1 in zip(mkpts0, mkpts1):
-        (x0, y0), (x1, y1) = kpt0, kpt1
-        i += 1
-        mcolor=(0, 0, 255)
-        if match_true[i] in [1, 2]:
-            continue
-        cv2.line(out, (x0, y0), (x1 + W0, y1),
-                     color=mcolor,
-                     thickness=1,
-                     lineType=cv2.LINE_AA)
-    i = -1
-    for kpt0, kpt1 in zip(mkpts0, mkpts1):
-        (x0, y0), (x1, y1) = kpt0, kpt1
-        mcolor=(0, 255, 0)
-        i += 1
-        if match_true[i] in [0, 2]:
-            continue
-        cv2.line(out, (x0, y0), (x1 + W0, y1),
-                     color=mcolor,
-                     thickness=1,
-                     lineType=cv2.LINE_AA)
-
-    return out
-
 
 
 
@@ -289,7 +179,7 @@ def plot_keypoints(image, kpts, radius=2, color=(0, 0, 255)):
 
     for kpt in kpts:
         x0, y0 = kpt
-        cv2.circle(out, (x0, y0), 10, color, -1, lineType=cv2.LINE_4)
+        cv2.circle(out, (x0, y0), 4, color, -1, lineType=cv2.LINE_4)
     return out
 
 
@@ -326,8 +216,8 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 def mnn_mather(desc1, desc2, method="mean_std"):
     sim = desc1 @ desc2.transpose()
     sim = (sim - np.min(sim))/ (np.max(sim) - np.min(sim))
-    threshold = np.percentile(sim, 99.5)
-    print("threshold", threshold)
+    sim = sim
+    threshold = np.percentile(sim, 99)
     
     sim[sim < threshold] = 0
     nn12 = np.argmax(sim, axis=1)

@@ -28,7 +28,7 @@ def extract_frames(video_path, output_path, frame_interval, name):
             output_foldername = f"{output_path}/{frame_count//frame_interval}"
             if not os.path.exists(output_foldername):
                 os.makedirs(output_foldername)
-            output_filename = f"{output_foldername}/{name}.jpg"
+            output_filename = f"{output_foldername}/{name}.png"
             cv2.imwrite(output_filename, frame)
         
         # フレームカウンタをインクリメント
@@ -48,7 +48,7 @@ def main():
 
     video_path = os.path.join(args.data, "O.MP4")
     output_path = os.path.join(args.data)    # 出力画像の保存先ディレクトリパス
-    frame_interval = 29            # 画像を切り出すフレーム間隔
+    frame_interval = 40            # 画像を切り出すフレーム間隔
 
     print(video_path)
     print(output_path)
@@ -57,7 +57,7 @@ def main():
 
     video_path = os.path.join(args.data, "R.MP4")
     output_path = os.path.join(args.data)    # 出力画像の保存先ディレクトリパス
-    frame_interval = 29       # 画像を切り出すフレーム間隔
+    frame_interval = 40       # 画像を切り出すフレーム間隔
 
     print(video_path)
     print(output_path)

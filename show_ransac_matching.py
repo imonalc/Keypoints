@@ -183,7 +183,7 @@ def plot_matches(image0,
         mcolor = (0, 0, 255) if mt == 0 else (0, 255, 0)  # Red for outliers, Green for inliers
         cv2.line(out, (x0, y0), (x1, y1),
                  color=mcolor,
-                 thickness=5,
+                 thickness=2,
                  lineType=cv2.LINE_AA)
 
     return out
@@ -296,7 +296,7 @@ def plot_keypoints(image, kpts, radius=2, color=(0, 0, 255)):
 
     for kpt in kpts:
         x0, y0 = kpt
-        cv2.circle(out, (x0, y0), 10, color, -1, lineType=cv2.LINE_4)
+        cv2.circle(out, (x0, y0), 4, color, -1, lineType=cv2.LINE_4)
     return out
 
 

@@ -1,12 +1,7 @@
-"""
-    PROGRAMA PARA CALCULAR KEYPOINTS DE DOS IMAGENES 512x1024, ASI MISMO DE SUS CORRESPONDENCIAS
-    POR UN KNN BILATERAL
-
-"""
 import sys
 import os
 sys.path.append(os.getcwd()+'/fivepoint')
-import fivepoint.build.fivep as f
+import build.fivep as f
 
 import time
 import torch
@@ -33,161 +28,138 @@ from utils.ransac   import *
 from utils.keypoint import *
 from utils.metrics  import *
 from utils.camera_recovering import *
+import utils.calibrate_SPHcamera_opencv as calibrate_SPHcamera_opencv
 
 from os import listdir
 from os.path import isfile, join, isdir
 from tqdm import tqdm
+from scipy.spatial.transform import Rotation
 
 sys.path.append(os.getcwd()+'/SPHORB-master')
-
 import build1.sphorb_cpp as sphorb
 
 
 def main():
 
+    # pose1
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
-    parser.add_argument('--points', type=int, default = 12000)
+    parser.add_argument('--pose'      , default="pose_test")
+    parser.add_argument('--descriptor', default="tsift")
     parser.add_argument('--match', default="ratio")
-    parser.add_argument('--solver', default="None")
+    parser.add_argument('--points', type=int, default = 10000)
+    parser.add_argument('--solver', default="GSM_wRT")
     parser.add_argument('--inliers', default="8PA")
-    parser.add_argument('--datas'      , nargs='+')
-    parser.add_argument('--descriptors', nargs='+')
     args = parser.parse_args()
 
-
-    DATAS       = args.datas
-    DESCRIPTORS = args.descriptors
+    descriptor = args.descriptor
     # ----------------------------------------------
     # Parameters
     # ----------------------------------------------
 
+    pose = args.pose
+    base_path = "./data/Farm/new/Calibration/"
+    mypath = os.path.join(base_path, pose)
+    paths  = [os.path.join(base_path, pose,f) for f in listdir(base_path+pose) if isdir(join(mypath, f))]
     NUM = 0
-    R_ERROR, T_ERROR, TIMES_FP, TIMES_MC, TIMES_PE = [], [], [], [], []
-    for i in range(len(DESCRIPTORS)):
-        R_ERROR.append([])
-        T_ERROR.append([])
-        TIMES_FP.append([])
-        TIMES_MC.append([])
-        TIMES_PE.append([])
+    NUM = NUM + len(paths)
+    print(paths)
 
+    R_quat_l = []
+    T_l = []
 
-    METRICS = np.zeros((len(DESCRIPTORS),2))
+    for path in tqdm(paths):
+        try:
+            opt, mode, sphered, use_our_method = get_descriptor(descriptor)
+            base_order = 0  # Base sphere resolution
+            sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
+            scale_factor = 1.0  # How much to scale input equirectangular image by
+            save_ply = False  # Whether to save the PLY visualizations too
+            dim = np.array([2*sphered, sphered])
+            path_o = path + '/O.png'
+            path_r = path + '/R.png'
+            if opt != 'sphorb':
+                # ----------------------------------------------
+                # Compute necessary data
+                # ----------------------------------------------
+                # 80 baricenter points
+                corners = tangent_image_corners(base_order, sample_order)
+                pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
+                pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
+                pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
 
-    data = get_data(DATAS)
-    for data in DATAS:
+            else:
+                os.chdir('SPHORB-master/')
+                pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
+                pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
+                os.chdir('../')
 
-        mypath = os.path.join('data/data_100',data)
-        paths  = [os.path.join(os.getcwd(),'data/data_100',data,f) for f in listdir('data/data_100/'+data) if isdir(join(mypath, f))]
-        NUM = NUM + len(paths)
-        std = []
+            height_threshold = 512*0.9
+            cond1_1 = (pts1[:, 1] < height_threshold)
+            cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 840))  & (pts1[:, 1] > 400))
+            cond1_3 = ~(((680 < pts1[:, 0]) &(pts1[:, 0] < 800)) & ((220< pts1[:, 1])&(pts1[:, 1] < 420)))
+            valid_idx1 = cond1_1 & cond1_2 &cond1_3
 
-        for path in tqdm(paths):
+            pts1 =  pts1[valid_idx1]
+            desc1 = desc1[valid_idx1]
 
-            for indicador, descriptor in enumerate(DESCRIPTORS):
-
-
-
-                try:
-                    opt, mode, sphered, use_our_method = get_descriptor(descriptor)
-
-                    base_order = 0  # Base sphere resolution
-                    sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
-                    scale_factor = 1.0  # How much to scale input equirectangular image by
-                    save_ply = False  # Whether to save the PLY visualizations too
-                    dim = np.array([2*sphered, sphered])
-
-                    path_o = path + '/O.png'
-                    path_r = path + '/R.png'
-
-                    if opt != 'sphorb':
-
-                        # ----------------------------------------------
-                        # Compute necessary data
-                        # ----------------------------------------------
-                        # 80 baricenter points
-                        corners = tangent_image_corners(base_order, sample_order)
-                        t_featurepoint_b = time.perf_counter()
-                        pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
-                        pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
-                        t_featurepoint_a = time.perf_counter()
-
-                        pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
-                        
-
-
-                    else:
-                        os.chdir('SPHORB-master/')
-                        t_featurepoint_b = time.perf_counter()
-                        pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
-                        pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
-                        t_featurepoint_a = time.perf_counter()
-                        os.chdir('../')
-
-
-                    if len(pts1.shape) == 1:
-                        pts1 = pts1.reshape(1,-1)
-
-                    if len(pts2.shape) == 1:
-                        pts2 = pts2.reshape(1,-1)
-                    Rx = np.load(path+"/R.npy")
-                    Tx = np.load(path+"/T.npy")
-
-
-                    if pts1.shape[0] > 0 or pts2.shape[0] >0:
-                        t_matching_b = time.perf_counter()
-                        s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
-                        t_matching_a = time.perf_counter()
-
-                        x1,x2 = coord_3d(x1, dim), coord_3d(x2, dim)
-
-                        s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
-                        
-                        if x1.shape[0] < 8:
-                            R_error, T_error = 3.14, 3.14
-                        else:
-                            t_poseestimate_b = time.perf_counter()
-
-                            if args.solver   == 'None':
-                                E, cam = get_cam_pose_by_ransac(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-                            elif args.solver == 'SK':
-                                E, can = get_cam_pose_by_ransac_opt_SK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-                            elif args.solver == 'GSM':
-                                E, can = get_cam_pose_by_ransac_GSM(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-                            elif args.solver == 'GSM_wRT':
-                                E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-                            elif args.solver == 'GSM_SK':
-                                E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-
-                            t_poseestimate_a = time.perf_counter()
-                            R1_,R2_,T1_,T2_ = decomposeE(E.T)
-                            R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
-                            R_error, T_error = r_error(Rx,R_), t_error(Tx,T_)
-
-                        R_ERROR[indicador].append(R_error)
-                        T_ERROR[indicador].append(T_error)
-                        TIMES_FP[indicador].append((t_featurepoint_a-t_featurepoint_b)/2)
-                        TIMES_MC[indicador].append(t_matching_a-t_matching_b)
-                        TIMES_PE[indicador].append(t_poseestimate_a-t_poseestimate_b)
-                        METRICS[indicador,:] = METRICS[indicador,:] + [x1.shape[0], (s_pts1.shape[0]+s_pts2.shape[1])/2]
-
-                        std.append(x1.shape[0])
-                except:     
-                    print("Unexpected error:",indicador, opt, use_our_method)
-
-
-        for indicador, descriptor in enumerate(DESCRIPTORS):
-            os.system('mkdir -p '+f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver)
-            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
-            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
-            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_FP.csv',np.array(TIMES_FP[indicador]),delimiter=",")
-            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_MC.csv',np.array(TIMES_MC[indicador]),delimiter=",")
-            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_PE.csv',np.array(TIMES_PE[indicador]),delimiter=",")
+            cond2_1 = (pts2[:, 1] < height_threshold)
+            cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 350))
+            cond2_3 = ~(((220 < pts2[:, 0]) &(pts2[:, 0] < 320)) & ((250< pts2[:, 1])&(pts2[:, 1] < 400)))
+            valid_idx2 = cond2_1 &  cond2_2 &cond2_3
+            pts2 =  pts2[valid_idx2]
+            desc2 = desc2[valid_idx2]
 
 
 
-    print('finish')
+            if len(pts1.shape) == 1:
+                pts1 = pts1.reshape(1,-1)
+            if len(pts2.shape) == 1:
+                pts2 = pts2.reshape(1,-1)
+
+            if pts1.shape[0] > 0 or pts2.shape[0] >0:
+                s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
+                x1,x2 = coord_3d(x1, dim), coord_3d(x2, dim)
+                s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
+
+                if x1.shape[0] < 8:
+                    R_error, T_error = 3.14, 3.14
+                else:
+                    if args.solver   == 'None':
+                        E, cam = get_cam_pose_by_ransac(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+                    elif args.solver == 'SK':
+                        E, can = get_cam_pose_by_ransac_opt_SK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+                    elif args.solver == 'GSM':
+                        E, can = get_cam_pose_by_ransac_GSM(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+                    elif args.solver == 'GSM_wRT':
+                        E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+                    elif args.solver == 'GSM_SK':
+                        E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+                    R1_,R2_,T1_,T2_ = decomposeE(E.T)
+                    R, T = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
+            
+
+            if abs(R[0][0]) < 1e-3 or np.isnan(R).any():
+                continue
+            R = R.tolist()
+            T = T.tolist()
+            T = [T[0], T[1], T[2]]
+            R_quat_l.append(mat2quat(R))
+            T_l.append(T)
+        except:     
+            print("Unexpected error:", opt, use_our_method)
 
 
+    RQ_true_value = mean_quat(R_quat_l)
+    T_true_value = get_T_true_value(T_l)
+
+    print(RQ_true_value)
+    print(T_true_value)
+
+    np.savetxt(os.path.join(os.getcwd(),'RQ_true_value.csv'), RQ_true_value, delimiter=',')
+    np.savetxt(os.path.join(os.getcwd(),'T_true_value.csv'), T_true_value, delimiter=',')
+    print("move files")
+
+    return
 
 
 def sort_key(pts1, pts2, desc1, desc2, points):
@@ -432,10 +404,27 @@ def get_kd(array):
     return K,D
 
 
+def get_T_true_value(T_list):
+    T_filtered_list = []
+    for i in range(len(T_list)):
+        if abs(T_list[i][0]) >100: continue
+        if abs(T_list[i][1]) >100: continue
+        if abs(T_list[i][2]) >100: continue
+        T_filtered_list.append(T_list[i]/np.linalg.norm(T_list[i]))
+        T_norm_array = np.array([T for T in T_filtered_list])
+        return np.mean(T_norm_array, axis=0) 
+
+def mat2quat(mat):
+    rot = Rotation.from_matrix(mat)
+    quat = rot.as_quat()
+    return quat
+
+
+def mean_quat(R_quat_list):
+    x = np.array([R_quat for R_quat in R_quat_list])
+    m = x.T @ x
+    w, v = np.linalg.eig(m)
+    return v[:, np.argmax(w)]
 
 if __name__ == '__main__':
     main()
-
-
-
-
