@@ -123,7 +123,7 @@ def main():
     print(s_pts1.shape, x1.shape, x2.shape)
     
     vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], inlier_idx)
-    vis_img = cv2.resize(vis_img,dsize=(1600, 400))
+    vis_img = cv2.resize(vis_img,dsize=(800, 800))
     cv2.imshow("aaa", vis_img)
     c = cv2.waitKey()
 
@@ -162,19 +162,26 @@ def plot_matches(image0,
     H0, W0 = image0.shape[0], image0.shape[1]
     H1, W1 = image1.shape[0], image1.shape[1]
 
-    H, W = max(H0, H1), W0 + W1
+    H, W = H0 + H1, max(W0, W1)
     out = 255 * np.ones((H, W, 3), np.uint8)
     out[:H0, :W0, :] = out0
-    out[:H1, W0:, :] = out1
+    out[H0:H0+H1, :W1, :] = out1
+
+    #H, W = max(H0, H1), W0 + W1
+    #out = 255 * np.ones((H, W, 3), np.uint8)
+    #out[:H0, :W0, :] = out0
+    #out[:H1, W0:, :] = out1
 
     mkpts0, mkpts1 = x1, x2
     mkpts0 = np.round(mkpts0).astype(int)
     mkpts1 = np.round(mkpts1).astype(int)
+
+    mkpts1[:, 1] += H0
     
     for kpt0, kpt1, mt in zip(mkpts0, mkpts1, match_true):
         (x0, y0), (x1, y1) = kpt0, kpt1
         mcolor = (0, 0, 255) if mt == 0 else (0, 255, 0)  # Red for outliers, Green for inliers
-        cv2.line(out, (x0, y0), (x1 + W0, y1),
+        cv2.line(out, (x0, y0), (x1, y1),
                  color=mcolor,
                  thickness=5,
                  lineType=cv2.LINE_AA)
@@ -325,10 +332,8 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 
 def mnn_mather(desc1, desc2, method="mean_std"):
     sim = desc1 @ desc2.transpose()
-    sim = (sim - np.mean(sim))/np.std(sim)
-    if method == "mean_std":
-        k = 3.89
-        threshold = sim.mean() + k * sim.std()
+    sim = (sim - np.min(sim))/ (np.max(sim) - np.min(sim))
+    threshold = np.percentile(sim, 100-5)
     
     sim[sim < threshold] = 0
     nn12 = np.argmax(sim, axis=1)
