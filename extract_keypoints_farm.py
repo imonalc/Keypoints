@@ -89,7 +89,7 @@ def main():
         for indicador, descriptor in enumerate(DESCRIPTORS):
 
 
-            #try:
+            try:
                 opt, mode, sphered, use_our_method = get_descriptor(descriptor)
                 base_order = 0  # Base sphere resolution
                 sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
@@ -118,6 +118,7 @@ def main():
                     t_featurepoint_a = time.perf_counter()
                     os.chdir('../')
                 
+                print(pts1.shape, desc1.shape)
 
                 height_threshold = 512*0.9
                 cond1_1 = (pts1[:, 1] < height_threshold)
@@ -202,8 +203,8 @@ def main():
                     TIMES_PE[indicador].append(t_poseestimate_a-t_poseestimate_b)
                     METRICS[indicador,:] = METRICS[indicador,:] + [x1.shape[0], (s_pts1.shape[0]+s_pts2.shape[1])/2]
                     std.append(x1.shape[0])
-            #except:     
-                #print("Unexpected error:",indicador, opt, use_our_method)
+            except:     
+                print("Unexpected error:",indicador, opt, use_our_method)
     for indicador, descriptor in enumerate(DESCRIPTORS):
         os.system('mkdir -p '+f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver)
         np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
