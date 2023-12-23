@@ -73,6 +73,8 @@ def main():
     path_true_value = os.path.join("./data/Farm/new/Calibration/", pose)
     RQ_true_value = np.genfromtxt(path_true_value + "/RQ_true_value.csv", delimiter=',')
     T_true_value = np.genfromtxt(path_true_value + "/T_true_value.csv", delimiter=',')
+    Rx = np.genfromtxt(path_true_value + "/Rm_true_value.csv", delimiter=',')
+    Tx = np.genfromtxt(path_true_value + "/T_true_value.csv", delimiter=',')
 
     mypath = os.path.join('./data/Farm/new',pose)
     paths  = [os.path.join('./data/Farm/new/',pose,f) for f in listdir('./data/Farm/new/'+pose) if isdir(join(mypath, f))]
@@ -118,15 +120,15 @@ def main():
 
                 height_threshold = 1024*0.9
                 cond1_1 = (pts1[:, 1] < height_threshold)
-                cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 840))  & (pts1[:, 1] > 400))
-                cond1_3 = ~(((680 < pts1[:, 0]) &(pts1[:, 0] < 800)) & ((220< pts1[:, 1])&(pts1[:, 1] < 420)))
+                cond2_1 = (pts2[:, 1] < height_threshold)
+                if pose == "pose1":
+                    cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 840))  & (pts1[:, 1] > 400))
+                    cond1_3 = ~(((680 < pts1[:, 0]) &(pts1[:, 0] < 800)) & ((220< pts1[:, 1])&(pts1[:, 1] < 420)))
+                    cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 350))
+                    cond2_3 = ~(((220 < pts2[:, 0]) &(pts2[:, 0] < 320)) & ((250< pts2[:, 1])&(pts2[:, 1] < 400)))
                 valid_idx1 = cond1_1 &  cond1_2 &cond1_3
                 pts1 =  pts1[valid_idx1]
                 desc1 = desc1[valid_idx1]
-
-                cond2_1 = (pts2[:, 1] < height_threshold)
-                cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 350))
-                cond2_3 = ~(((220 < pts2[:, 0]) &(pts2[:, 0] < 320)) & ((250< pts2[:, 1])&(pts2[:, 1] < 400)))
                 valid_idx2 = cond2_1 &  cond2_2 &cond2_3
                 pts2 =  pts2[valid_idx2]
                 desc2 = desc2[valid_idx2]
@@ -164,11 +166,12 @@ def main():
                         R1_,R2_,T1_,T2_ = decomposeE(E.T)
                         R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
 
+                        print(R_)
+                        print(T_)
                         RQ = mat2quat(R_)
                         T_norm = T_ / np.linalg.norm(T_)
                     
-                    R_error = 2 * np.arccos(np.dot(RQ, RQ_true_value))
-                    T_error = math.acos(np.dot(T_norm, T_true_value))
+                    R_error, T_error = r_error(Rx,R_), t_error(Tx,T_)
 
                     R_ERROR[indicador].append(R_error)
                     T_ERROR[indicador].append(T_error)
@@ -230,11 +233,28 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 
     return pts1, pts2, desc1, desc2
 
-def mnn_mather(desc1, desc2, method="mean_std"):
+def mnn_mather(desc1, desc2, use_new_method):
     sim = desc1 @ desc2.transpose()
-    if method == "mean_std":
-        k = 4
-        threshold = sim.mean() + k * sim.std()
+    sim = (sim - np.min(sim))/ (np.max(sim) - np.min(sim))
+    if use_new_method == 1:
+        dec = 5
+    elif use_new_method == 4:
+        dec = 0.1
+    elif use_new_method == 5:
+        dec = 0.3
+    elif use_new_method == 6:
+        dec = 0.5
+    elif use_new_method == 7:
+        dec = 1
+    elif use_new_method == 8:
+        dec = 3
+    elif use_new_method == 9:
+        dec = 100
+    elif use_new_method == 10:
+        dec = 10
+    elif use_new_method == 11:
+        dec = 20
+    threshold = np.percentile(sim, 100-dec)
     
     sim[sim < threshold] = 0
     nn12 = np.argmax(sim, axis=1)
@@ -261,10 +281,10 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
         s_desc2 = s_desc2.astype(np.uint8)
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
-    elif match == 'mnn' or use_new_method == 1:
-        matches_idx = mnn_mather(s_desc1, s_desc2)
+    elif use_new_method in [1, 4, 5, 6, 7, 8]:
+        matches_idx = mnn_mather(s_desc1, s_desc2, use_new_method)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
-    elif use_new_method == 3:
+    elif use_new_method == 2:
         thresh = 0.75
         bf = cv2.BFMatcher(cv2.NORM_L2, False)
         matches1 = bf.knnMatch(s_desc1,s_desc2, k=2)
@@ -283,6 +303,18 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
                 if m1.queryIdx == m2.trainIdx and m1.trainIdx == m2.queryIdx:
                     good.append(m1)
                     break
+        matches = good
+    elif use_new_method == 3:
+        thresh = 0.75
+        FLANN_INDEX_KDTREE = 1
+        index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+        search_params = dict(checks = 50)
+        flann = cv2.FlannBasedMatcher(index_params, search_params)
+        matches = flann.knnMatch(s_desc1, s_desc2, k=2)
+        good = []
+        for m,n in matches:
+            if m.distance < thresh * n.distance:
+                good.append(m)
         matches = good
     elif match == 'ratio':
         thresh = 0.75
@@ -305,6 +337,7 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
 
 
     return s_pts1, s_pts2, s_pts1[M[0,:].astype(int),:3], s_pts2[M[1,:].astype(int),:3]
+
 
 
 
@@ -336,38 +369,40 @@ def get_descriptor(descriptor):
         return 'sift', 'erp', 512, 0
     elif descriptor == 'tsift':
         return 'sift', 'tangent', 512, 0
-    elif descriptor == 'csift':
-        return 'sift', 'cube', 512, 0
-    elif descriptor == 'cpsift':
-        return 'sift', 'cubepad', 512, 0
     elif descriptor == 'orb':
         return 'orb', 'erp', 512, 0
     elif descriptor == 'torb':
         return 'orb', 'tangent', 512, 0
-    elif descriptor == 'corb':
-        return 'orb', 'cube', 512, 0
-    elif descriptor == 'cporb':
-        return 'orb', 'cubepad', 512, 0
     elif descriptor == 'spoint':
         return 'superpoint', 'erp', 512, 0
     elif descriptor == 'tspoint':
         return 'superpoint', 'tangent', 512, 0
-    elif descriptor == 'cspoint':
-        return 'superpoint', 'cube', 512, 0
-    elif descriptor == 'cpspoint':
-        return 'superpoint', 'cubepad', 512, 0
     elif descriptor == 'alike':
         return 'alike', 'erp', 512, 0
     elif descriptor == 'talike':
         return 'alike', 'tangent', 512, 0
-    elif descriptor == 'calike':
-        return 'alike', 'cube', 512, 0
-    elif descriptor == 'cpalike':
-        return 'alike', 'cubepad', 512, 0
     elif descriptor == 'Proposed':
-        return 'superpoint', 'erp', 512, 1
+        return 'superpoint', 'tangent', 512, 1
     elif descriptor == 'Ltspoint':
-        return 'superpoint', 'erp', 512, 3
+        return 'superpoint', 'tangent', 512, 2
+    elif descriptor == 'Ftspoint':
+        return 'superpoint', 'tangent', 512, 3
+    elif descriptor == 'Proposed01':
+        return 'superpoint', 'tangent', 512, 4
+    elif descriptor == 'Proposed03':
+        return 'superpoint', 'tangent', 512, 5
+    elif descriptor == 'Proposed05':
+        return 'superpoint', 'tangent', 512, 6
+    elif descriptor == 'Proposed1':
+        return 'superpoint', 'tangent', 512, 7
+    elif descriptor == 'Proposed3':
+        return 'superpoint', 'tangent', 512, 8
+    elif descriptor == 'Proposed_un':
+        return 'superpoint', 'tangent', 512, 9
+    elif descriptor == 'Proposed10':
+        return 'superpoint', 'tangent', 512, 10
+    elif descriptor == 'Proposed20':
+        return 'superpoint', 'tangent', 512, 11
 
 
 def AUC(ROT, TRA, MET, L):

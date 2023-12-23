@@ -137,9 +137,8 @@ def main():
                     R1_,R2_,T1_,T2_ = decomposeE(E.T)
                     R, T = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
             
-
-            if abs(R[0][0]) < 1e-3 or np.isnan(R).any():
-                continue
+            print(R)
+            print(T)
             R = R.tolist()
             T = T.tolist()
             T = [T[0], T[1], T[2]]
@@ -151,11 +150,14 @@ def main():
 
     RQ_true_value = mean_quat(R_quat_l)
     T_true_value = get_T_true_value(T_l)
+    Rm_true_value = Rotation.from_quat(RQ_true_value).as_matrix()
 
     print(RQ_true_value)
+    print(Rm_true_value)
     print(T_true_value)
 
     np.savetxt(os.path.join(os.getcwd(),'RQ_true_value.csv'), RQ_true_value, delimiter=',')
+    np.savetxt(os.path.join(os.getcwd(),'Rm_true_value.csv'), Rm_true_value, delimiter=',')
     np.savetxt(os.path.join(os.getcwd(),'T_true_value.csv'), T_true_value, delimiter=',')
     print("move files")
 

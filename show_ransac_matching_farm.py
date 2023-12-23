@@ -104,7 +104,6 @@ def main():
     cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 350))
     cond2_3 = ~(((220 < pts2[:, 0]) &(pts2[:, 0] < 320)) & ((250< pts2[:, 1])&(pts2[:, 1] < 400)))
     valid_idx2 = cond2_1 &  cond2_2 &cond2_3
-    print(valid_idx2)
     pts2 =  pts2[valid_idx2]
     desc2 = desc2[:, valid_idx2]
 
@@ -114,12 +113,19 @@ def main():
     if len(pts1.shape) == 1:
         pts1 = pts1.reshape(1,-1)
 
-    s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
+    s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
+    x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
+    s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
 
     E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+    R1_,R2_,T1_,T2_ = decomposeE(E.T)
+    R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
     print("True:", sum(inlier_idx), len(inlier_idx), ", ratio:", sum(inlier_idx) / len(inlier_idx))
+
+    print(R_)
+    print(T_)
     
-    vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], inlier_idx)
+    vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1_[:, :2], x2_[:, :2], inlier_idx)
     vis_img = cv2.resize(vis_img,dsize=(512,512))
     cv2.imshow("aaa", vis_img)
     c = cv2.waitKey()
@@ -217,7 +223,7 @@ def mnn_mather(desc1, desc2, method="mean_std"):
     sim = desc1 @ desc2.transpose()
     sim = (sim - np.min(sim))/ (np.max(sim) - np.min(sim))
     sim = sim
-    threshold = np.percentile(sim, 99)
+    threshold = np.percentile(sim, 99.9)
     
     sim[sim < threshold] = 0
     nn12 = np.argmax(sim, axis=1)
@@ -303,27 +309,6 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
     return s_pts1, s_pts2, s_pts1[M[0,:].astype(int),:3], s_pts2[M[1,:].astype(int),:3]
 
 
-def get_error(x1, x2, Rx, Tx):
-
-    S = computeEssentialMatrixByRANSAC(x1, x2)
-    I = S[1]
-    I = I.astype(np.int64)
-
-    x1 = x1[I,:]
-    x2 = x2[I,:]
-
-    F = calc_ematrix(x1,x2)
-
-
-    R1,R2,T1,T2 = decomposeE(F)
-
-    R,T = choose_rt(R1,R2,T1,T2,x1,x2)
-
-    R_error = r_error(Rx,R)
-    T_error = t_error(Tx,T)
-
-    return R_error, T_error
-
 def get_descriptor(descriptor):
     if descriptor == 'sphorb':
         return 'sphorb', 'erp', 640, 0
@@ -349,6 +334,22 @@ def get_descriptor(descriptor):
         return 'superpoint', 'tangent', 512, 2
     elif descriptor == 'Ftspoint':
         return 'superpoint', 'tangent', 512, 3
+    elif descriptor == 'Proposed01':
+        return 'superpoint', 'tangent', 512, 4
+    elif descriptor == 'Proposed03':
+        return 'superpoint', 'tangent', 512, 5
+    elif descriptor == 'Proposed05':
+        return 'superpoint', 'tangent', 512, 6
+    elif descriptor == 'Proposed1':
+        return 'superpoint', 'tangent', 512, 7
+    elif descriptor == 'Proposed3':
+        return 'superpoint', 'tangent', 512, 8
+    elif descriptor == 'Proposed_un':
+        return 'superpoint', 'tangent', 512, 9
+    elif descriptor == 'Proposed10':
+        return 'superpoint', 'tangent', 512, 10
+    elif descriptor == 'Proposed20':
+        return 'superpoint', 'tangent', 512, 11
 
 def get_error(x1, x2, Rx, Tx):
 
@@ -414,6 +415,9 @@ def get_kd(array):
     K = A[:delimiter].reshape(-1,3)
     D = A[delimiter:].reshape(-1,32)
     return K,D
+
+
+
 
 
 
