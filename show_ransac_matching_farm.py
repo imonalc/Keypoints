@@ -93,19 +93,41 @@ def main():
         pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
         os.chdir('../')
 
+    height_threshold = 512*0.9
     cond1_1 = (pts1[:, 1] < height_threshold)
-    cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 840))  & (pts1[:, 1] > 400))
-    cond1_3 = ~(((680 < pts1[:, 0]) &(pts1[:, 0] < 800)) & ((220< pts1[:, 1])&(pts1[:, 1] < 420)))
-    valid_idx1 = cond1_1 &  cond1_2 &cond1_3
+    cond2_1 = (pts2[:, 1] < height_threshold)
+        # pose1
+    # cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 840))  & (pts1[:, 1] > 400))
+    # cond1_3 = ~(((680 < pts1[:, 0]) &(pts1[:, 0] < 800)) & ((220< pts1[:, 1])))
+    # cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 350))
+    # cond2_3 = ~(((220 < pts2[:, 0]) &(pts2[:, 0] < 320)) & ((250< pts2[:, 1])))
+        # pose2
+    # cond1_2 = ~(((500 < pts1[:, 0]) &(pts1[:, 0] < 1000))  & (pts1[:, 1] > 360))
+    # cond1_3 = ~(((800 < pts1[:, 0]) &(pts1[:, 0] < 1000)) & ((220< pts1[:, 1])))
+    # cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 350))
+    # cond2_3 = ~(((100 < pts2[:, 0]) &(pts2[:, 0] < 250)) & ((250< pts2[:, 1])))
+        # pose3
+    #cond1_2 = ~(((200 < pts1[:, 0]) &(pts1[:, 0] < 700))  & (pts1[:, 1] > 360))
+    #cond1_3 = ~(((500 < pts1[:, 0]) &(pts1[:, 0] < 750)) & ((240< pts1[:, 1])))
+    #cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 300))
+    #cond2_3 = ~(((200 < pts2[:, 0]) &(pts2[:, 0] < 400)) & ((250< pts2[:, 1])))
+        # pose4
+    #cond1_2 = ~(((500 < pts1[:, 0]) &(pts1[:, 0] < 1000))  & (pts1[:, 1] > 360))
+    #cond1_3 = ~(((800 < pts1[:, 0]) &(pts1[:, 0] < 1000)) & ((240< pts1[:, 1])))
+    #cond2_2 = ~((pts2[:, 0] < 300) & (pts2[:, 1] > 300))
+    #cond2_3 = ~(((60 < pts2[:, 0]) &(pts2[:, 0] < 240)) & ((250< pts2[:, 1])))
+        # pose5
+    cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 900))  & (pts1[:, 1] > 360))
+    cond1_3 = ~(((650 < pts1[:, 0]) &(pts1[:, 0] < 850)) & ((240< pts1[:, 1])))
+    cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 400))
+    cond2_3 = ~(((100 < pts2[:, 0]) &(pts2[:, 0] < 350)) & ((250< pts2[:, 1])))
+    valid_idx1 = cond1_1 & cond1_2 &cond1_3
     pts1 =  pts1[valid_idx1]
     desc1 = desc1[:, valid_idx1]
-
-    cond2_1 = (pts2[:, 1] < height_threshold)
-    cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 350))
-    cond2_3 = ~(((220 < pts2[:, 0]) &(pts2[:, 0] < 320)) & ((250< pts2[:, 1])&(pts2[:, 1] < 400)))
-    valid_idx2 = cond2_1 &  cond2_2 &cond2_3
+    valid_idx2 = cond2_1 & cond2_2 &cond2_3
     pts2 =  pts2[valid_idx2]
     desc2 = desc2[:, valid_idx2]
+    print(pts1)
 
 
     pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
