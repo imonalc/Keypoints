@@ -122,7 +122,7 @@ def main():
                         pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
                         t_featurepoint_a = time.perf_counter()
                         os.chdir('../')
-
+                    
 
                     if len(pts1.shape) == 1:
                         pts1 = pts1.reshape(1,-1)

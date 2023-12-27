@@ -113,12 +113,14 @@ def main():
                 else:
                     os.chdir('SPHORB-master/')
                     t_featurepoint_b = time.perf_counter()
+                    path_o = "."+path_o
+                    path_r = "."+path_r
                     pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
                     pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
                     t_featurepoint_a = time.perf_counter()
                     os.chdir('../')
                 
-                print(pts1.shape, desc1.shape)
+                #print(pts1.shape, desc1.shape)
 
                 height_threshold = 512*0.9
                 cond1_1 = (pts1[:, 1] < height_threshold)
