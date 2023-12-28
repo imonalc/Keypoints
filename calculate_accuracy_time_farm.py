@@ -13,6 +13,7 @@ PARAMS_DICT = {"R": "Rotation", "T": "Translation"}
 ALL_LOCS = ["Classroom", "Room", "Realistic", "Interior1", "Interior2", "Urban1", "Urban2", "Urban3", "Urban4"]
 INDOORS = ["Classroom", "Room", "Realistic", "Interior1", "Interior2"]
 OUTDOORS = ["Urban1", "Urban2", "Urban3", "Urban4"]
+POSES = ["pose1", "pose2", "pose3", "pose4", "pose5"]
 TIME_CATEGORYS = ["FP", "MC", "PE"]
 DESCRIPTORS_DICT = {"Proposed1": "Proposed (1%)",
                     "Proposed01": "Proposed (0.1%)",
@@ -33,6 +34,7 @@ DESCRIPTORS_DICT = {"Proposed1": "Proposed (1%)",
                     "Ftspoint": "FLANN"
                     }
 METHODS_DICT = {"t": "T", "":""}
+FIG_IDX = ["a", "b", "c", "d"]
 
 
 def read_csv_data(file_path):
@@ -49,17 +51,13 @@ def main():
                 descriptors = COMPARE_DESCRIPTORS
             else:
                 descriptors = ABLATION_DESCRIPTORS
-            fig, axes = plt.subplots(2, 2, figsize=(16, 12),)
+            fig, axes = plt.subplots(1, 2, figsize=(16, 7),)
             plt.rcParams["font.size"] = 20
             for i, param in enumerate(PARAMS):
-                for j, loc in enumerate(["indoor", "outdoor"]):
-                    if loc == "indoor":
-                        locs = INDOORS
-                    else:
-                        locs = OUTDOORS
-                    ax = axes[i, j]
+                    locs = POSES
+                    ax = axes[i]
                     ax.tick_params(axis='both', labelsize=20)
-                    ax.set_title(f"{PARAMS_DICT[param]} {loc}")
+                    ax.set_title(f"{PARAMS_DICT[param]} ({FIG_IDX[i]})", y=-0.3)
                     ax.grid(True)
                     ax.set_ylabel('Ratio of Values ≤ Threshold', fontsize=20)
                     ax.set_xlabel('Angle Threshold (°)', fontsize=20)
@@ -83,13 +81,13 @@ def main():
                                 ratios.append(ratio)
                             ax.plot(thresholds, ratios, linestyle='-', label=method_tmp)
 
-
-                            if i == 0 and j == 1:
+                            if i == 1:
                                 ax.legend(loc='upper left', bbox_to_anchor=(1.05, 1))
+            #fig.text(0.5, -0.02, 'Your Title Here', ha='center', fontsize=14, fontweight='bold')
 
             plt.tight_layout()
             #plt.show()
-            plt.savefig(f"FP{num_points}_{tgt_idx+1}.pdf")
+            plt.savefig(f"FP{num_points}_{tgt_idx+1}_farm.pdf")
             plt.close()
     
 
