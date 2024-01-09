@@ -62,13 +62,16 @@ def main():
     # ----------------------------------------------
 
     NUM = 0
-    R_ERROR, T_ERROR, TIMES_FP, TIMES_MC, TIMES_PE = [], [], [], [], []
+    R_ERROR, T_ERROR, TIMES_FP, TIMES_MC, TIMES_PE, MATCHING_SCORE, MEAN_MATCHING_ACCURCY, MATCHING_NUM = [], [], [], [], [], [], [], []
     for i in range(len(DESCRIPTORS)):
         R_ERROR.append([])
         T_ERROR.append([])
         TIMES_FP.append([])
         TIMES_MC.append([])
         TIMES_PE.append([])
+        MATCHING_SCORE.append([])
+        MEAN_MATCHING_ACCURCY.append([])
+        MATCHING_NUM.append([])
 
 
     METRICS = np.zeros((len(DESCRIPTORS),2))
@@ -133,6 +136,9 @@ def main():
                     Tx = np.load(path+"/T.npy")
 
 
+                    len_pts = (len(pts1) + len(pts2)) / 2
+
+
                     if pts1.shape[0] > 0 or pts2.shape[0] >0:
                         t_matching_b = time.perf_counter()
                         s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
@@ -162,12 +168,17 @@ def main():
                             R1_,R2_,T1_,T2_ = decomposeE(E.T)
                             R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
                             R_error, T_error = r_error(Rx,R_), t_error(Tx,T_)
+                            count_inliers = np.sum(inlier_idx == 1)
 
                         R_ERROR[indicador].append(R_error)
                         T_ERROR[indicador].append(T_error)
                         TIMES_FP[indicador].append((t_featurepoint_a-t_featurepoint_b)/2)
                         TIMES_MC[indicador].append(t_matching_a-t_matching_b)
                         TIMES_PE[indicador].append(t_poseestimate_a-t_poseestimate_b)
+                        MATCHING_SCORE[indicador].append(count_inliers / len_pts)
+                        MEAN_MATCHING_ACCURCY[indicador].append(count_inliers/len(inlier_idx))
+                        MATCHING_NUM[indicador].append(count_inliers)
+
                         METRICS[indicador,:] = METRICS[indicador,:] + [x1.shape[0], (s_pts1.shape[0]+s_pts2.shape[1])/2]
 
                         std.append(x1.shape[0])
@@ -181,7 +192,9 @@ def main():
             np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
             np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_FP.csv',np.array(TIMES_FP[indicador]),delimiter=",")
             np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_MC.csv',np.array(TIMES_MC[indicador]),delimiter=",")
-            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_PE.csv',np.array(TIMES_PE[indicador]),delimiter=",")
+            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/MATCHING_SCORE.csv',np.array(MATCHING_SCORE[indicador]),delimiter=",")
+            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/MEAN_MATCHING_ACCURCY.csv',np.array(MEAN_MATCHING_ACCURCY[indicador]),delimiter=",")
+            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/MATCHING_NUM.csv',np.array(MATCHING_NUM[indicador]),delimiter=",")
 
 
 
