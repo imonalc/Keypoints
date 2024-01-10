@@ -56,7 +56,7 @@ def main():
     # ----------------------------------------------
 
     NUM = 0
-    R_ERROR, T_ERROR, TIMES_FP, TIMES_MC, TIMES_PE, MATCHING_SCORE, MEAN_MATCHING_ACCURCY, MATCHING_NUM = [], [], [], [], [], [], [], []
+    R_ERROR, T_ERROR, TIMES_FP, TIMES_MC, TIMES_PE, MATCHING_SCORE, MEAN_MATCHING_ACCURCY, MATCHING_NUM, FP_NUM = [], [], [], [], [], [], [], [], []
     for i in range(len(DESCRIPTORS)):
         R_ERROR.append([])
         T_ERROR.append([])
@@ -66,6 +66,7 @@ def main():
         MATCHING_SCORE.append([])
         MEAN_MATCHING_ACCURCY.append([])
         MATCHING_NUM.append([])
+        FP_NUM.append([])
 
 
     METRICS = np.zeros((len(DESCRIPTORS),2))
@@ -111,7 +112,6 @@ def main():
                     pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
                     pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
                     t_featurepoint_a = time.perf_counter()
-                    len_pts = (len(pts1) + len(pts2)) / 2
                     pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
                     
                 else:
@@ -124,6 +124,8 @@ def main():
                     t_featurepoint_a = time.perf_counter()
                     os.chdir('../')
                 
+                len_pts = (len(pts1) + len(pts2)) / 2
+
                 #print(pts1.shape, desc1.shape)
 
                 height_threshold = 512*0.9
@@ -211,6 +213,7 @@ def main():
                     MATCHING_SCORE[indicador].append(count_inliers / len_pts)
                     MEAN_MATCHING_ACCURCY[indicador].append(count_inliers/len(inlier_idx))
                     MATCHING_NUM[indicador].append(count_inliers)
+                    FP_NUM[indicador].append(len_pts)
                     METRICS[indicador,:] = METRICS[indicador,:] + [x1.shape[0], (s_pts1.shape[0]+s_pts2.shape[1])/2]
                     std.append(x1.shape[0])
             except:     
@@ -225,6 +228,7 @@ def main():
         np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/MATCHING_SCORE.csv',np.array(MATCHING_SCORE[indicador]),delimiter=",")
         np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/MEAN_MATCHING_ACCURCY.csv',np.array(MEAN_MATCHING_ACCURCY[indicador]),delimiter=",")
         np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/MATCHING_NUM.csv',np.array(MATCHING_NUM[indicador]),delimiter=",")
+        np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/FP_NUM.csv',np.array(FP_NUM[indicador]),delimiter=",")
 print('finish')
 
 
