@@ -1,0 +1,3 @@
+[submodule "SphereGlue"]
+	path = SphereGlue
+	url = git@github.com:vishalsharbidar/SphereGlue.git
