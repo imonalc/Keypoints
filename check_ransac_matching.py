@@ -123,26 +123,27 @@ def main():
     print("pose:", t4-t3)
     print(s_pts1.shape, x1.shape, x2.shape)
     
-
-    match_true = np.zeros(x1.shape[0])
-    match_TF_list = []
-    for idx in range(x1.shape[0]):
-        match_true[idx] = 1
-        vis_img = plot_matches2(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], match_true)
-        vis_img = cv2.resize(vis_img,dsize=(1600, 400))
-        cv2.imshow("aaa", vis_img)
-        input_key = cv2.waitKey()
-        match_TF_list.append(input_key-49)
-        match_true[idx] = 0
-    print(match_TF_list)
-
-    match_TF_list_bool = np.array(match_TF_list, dtype=bool)
-    x1, x2 = x1[match_TF_list_bool], x2[match_TF_list_bool]
-    E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-    print("True:", sum(inlier_idx), len(inlier_idx), ", ratio:", sum(inlier_idx) / len(inlier_idx))
-    t4 = time.time()
-    print("pose:", t4-t3)
-    print(s_pts1.shape, x1.shape, x2.shape)
+    vis_flag = 0
+    if vis_flag:
+        match_true = np.zeros(x1.shape[0])
+        match_TF_list = []
+        for idx in range(x1.shape[0]):
+            match_true[idx] = 1
+            vis_img = plot_matches2(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], match_true)
+            vis_img = cv2.resize(vis_img,dsize=(1600, 400))
+            cv2.imshow("aaa", vis_img)
+            input_key = cv2.waitKey()
+            match_TF_list.append(input_key-49)
+            match_true[idx] = 0
+        print(match_TF_list)
+    
+        match_TF_list_bool = np.array(match_TF_list, dtype=bool)
+        x1, x2 = x1[match_TF_list_bool], x2[match_TF_list_bool]
+        E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+        print("True:", sum(inlier_idx), len(inlier_idx), ", ratio:", sum(inlier_idx) / len(inlier_idx))
+        t4 = time.time()
+        print("pose:", t4-t3)
+        print(s_pts1.shape, x1.shape, x2.shape)
     
     vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1[:, :2], x2[:, :2], inlier_idx)
     vis_img = cv2.resize(vis_img,dsize=(1600, 400))
