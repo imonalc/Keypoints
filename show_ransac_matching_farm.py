@@ -40,7 +40,7 @@ import build1.sphorb_cpp as sphorb
 def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
-    parser.add_argument('--points', type=int, default = 500)
+    parser.add_argument('--points', type=int, default = 1000)
     parser.add_argument('--match', default="ratio")
     parser.add_argument('--g_metrics',default="False")
     parser.add_argument('--solver', default="GSM_wRT")
@@ -133,12 +133,12 @@ def main():
     #pts2 =  pts2[valid_idx2]
     #desc2 = desc2[valid_idx2]
 
-    valid_idx1 = cond1_1
-    pts1 =  pts1[valid_idx1]
-    desc1 = desc1[valid_idx1]
-    valid_idx2 = cond2_1
-    pts2 =  pts2[valid_idx2]
-    desc2 = desc2[valid_idx2]
+    #valid_idx1 = cond1_1
+    #pts1 =  pts1[valid_idx1]
+    #desc1 = desc1[valid_idx1]
+    #valid_idx2 = cond2_1
+    #pts2 =  pts2[valid_idx2]
+    #desc2 = desc2[valid_idx2]
 
 
     if len(pts1.shape) == 1:
