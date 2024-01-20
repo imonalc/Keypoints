@@ -1,3 +1,6 @@
 [submodule "SphereGlue"]
 	path = SphereGlue
 	url = git@github.com:vishalsharbidar/SphereGlue.git
+[submodule "SuperGluePretrainedNetwork"]
+	path = SuperGluePretrainedNetwork
+	url = git@github.com:magicleap/SuperGluePretrainedNetwork.git

@@ -37,6 +37,11 @@ sys.path.append(os.getcwd()+'/SPHORB-master')
 import build1.sphorb_cpp as sphorb
 
 
+from SuperGluePretrainedNetwork.models.matching import Matching
+from SuperGluePretrainedNetwork.models.utils import (AverageTimer, VideoStreamer,
+                          make_matching_plot_fast, frame2tensor)
+
+
 def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
@@ -79,11 +84,11 @@ def main():
 
     if opt != 'sphorb':
         corners = tangent_image_corners(base_order, sample_order)
-        pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
-        pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
-        pts1[pts1[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
-        pts2[pts2[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
-        pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
+        pts1_, desc1_ = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
+        pts2_, desc2_ = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
+        pts1_[pts1_[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
+        pts2_[pts2_[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
+        pts1, pts2, desc1, desc2 = sort_key(pts1_, pts2_, desc1_, desc2_, args.points)
         
 
     else:           
@@ -117,10 +122,10 @@ def main():
     #cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 300))
     #cond2_3 = ~(((200 < pts2[:, 0]) &(pts2[:, 0] < 400)) & ((250< pts2[:, 1])))
         # pose4
-    cond1_2 = ~(((500 < pts1[:, 0]) &(pts1[:, 0] < 1000))  & (pts1[:, 1] > 360))
-    cond1_3 = ~(((800 < pts1[:, 0]) &(pts1[:, 0] < 1000)) & ((240< pts1[:, 1])))
-    cond2_2 = ~((pts2[:, 0] < 300) & (pts2[:, 1] > 300))
-    cond2_3 = ~(((60 < pts2[:, 0]) &(pts2[:, 0] < 240)) & ((250< pts2[:, 1])))
+    #cond1_2 = ~(((500 < pts1[:, 0]) &(pts1[:, 0] < 1000))  & (pts1[:, 1] > 360))
+    #cond1_3 = ~(((800 < pts1[:, 0]) &(pts1[:, 0] < 1000)) & ((240< pts1[:, 1])))
+    #cond2_2 = ~((pts2[:, 0] < 300) & (pts2[:, 1] > 300))
+    #cond2_3 = ~(((60 < pts2[:, 0]) &(pts2[:, 0] < 240)) & ((250< pts2[:, 1])))
         # pose5
     #cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 900))  & (pts1[:, 1] > 360))
     #cond1_3 = ~(((650 < pts1[:, 0]) &(pts1[:, 0] < 850)) & ((240< pts1[:, 1])))
@@ -144,7 +149,55 @@ def main():
     if len(pts1.shape) == 1:
         pts1 = pts1.reshape(1,-1)
 
-    s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
+    if use_our_method != 12:
+        s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
+    else:
+        config = {
+            'superpoint': {
+                'max_keypoints': 1000
+            },
+            'superglue': {
+                'weights': "indoor",
+            }
+        }
+        x1_, x2_ = [], []
+        matching = Matching(config).eval().to(device)
+        img_o_tensor = torch.from_numpy(img_o).float()/255.0
+        img_o_tensor = img_o_tensor.permute(2, 0, 1).unsqueeze(0).to(device)
+        img_r_tensor = torch.from_numpy(img_r).float()/255.0
+        img_r_tensor = img_r_tensor.permute(2, 0, 1).unsqueeze(0).to(device)
+
+        img_o_tensor = img_o_tensor[:, 0:1, :, :]
+        img_r_tensor = img_r_tensor[:, 0:1, :, :]
+        print(0000)
+        print(img_o_tensor.shape)
+        print(1111)
+        pred = matching({
+            "image0":img_o_tensor,
+            #"keypoints0":1,
+            #"descriptors0":1,
+            #"scores0":1,
+            "image1":img_r_tensor,
+            #"keypoints0":1,
+            #"descriptors0":1,
+            #"scores0":1,
+
+        })
+        kpt1 = pred["keypoints0"][0].cpu().numpy()
+        kpt1 = np.hstack((kpt1, np.ones((kpt1.shape[0], 1))))
+        kpt2 = pred["keypoints1"][0].cpu().numpy()
+        kpt2 = np.hstack((kpt2, np.ones((kpt2.shape[0], 1))))
+        matches1 = pred["matches0"][0].cpu().numpy()
+        matches2 = pred["matches1"][0].cpu().numpy()
+        for i in range(len(matches1)):
+            if matches1[i] == -1: continue
+            x1_.append(kpt1[i])
+            x2_.append(kpt2[matches1[i]])
+        s_pts1, s_pts2 = np.array(kpt1), np.array(kpt2)
+        x1_, x2_ = np.array(x1_), np.array(x2_)
+
+
+    print(x1_.shape, s_pts1.shape)
     x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
     s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
 
@@ -317,6 +370,18 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
             if m.distance < thresh * n.distance:
                 good.append(m)
         matches = good
+    elif use_new_method == 12:
+        matching = Matching().eval().to(device)
+        print(pts1)
+        print(111111111111111111)
+        print(desc1)
+        pred = matching({"keypoints0":pts1[:, :1],
+                         "descriptors0":desc1,
+                         "image0":0,
+                         "keypoints1":pts2[:, :1],
+                         "descriptors1":desc2,
+                         "image1":1
+                        })
     elif match == 'ratio':
         thresh = 0.75
         bf = cv2.BFMatcher(cv2.NORM_L2, False)
@@ -381,6 +446,8 @@ def get_descriptor(descriptor):
         return 'superpoint', 'tangent', 512, 10
     elif descriptor == 'Proposed20':
         return 'superpoint', 'tangent', 512, 11
+    elif descriptor == "glue":
+        return "superpoint", "erp", 512, 12
 
 def get_error(x1, x2, Rx, Tx):
 
