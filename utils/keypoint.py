@@ -13,9 +13,6 @@ import argparse
 import utils.superpoint.magic_sp.superpoint as magic_sp
 import utils.superpoint.train_sp.superpoint as train_sp
 from utils.ALIKE.alike import ALike, configs
-from utils.eqr2cub import *
-from utils.cub2eqr import *
-from utils.cubcor2eqrcor import *
 
 def process_img(img):
     """ Process a image transposing it and convert to grayscale format, Then normalize
@@ -254,161 +251,6 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
     return erp_kp, erp_desc
 
 
-def keypoint_cube(img, opt="orb", crop_degree=0):
-    """
-    Extracts only the visible Superpoint features from a collection tangent image. That is, only returns the keypoints visible to a spherical camera at the center of the icosahedron.
-
-    tex_image: 3 x N x H x W
-    corners: N x 4 x 3 coordinates of tangent image corners in 3D
-    image_shape: (H, W) of equirectangular image that we render back to
-    crop_degree: [optional] scalar value in degrees dictating how much of input equirectangular image is 0-padding
-
-    returns [visible_kp, visible_desc] (M x 4, M x length_descriptors)
-    """
-    # ----------------------------------------------
-    # Compute descriptors for each patch
-    # ----------------------------------------------
-    kp_list = []  # Stores keypoint coords
-    desc_list = []  # Stores keypoint descriptors
-    [back_img, bottom_img, front_img, left_img, right_img, top_img], cube_w = create_cube_imgs(img.permute(1, 2, 0).cpu().numpy())
-    face_h, face_w, face_c = back_img.shape
-    face_dict = {"top": top_img,
-                 "left": left_img,
-                 "front": front_img,
-                 "right": right_img,
-                 "bottom": bottom_img, 
-                 "back": back_img
-    }
-
-    for idx, (face, img) in enumerate(face_dict.items()):
-        img = torch.from_numpy(img.astype(np.float32)).clone().permute(2, 1, 0)
-        if opt == 'superpoint':
-            img = process_img(img)
-            kp_details = computes_superpoint_keypoints(img, opt)
-
-        if opt == 'sift':
-            kp_details = computes_sift_keypoints(img)
-
-        if opt == 'orb':
-            kp_details = computes_orb_keypoints(img)
-
-        if opt == 'surf':
-            kp_details = computes_surf_keypoints(img)
-
-        if opt == 'alike':
-            kp_details = computes_alike_keypoints(img)
-   
-        if kp_details is not None:
-            kp = kp_details[0]
-            desc = kp_details[1]
-            new_coords = []
-            new_kps = []
-            new_desc = []
-            for jdx, row in enumerate(kp):
-                x, y = row[:2].tolist()
-                new_x, new_y = cube_to_equirectangular_coord(face, (x, y), face_h//2)
-                new_coords.append([new_x, new_y])
-                new_kps.append(row[2:])
-                new_desc.append(desc[jdx])
-            if len(new_coords) < 1:
-                continue
-            new_coords_tensor = torch.tensor(new_coords)
-            new_kps_tensor = torch.stack(new_kps)
-            new_desc_tensor = torch.stack(new_desc)
-            
-            kp_converted = torch.cat((new_coords_tensor, new_kps_tensor), dim=1)
-            
-            kp_list.append(kp_converted)
-            desc_list.append(new_desc_tensor)
-            
-    
-    kp_list = torch.cat(kp_list, dim=0)
-    desc_list = torch.cat(desc_list, dim=0)
-
-    return kp_list, desc_list
-
-
-def keypoint_cube_pad(img, opt="orb", crop_degree=0):
-    """
-    Extracts only the visible Superpoint features from a collection tangent image. That is, only returns the keypoints visible to a spherical camera at the center of the icosahedron.
-
-    tex_image: 3 x N x H x W
-    corners: N x 4 x 3 coordinates of tangent image corners in 3D
-    image_shape: (H, W) of equirectangular image that we render back to
-    crop_degree: [optional] scalar value in degrees dictating how much of input equirectangular image is 0-padding
-
-    returns [visible_kp, visible_desc] (M x 4, M x length_descriptors)
-    """
-    # ----------------------------------------------
-    # Compute descriptors for each patch
-    # ----------------------------------------------
-    kp_list = []  # Stores keypoint coords
-    desc_list = []  # Stores keypoint descriptors
-    pad_bool = True
-    [back_img, bottom_img, front_img, left_img, right_img, top_img], cube_w = create_cube_imgs_pad(img.permute(1, 2, 0).cpu().numpy())
-    face_h, face_w, face_c = back_img.shape
-    face_dict = {"top": top_img,
-                 "left": left_img,
-                 "front": front_img,
-                 "right": right_img,
-                 "bottom": bottom_img, 
-                 "back": back_img
-    }
-
-    for idx, (face, img) in enumerate(face_dict.items()):
-        img = torch.from_numpy(img.astype(np.float32)).clone().permute(2, 1, 0)
-        if opt == 'superpoint':
-            img = process_img(img)
-            kp_details = computes_superpoint_keypoints(img, opt)
-
-        if opt == 'sift':
-            kp_details = computes_sift_keypoints(img)
-
-        if opt == 'orb':
-            kp_details = computes_orb_keypoints(img)
-
-        if opt == 'surf':
-            kp_details = computes_surf_keypoints(img)
-
-        if opt == 'alike':
-            kp_details = computes_alike_keypoints(img)
-   
-        if kp_details is not None:
-            kp = kp_details[0]
-            desc = kp_details[1]
-            new_coords = []
-            new_kps = []
-            new_desc = []
-            for jdx, row in enumerate(kp):
-                x, y = row[:2].tolist()
-                if pad_bool:
-                    if x < face_w // 4 or face_w * 3 // 4 <= x:
-                        continue
-                    if y < face_h // 4 or face_h * 3 // 4 <= y:
-                        continue
-                    x -= (face_w // 4)
-                    y -= (face_h // 4)
-                new_x, new_y = cube_to_equirectangular_coord(face, (x, y), face_h//4)
-                new_coords.append([new_x, new_y])
-                new_kps.append(row[2:])
-                new_desc.append(desc[jdx])
-            if len(new_coords) < 1:
-                continue
-            new_coords_tensor = torch.tensor(new_coords)
-            new_kps_tensor = torch.stack(new_kps)
-            new_desc_tensor = torch.stack(new_desc)
-            
-            kp_converted = torch.cat((new_coords_tensor, new_kps_tensor), dim=1)
-            
-            kp_list.append(kp_converted)
-            desc_list.append(new_desc_tensor)
-            
-    
-    kp_list = torch.cat(kp_list, dim=0)
-    desc_list = torch.cat(desc_list, dim=0)
-
-    return kp_list, desc_list
-
 
 def nn_match_two_way(desc1, desc2, nn_thresh = 0.7):
     """
@@ -475,12 +317,6 @@ def process_image_to_keypoints(image_path, corners, scale_factor, base_order, sa
 
     if mode == 'erp':
         image_kp, image_desc = keypoint_equirectangular(img, opt)
-    
-    if mode == "cube":
-        image_kp, image_desc = keypoint_cube(img, opt)
-    
-    if mode == "cubepad":
-        image_kp, image_desc = keypoint_cube_pad(img, opt)
 
     #print(tangent_image_desc.shape)
     #print(np.transpose(tangent_image_desc,[1,0]).shape)
