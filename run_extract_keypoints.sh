@@ -2,6 +2,8 @@
 python3 extract_keypoints.py --datas Room --descriptors sphorb --solver GSM_wRT --inliers "5PA" --points 500
 python3 extract_keypoints_farm.py --descriptors orb --pose pose1 --solver GSM_wRT --inliers 5PA --points 500
 
+python3 extract_keypoints.py --datas Room --descriptors orb torb sift tsift spoint tspoint sphorb alike talike Ltspoint Ftspoint Proposed5 Proposed01 Proposed1 Proposed10 Proposed_nolimit --solver GSM_wRT --inliers "5PA" --points 500
+
 # indoor
 #python3 extract_keypoints.py --datas Room Classroom Realistic Interior1 Interior2 --descriptors orb torb sift tsift spoint tspoint sphorb alike talike Ltspoint Ftspoint Proposed Proposed01 Proposed1 Proposed10 Proposed_un --solver GSM_wRT --inliers "5PA" --points 500
 #python3 extract_keypoints.py --datas Room Classroom Realistic Interior1 Interior2 --descriptors orb torb sift tsift spoint tspoint sphorb alike talike Ltspoint Ftspoint Proposed Proposed01 Proposed1 Proposed10 Proposed_un --solver GSM_wRT --inliers "5PA" --points 1000
