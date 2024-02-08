@@ -101,7 +101,7 @@ def main():
     pts2 =  pts2[valid_idx2]
     desc2 = desc2[:, valid_idx2]
 
-    pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
+    pts1, pts2, desc1, desc2, _, _ = sort_key(pts1, pts2, desc1, desc2, args.points)
 
     t2 = time.time()
     print("detection:", t2-t1)

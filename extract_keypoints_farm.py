@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 import argparse
 
+from scipy.spatial.transform import Rotation
 
 from utils.coord    import coord_3d
 from utils.ransac   import *
@@ -102,7 +103,7 @@ def main():
                     pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
                     pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
                     t_featurepoint_a = time.perf_counter()
-                    pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
+                    pts1, pts2, desc1, desc2, _, _ = sort_key(pts1, pts2, desc1, desc2, args.points)
                     
                 else:
                     os.chdir('SPHORB-master/')

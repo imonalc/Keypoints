@@ -1,6 +1,6 @@
 import sys
 import os
-sys.path.append(os.getcwd()+'/fivepoint')
+sys.path.append('.'+'/fivepoint')
 import build.fivep as f
 import time
 import torch
@@ -27,19 +27,20 @@ from utils.ransac   import *
 from utils.keypoint import *
 from utils.metrics  import *
 from utils.camera_recovering import *
+from utils.matching import *
 
 from os import listdir
 from os.path import isfile, join, isdir
 from tqdm import tqdm
 
-sys.path.append(os.getcwd()+'/SPHORB-master')
+sys.path.append('.'+'/SPHORB-master')
 
 import build1.sphorb_cpp as sphorb
 
+#sys.path.append('..')
+#from SuperGluePretrainedNetwork.models.matching import Matching
 
-from SuperGluePretrainedNetwork.models.matching import Matching
-from SuperGluePretrainedNetwork.models.utils import (AverageTimer, VideoStreamer,
-                          make_matching_plot_fast, frame2tensor)
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 def main():
@@ -51,7 +52,7 @@ def main():
     parser.add_argument('--solver', default="GSM_wRT")
     parser.add_argument('--inliers', default="8PA")
     parser.add_argument('--descriptor', default = 'sift')
-    parser.add_argument('--path', default = "./data/Farm_pair")
+    parser.add_argument('--path', default = "./data/Farm/new")
     args = parser.parse_args()
 
 
@@ -86,9 +87,7 @@ def main():
         corners = tangent_image_corners(base_order, sample_order)
         pts1_, desc1_ = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
         pts2_, desc2_ = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
-        pts1_[pts1_[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
-        pts2_[pts2_[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
-        pts1, pts2, desc1, desc2 = sort_key(pts1_, pts2_, desc1_, desc2_, args.points)
+        pts1, pts2, desc1, desc2, scores1, scores2 = sort_key(pts1_, pts2_, desc1_, desc2_, args.points)
         
 
     else:           
@@ -101,11 +100,117 @@ def main():
         pts2[pts2[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
         os.chdir('../')
 
-    #pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
-    print(pts1)
-    height_threshold = 0.75 * img_o.shape[0]
+    #pts1, pts2, desc1, desc2, _, _ = sort_key(pts1, pts2, desc1, desc2, args.points)
+    #pts1, desc1 = mask_cameraman(pts1, desc1, img_o.shape)
+    #pts2, desc2 = mask_cameraman(pts2, desc2, img_o.shape)
+
+
+
+    if len(pts1.shape) == 1:
+        pts1 = pts1.reshape(1,-1)
+
+    if use_our_method != 12:
+        s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
+    else:
+        config = {
+            'superpoint': {
+                'max_keypoints': 1000
+            },
+            'superglue': {
+                'weights': "indoor",
+            }
+        }
+        x1_, x2_ = [], []
+        matching = Matching(config).eval().to(device)
+        img_o_tensor = torch.from_numpy(img_o).float()/255.0
+        img_o_tensor = img_o_tensor.permute(2, 0, 1).unsqueeze(0).to(device)
+        img_r_tensor = torch.from_numpy(img_r).float()/255.0
+        img_r_tensor = img_r_tensor.permute(2, 0, 1).unsqueeze(0).to(device)
+        img_o_tensor = img_o_tensor[:, 0:1, :, :]
+        img_r_tensor = img_r_tensor[:, 0:1, :, :]
+        
+        
+        print(1000)
+        print(type(img_o_tensor), img_o_tensor.shape)
+        print(type(img_r_tensor), img_r_tensor.shape)
+
+        print(1111)
+        keypoints0 = np.delete(pts1, 2, axis=1)
+        keypoints0_tensor = torch.tensor(keypoints0)
+        keypoints1 = np.delete(pts2, 2, axis=1)
+        keypoints1_tensor = torch.tensor(keypoints1)
+        print(type(keypoints0_tensor), keypoints0_tensor.shape)
+        print(type(keypoints1_tensor), keypoints1_tensor.shape)
+        print(2222)
+
+        descriptors0_tensor = torch.tensor(desc1.T)
+        descriptors1_tensor = torch.tensor(desc2.T)
+        print(type(descriptors0_tensor), descriptors0_tensor.shape)
+        print(type(descriptors1_tensor), descriptors1_tensor.shape)
+        print(3333)
+
+        scores0_tensor = scores1.squeeze()
+        scores1_tensor = scores2.squeeze()
+        print(type(scores0_tensor), scores0_tensor.shape)
+        print(type(scores1_tensor), scores1_tensor.shape)
+        print(4444)
+
+        data_a = {
+            "image0":img_o_tensor,
+            "image1":img_r_tensor,
+        }
+
+        data_b = {
+            "keypoints0": [keypoints0_tensor],
+            "descriptors0": (descriptors0_tensor),
+            "scores0": (scores0_tensor),
+            "keypoints1": [keypoints1_tensor],
+            "descriptors1": (descriptors1_tensor),
+            "scores1": (scores1_tensor),
+        }
+
+        #print(data_b)
+        
+        pred = matching(data_a)
+
+        
+        kpt1 = pred["keypoints0"][0].cpu().numpy()
+        kpt1 = np.hstack((kpt1, np.ones((kpt1.shape[0], 1))))
+        kpt2 = pred["keypoints1"][0].cpu().numpy()
+        kpt2 = np.hstack((kpt2, np.ones((kpt2.shape[0], 1))))
+        matches1 = pred["matches0"][0].cpu().numpy()
+        matches2 = pred["matches1"][0].cpu().numpy()
+        for i in range(len(matches1)):
+            if matches1[i] == -1: continue
+            x1_.append(kpt1[i])
+            x2_.append(kpt2[matches1[i]])
+        s_pts1, s_pts2 = np.array(kpt1), np.array(kpt2)
+        x1_, x2_ = np.array(x1_), np.array(x2_)
+
+
+    print(x1_.shape, s_pts1.shape)
+    x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
+    s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
+
+    E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+    R1_,R2_,T1_,T2_ = decomposeE(E.T)
+    R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
+    print("True:", sum(inlier_idx), len(inlier_idx), ", ratio:", sum(inlier_idx) / len(inlier_idx))
+
+    print(R_)
+    print(T_)
+    
+    vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1_[:, :2], x2_[:, :2], inlier_idx)
+    vis_img = cv2.resize(vis_img,dsize=(512,512))
+    cv2.imshow("aaa", vis_img)
+    c = cv2.waitKey()
+
+
+
+def mask_cameraman(pts1, desc1, img_o_shape):
+    height_threshold = 0.75 * img_o_shape[0]
     cond1_1 = (pts1[:, 1] < height_threshold)
-    cond2_1 = (pts2[:, 1] < height_threshold)
+    #cond2_1 = (pts2[:, 1] < height_threshold)
         # pose1
     # cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 840))  & (pts1[:, 1] > 400))
     # cond1_3 = ~(((680 < pts1[:, 0]) &(pts1[:, 0] < 800)) & ((220< pts1[:, 1])))
@@ -144,75 +249,9 @@ def main():
     #valid_idx2 = cond2_1
     #pts2 =  pts2[valid_idx2]
     #desc2 = desc2[valid_idx2]
+    return pts1, desc1
 
 
-    if len(pts1.shape) == 1:
-        pts1 = pts1.reshape(1,-1)
-
-    if use_our_method != 12:
-        s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
-    else:
-        config = {
-            'superpoint': {
-                'max_keypoints': 1000
-            },
-            'superglue': {
-                'weights': "indoor",
-            }
-        }
-        x1_, x2_ = [], []
-        matching = Matching(config).eval().to(device)
-        img_o_tensor = torch.from_numpy(img_o).float()/255.0
-        img_o_tensor = img_o_tensor.permute(2, 0, 1).unsqueeze(0).to(device)
-        img_r_tensor = torch.from_numpy(img_r).float()/255.0
-        img_r_tensor = img_r_tensor.permute(2, 0, 1).unsqueeze(0).to(device)
-
-        img_o_tensor = img_o_tensor[:, 0:1, :, :]
-        img_r_tensor = img_r_tensor[:, 0:1, :, :]
-        print(0000)
-        print(img_o_tensor.shape)
-        print(1111)
-        pred = matching({
-            "image0":img_o_tensor,
-            #"keypoints0":1,
-            #"descriptors0":1,
-            #"scores0":1,
-            "image1":img_r_tensor,
-            #"keypoints0":1,
-            #"descriptors0":1,
-            #"scores0":1,
-
-        })
-        kpt1 = pred["keypoints0"][0].cpu().numpy()
-        kpt1 = np.hstack((kpt1, np.ones((kpt1.shape[0], 1))))
-        kpt2 = pred["keypoints1"][0].cpu().numpy()
-        kpt2 = np.hstack((kpt2, np.ones((kpt2.shape[0], 1))))
-        matches1 = pred["matches0"][0].cpu().numpy()
-        matches2 = pred["matches1"][0].cpu().numpy()
-        for i in range(len(matches1)):
-            if matches1[i] == -1: continue
-            x1_.append(kpt1[i])
-            x2_.append(kpt2[matches1[i]])
-        s_pts1, s_pts2 = np.array(kpt1), np.array(kpt2)
-        x1_, x2_ = np.array(x1_), np.array(x2_)
-
-
-    print(x1_.shape, s_pts1.shape)
-    x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
-    s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
-
-    E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-    R1_,R2_,T1_,T2_ = decomposeE(E.T)
-    R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
-    print("True:", sum(inlier_idx), len(inlier_idx), ", ratio:", sum(inlier_idx) / len(inlier_idx))
-
-    print(R_)
-    print(T_)
-    
-    vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1_[:, :2], x2_[:, :2], inlier_idx)
-    vis_img = cv2.resize(vis_img,dsize=(512,512))
-    cv2.imshow("aaa", vis_img)
-    c = cv2.waitKey()
 
 
 def plot_matches(image0,
@@ -274,50 +313,6 @@ def plot_keypoints(image, kpts, radius=2, color=(0, 0, 255)):
 
 
 
-
-def sort_key(pts1, pts2, desc1, desc2, points):
-
-    ind1 = np.argsort(pts1[:,2].numpy(),axis = 0)[::-1]
-    ind2 = np.argsort(pts2[:,2].numpy(),axis = 0)[::-1]
-
-    max1 = np.min([points,ind1.shape[0]])
-    max2 = np.min([points,ind2.shape[0]])
-
-    ind1 = ind1[:max1]
-    ind2 = ind2[:max2]
-
-    pts1 = pts1[ind1.copy(),:]
-    pts2 = pts2[ind2.copy(),:]
-
-    desc1 = desc1[:,ind1.copy()]
-    desc2 = desc2[:,ind2.copy()]
-
-    pts1 = np.concatenate((pts1[:,:2], np.ones((pts1.shape[0],1))), axis = 1 )
-    pts2 = np.concatenate((pts2[:,:2], np.ones((pts2.shape[0],1))), axis = 1 )
-
-    desc1 = np.transpose(desc1,[1,0]).numpy()
-    desc2 = np.transpose(desc2,[1,0]).numpy()
-
-    return pts1, pts2, desc1, desc2
-
-
-
-
-def mnn_matcher(desc1, desc2, method="mean_std"):
-    sim = desc1 @ desc2.transpose()
-    sim = (sim - np.min(sim))/ (np.max(sim) - np.min(sim))
-    sim = sim
-    threshold = np.percentile(sim, 99.9)
-    
-    sim[sim < threshold] = 0
-    nn12 = np.argmax(sim, axis=1)
-    nn21 = np.argmax(sim, axis=0)
-    ids1 = np.arange(0, sim.shape[0])
-    mask = (ids1 == nn21[nn12])
-    matches = np.stack([ids1[mask], nn12[mask]])
-    return matches.transpose()
-
-
 def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_new_method=0):
     if opt[-1] == 'p':
         porce = int(opt[:-1])
@@ -336,7 +331,7 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
     elif use_new_method == 1:
-        matches_idx = mnn_matcher(s_desc1, s_desc2)
+        matches_idx = mnn_matcher(s_desc1, s_desc2, use_new_method)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
     elif use_new_method == 2:
         thresh = 0.75
@@ -370,18 +365,6 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
             if m.distance < thresh * n.distance:
                 good.append(m)
         matches = good
-    elif use_new_method == 12:
-        matching = Matching().eval().to(device)
-        print(pts1)
-        print(111111111111111111)
-        print(desc1)
-        pred = matching({"keypoints0":pts1[:, :1],
-                         "descriptors0":desc1,
-                         "image0":0,
-                         "keypoints1":pts2[:, :1],
-                         "descriptors1":desc2,
-                         "image1":1
-                        })
     elif match == 'ratio':
         thresh = 0.75
         bf = cv2.BFMatcher(cv2.NORM_L2, False)
@@ -448,71 +431,6 @@ def get_descriptor(descriptor):
         return 'superpoint', 'tangent', 512, 11
     elif descriptor == "glue":
         return "superpoint", "erp", 512, 12
-
-def get_error(x1, x2, Rx, Tx):
-
-    S = computeEssentialMatrixByRANSAC(x1, x2)
-    I = S[1]
-    I = I.astype(np.int64)
-
-    x1 = x1[I,:]
-    x2 = x2[I,:]
-
-    F = calc_ematrix(x1,x2)
-
-
-    R1,R2,T1,T2 = decomposeE(F)
-
-    R,T = choose_rt(R1,R2,T1,T2,x1,x2)
-
-    R_error = r_error(Rx,R)
-    T_error = t_error(Tx,T)
-
-    return R_error, T_error
-
-
-def AUC(ROT, TRA, MET, L):
-
-    RAUC  = np.zeros(len(L))
-    TAUC  = np.zeros(len(L))
-
-    for index, t in enumerate(L):
-        ids = np.where(ROT<np.radians(t))[0]
-        RAUC[index] = len(ids)/len(ROT)
-
-    for index, t in enumerate(L):
-        ids = np.where(TRA<np.radians(t))[0]
-        TAUC[index] = len(ids)/len(TRA)
-
-    return RAUC, TAUC, np.array(MET)
-
-def get_data(DATAS):
-    if len(DATAS) == 1:
-        data = DATAS[0]
-    elif set(['Urban1','Urban2','Urban3','Urban4']) == set(DATAS):
-        data = 'Outdoor'
-    elif set(['Realistic','Interior1','Interior2','Room','Classroom']) == set(DATAS):
-        data = 'Indoor'
-    elif set(['Urban1_R','Urban2_R','Urban3_R','Urban4_R','Realistic_R','Interior1_R','Interior2_R','Room_R','Classroom_R']) == set(DATAS):
-        data = 'OnlyRot'
-    elif set(['Urban1_T','Urban2_T','Urban3_T','Urban4_T','Realistic_T','Interior1_T','Interior2_T','Room_T','Classroom_T']) == set(DATAS):
-        data = 'OnlyTra'
-    else:
-        data = ''
-        for DA in DATAS:
-            data+=DA
-
-    return data
-
-
-def get_kd(array):
-
-    array = np.array(array)
-    delimiter = int(array[-1])
-    A = array[:-1]
-    K = A[:delimiter].reshape(-1,3)
-    D = A[delimiter:].reshape(-1,32)
-    return K,D
 
 
 

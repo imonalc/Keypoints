@@ -100,7 +100,7 @@ def main():
                         pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
                         t_featurepoint_a = time.perf_counter()
 
-                        pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
+                        pts1, pts2, desc1, desc2, score1, score2 = sort_key(pts1, pts2, desc1, desc2, args.points)
                         
 
 

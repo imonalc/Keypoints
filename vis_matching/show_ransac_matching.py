@@ -1,5 +1,6 @@
 import sys
 import os
+sys.path.append('..')
 sys.path.append(os.getcwd()+'/fivepoint')
 import build.fivep as f
 import time
@@ -90,7 +91,7 @@ def main():
         print(pts1[:5])
         pts1[pts1[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
         pts2[pts2[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
-        pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
+        pts1, pts2, desc1, desc2, _, _ = sort_key(pts1, pts2, desc1, desc2, args.points)
         
 
     else:           
@@ -103,7 +104,7 @@ def main():
         pts2[pts2[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
         os.chdir('../')
 
-    #pts1, pts2, desc1, desc2 = sort_key(pts1, pts2, desc1, desc2, args.points)
+    #pts1, pts2, desc1, desc2, _, _ = sort_key(pts1, pts2, desc1, desc2, args.points)
     print(pts1)
     height_threshold = 0.75 * img_o.shape[0]
     cond1_1 = (pts1[:, 1] < height_threshold)

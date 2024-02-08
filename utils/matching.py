@@ -9,7 +9,54 @@ from utils.keypoint import *
 from utils.metrics  import *
 from utils.camera_recovering import *
 
+import time
 
+import sys
+sys.path.append('..')
+from SuperGluePretrainedNetwork.models.superpoint import SuperPoint
+from SuperGluePretrainedNetwork.models.superglue import SuperGlue
+
+
+
+class Matching(torch.nn.Module):
+    """ Image Matching Frontend (SuperPoint + SuperGlue) """
+    def __init__(self, config={}):
+        super().__init__()
+        self.superpoint = SuperPoint(config.get('superpoint', {}))
+        self.superglue = SuperGlue(config.get('superglue', {}))
+
+    def forward(self, data):
+        """ Run SuperPoint (optionally) and SuperGlue
+        SuperPoint is skipped if ['keypoints0', 'keypoints1'] exist in input
+        Args:
+          data: dictionary with minimal keys: ['image0', 'image1']
+        """
+        pred = {}
+
+        # Extract SuperPoint (keypoints, scores, descriptors) if not provided
+        if 'keypoints0' not in data:
+            pred0 = self.superpoint({'image': data['image0']})
+            pred = {**pred, **{k+'0': v for k, v in pred0.items()}}
+        if 'keypoints1' not in data:
+            pred1 = self.superpoint({'image': data['image1']})
+            pred = {**pred, **{k+'1': v for k, v in pred1.items()}}
+
+        print(time.perf_counter())
+        #print(pred)
+        # Batch all features
+        # We should either have i) one image per batch, or
+        # ii) the same number of local features for all images in the batch.
+        data = {**data, **pred}
+
+        for k in data:
+            if isinstance(data[k], (list, tuple)):
+                data[k] = torch.stack(data[k])
+
+        # Perform the matching
+        pred = {**pred, **self.superglue(data)}
+
+        print(time.perf_counter())
+        return pred
 
 
 
@@ -27,6 +74,9 @@ def sort_key(pts1, pts2, desc1, desc2, points):
     pts1 = pts1[ind1.copy(),:]
     pts2 = pts2[ind2.copy(),:]
 
+    scores1 = pts1[:, 2:3].clone()
+    scores2 = pts2[:, 2:3].clone()
+
     desc1 = desc1[:,ind1.copy()]
     desc2 = desc2[:,ind2.copy()]
 
@@ -36,7 +86,7 @@ def sort_key(pts1, pts2, desc1, desc2, points):
     desc1 = np.transpose(desc1,[1,0]).numpy()
     desc2 = np.transpose(desc2,[1,0]).numpy()
 
-    return pts1, pts2, desc1, desc2
+    return pts1, pts2, desc1, desc2, scores1, scores2
 
 
 
@@ -75,14 +125,23 @@ def mnn_matcher(desc1, desc2, use_new_method):
 
     distances = (distances - np.min(distances)) / (np.max(distances) - np.min(distances))
 
-    # しきい値の設定
-    dec = 5
-    threshold = np.percentile(distances, dec)  # 距離が小さいほど良いため、下位パーセンタイルを使用
+    if use_new_method == 1:
+        dec = 1
+    elif use_new_method == 2:
+        dec = 0.1
+    elif use_new_method == 3:
+        dec = 0.5
+    elif use_new_method == 4:
+        dec = 3
+    elif use_new_method == 5:
+        dec = 5
+    elif use_new_method == 6:
+        dec = 10
+    elif use_new_method == 7:
+        dec = 100
+    threshold = np.percentile(distances, dec) 
+    distances[distances > threshold] = np.max(distances)
 
-    # しきい値以上の距離を持つ要素を除外
-    distances[distances > threshold] = np.max(distances) + 1  # 最大距離より大きな値で除外
-
-    # 相互最近傍マッチング
     nn12 = np.argmin(distances, axis=1)
     nn21 = np.argmin(distances, axis=0)
     ids1 = np.arange(0, distances.shape[0])
