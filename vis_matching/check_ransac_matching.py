@@ -330,7 +330,7 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 
 
 
-def mnn_mather(desc1, desc2, method="mean_std"):
+def mnn_matcher(desc1, desc2, method="mean_std"):
     sim = desc1 @ desc2.transpose()
     sim = (sim - np.mean(sim))/np.std(sim)
     if method == "mean_std":
@@ -364,7 +364,7 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
     elif use_new_method == 1:
-        matches_idx = mnn_mather(s_desc1, s_desc2)
+        matches_idx = mnn_matcher(s_desc1, s_desc2)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
     elif use_new_method == 2:
         thresh = 0.75
