@@ -1,30 +1,15 @@
-"""
-    PROGRAMA PARA CALCULAR KEYPOINTS DE DOS IMAGENES 512x1024, ASI MISMO DE SUS CORRESPONDENCIAS
-    POR UN KNN BILATERAL
-
-"""
 import sys
 import os
 sys.path.append(os.getcwd()+'/fivepoint')
 import fivepoint.build.fivep as f
 
 import time
-import torch
-import torch.nn.functional as F
-from spherical_distortion.functional import create_tangent_images, unresample
 from spherical_distortion.util import *
-import matplotlib.pyplot as plt
-from skimage import io
-import cv2
 
 import pandas as pd
 import numpy as np
-import _spherical_distortion_ext._mesh as _mesh
 import argparse
 
-from random import sample
-import imageio
-from scipy.spatial.transform import Rotation as Rot
 
 from utils.coord    import coord_3d
 from utils.ransac   import *

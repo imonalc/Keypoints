@@ -1,5 +1,5 @@
 # test
-#python3 extract_keypoints.py --datas Room --descriptors sphorb --solver GSM_wRT --inliers "5PA" --points 500
+python3 extract_keypoints.py --datas Room --descriptors sphorb --solver GSM_wRT --inliers "5PA" --points 500
 python3 extract_keypoints_farm.py --descriptors orb --pose pose1 --solver GSM_wRT --inliers 5PA --points 500
 
 #python3 extract_keypoints.py --datas Room --descriptors orb torb sift tsift spoint tspoint sphorb alike talike Ltspoint Ftspoint Proposed5 Proposed01 Proposed1 Proposed10 Proposed_nolimit --solver GSM_wRT --inliers "5PA" --points 500
