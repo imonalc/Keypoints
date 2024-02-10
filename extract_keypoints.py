@@ -6,6 +6,7 @@ import fivepoint.build.fivep as f
 import time
 from spherical_distortion.util import *
 
+import torch
 import pandas as pd
 import numpy as np
 import argparse
@@ -25,6 +26,7 @@ from tqdm import tqdm
 sys.path.append(os.getcwd()+'/SPHORB-master')
 
 import build1.sphorb_cpp as sphorb
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 
@@ -77,7 +79,7 @@ def main():
 
 
                 try:
-                    opt, mode, sphered, use_our_method = get_descriptor(descriptor)
+                    opt, mode, sphered, method_idx = get_descriptor(descriptor)
 
                     base_order = 0  # Base sphere resolution
                     sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
@@ -88,12 +90,15 @@ def main():
                     path_o = path + '/O.png'
                     path_r = path + '/R.png'
 
-                    if opt != 'sphorb':
+                    if opt == 'sphorb':
+                        os.chdir('SPHORB-master/')
+                        t_featurepoint_b = time.perf_counter()
+                        pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
+                        pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
+                        t_featurepoint_a = time.perf_counter()
+                        os.chdir('../')
 
-                        # ----------------------------------------------
-                        # Compute necessary data
-                        # ----------------------------------------------
-                        # 80 baricenter points
+                    else:
                         corners = tangent_image_corners(base_order, sample_order)
                         t_featurepoint_b = time.perf_counter()
                         pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
@@ -101,16 +106,9 @@ def main():
                         t_featurepoint_a = time.perf_counter()
 
                         pts1, pts2, desc1, desc2, score1, score2 = sort_key(pts1, pts2, desc1, desc2, args.points)
-                        
 
 
-                    else:
-                        os.chdir('SPHORB-master/')
-                        t_featurepoint_b = time.perf_counter()
-                        pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
-                        pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
-                        t_featurepoint_a = time.perf_counter()
-                        os.chdir('../')
+                    
                     
 
                     if len(pts1.shape) == 1:
@@ -126,11 +124,32 @@ def main():
 
 
                     if pts1.shape[0] > 0 or pts2.shape[0] >0:
-                        t_matching_b = time.perf_counter()
-                        s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
-                        t_matching_a = time.perf_counter()
+                        if method_idx == 100:
+                            print(1111)
+                            img_o = load_torch_img(path_o)[:3, ...].float()
+                            img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+                            img_r = load_torch_img(path_r)[:3, ...].float()
+                            img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+                            img_o = torch2numpy(img_o.byte())
+                            img_r = torch2numpy(img_r.byte())
 
-                        x1,x2 = coord_3d(x1, dim), coord_3d(x2, dim)
+                            img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
+                            img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
+                            s_pts1, s_pts2, x1_, x2, t_matching_b, t_matching_a = superglue_matching(pts1, pts2, desc1, desc2, score1, score2, img_o, img_r, device)
+                            print(2222)
+                            
+                        elif method_idx == 101:
+                            print(3333)
+                            s_pts1, s_pts2, x1_, x2, t_matching_b, t_matching_a = lightglue_matching(pts1, pts2, desc1, desc2, score1, score2, device)
+                            print(4444)
+                        else:
+                            t_matching_b = time.perf_counter()
+                            s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=method_idx)
+                            t_matching_a = time.perf_counter()
+                            
+
+
+                        x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
 
                         s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
                         
@@ -170,7 +189,7 @@ def main():
 
                         std.append(x1.shape[0])
                 except:     
-                    print("Unexpected error:",indicador, opt, use_our_method)
+                    print("Unexpected error:",indicador, opt, method_idx)
 
 
         for indicador, descriptor in enumerate(DESCRIPTORS):

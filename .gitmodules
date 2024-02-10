@@ -4,3 +4,6 @@
 [submodule "SuperGluePretrainedNetwork"]
 	path = SuperGluePretrainedNetwork
 	url = git@github.com:magicleap/SuperGluePretrainedNetwork.git
+[submodule "LightGlue"]
+	path = LightGlue
+	url = git@github.com:cvg/LightGlue.git

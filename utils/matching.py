@@ -16,6 +16,8 @@ sys.path.append('..')
 from SuperGluePretrainedNetwork.models.superpoint import SuperPoint
 from SuperGluePretrainedNetwork.models.superglue import SuperGlue
 
+from LightGlue.lightglue import LightGlue
+
 
 
 class Matching(torch.nn.Module):
@@ -37,12 +39,13 @@ class Matching(torch.nn.Module):
         if 'keypoints0' not in data:
             pred0 = self.superpoint({'image': data['image0']})
             pred = {**pred, **{k+'0': v for k, v in pred0.items()}}
+            #print(pred)
         if 'keypoints1' not in data:
+            print(3333)
             pred1 = self.superpoint({'image': data['image1']})
             pred = {**pred, **{k+'1': v for k, v in pred1.items()}}
 
-        print(time.perf_counter())
-        #print(pred)
+        matching_b = time.perf_counter()
         # Batch all features
         # We should either have i) one image per batch, or
         # ii) the same number of local features for all images in the batch.
@@ -52,13 +55,149 @@ class Matching(torch.nn.Module):
             if isinstance(data[k], (list, tuple)):
                 data[k] = torch.stack(data[k])
 
-        # Perform the matching
         pred = {**pred, **self.superglue(data)}
+        matching_a = time.perf_counter()
 
-        print(time.perf_counter())
-        return pred
+        return pred, matching_b, matching_a
 
 
+def superpoint_superglue(img_o, img_r, device):
+    config = {
+        'superpoint': {
+            'max_keypoints': 1000
+        },
+        'superglue': {
+            'weights': "indoor",
+            'match_threshold': 0.03
+        }
+    }
+    x1_, x2_ = [], []
+    matching = Matching(config).eval().to(device)
+    img_o_tensor = torch.from_numpy(img_o).float()/255.0
+    img_o_tensor = img_o_tensor.permute(2, 0, 1).unsqueeze(0).to(device)
+    img_r_tensor = torch.from_numpy(img_r).float()/255.0
+    img_r_tensor = img_r_tensor.permute(2, 0, 1).unsqueeze(0).to(device)
+    img_o_tensor = img_o_tensor[:, 0:1, :, :]
+    img_r_tensor = img_r_tensor[:, 0:1, :, :]
+    
+    data = {
+        "image0":img_o_tensor,
+        "image1":img_r_tensor,
+    }
+    
+    pred, t_matching_b, t_matching_a = matching(data)
+  
+    kpt1 = pred["keypoints0"][0].cpu().numpy()
+    kpt1 = np.hstack((kpt1, np.ones((kpt1.shape[0], 1))))
+    kpt2 = pred["keypoints1"][0].cpu().numpy()
+    kpt2 = np.hstack((kpt2, np.ones((kpt2.shape[0], 1))))
+    matches1 = pred["matches0"][0].cpu().numpy()
+    matches2 = pred["matches1"][0].cpu().numpy()
+    for i in range(len(matches1)):
+        if matches1[i] == -1: continue
+        x1_.append(kpt1[i])
+        x2_.append(kpt2[matches1[i]])
+    s_pts1, s_pts2 = np.array(kpt1), np.array(kpt2)
+    x1_, x2_ = np.array(x1_), np.array(x2_)
+
+    return s_pts1, s_pts2, x1_, x2_, t_matching_b, t_matching_a
+
+
+def superglue_matching(pts1, pts2, desc1, desc2, scores1, scores2, img_o, img_r, device):
+    config = {
+        'superglue': {
+            'weights': "indoor",
+            'match_threshold': 0.03
+        }
+    }
+    x1_, x2_ = [], []
+    matching = Matching(config).eval().to(device)
+    img_o_tensor = torch.from_numpy(img_o).float()/255.0
+    img_o_tensor = img_o_tensor.permute(2, 0, 1).unsqueeze(0).to(device)
+    img_r_tensor = torch.from_numpy(img_r).float()/255.0
+    img_r_tensor = img_r_tensor.permute(2, 0, 1).unsqueeze(0).to(device)
+    img_o_tensor = img_o_tensor[:, 0:1, :, :]
+    img_r_tensor = img_r_tensor[:, 0:1, :, :]
+    
+    
+    keypoints0 = np.delete(pts1, 2, axis=1)
+    keypoints0_tensor = torch.tensor(keypoints0,dtype=torch.float).to(device)
+    keypoints1 = np.delete(pts2, 2, axis=1)
+    keypoints1_tensor = torch.tensor(keypoints1,dtype=torch.float).to(device)
+    
+    descriptors0_tensor = torch.tensor(desc1.T,dtype=torch.float).to(device)
+    descriptors1_tensor = torch.tensor(desc2.T,dtype=torch.float).to(device)
+    
+    scores0_tensor = scores1.squeeze(1).to(device)
+    scores1_tensor = scores2.squeeze(1).to(device)
+    
+    data = {
+        "keypoints0": [keypoints0_tensor],
+        "descriptors0": [descriptors0_tensor],
+        "scores0": (scores0_tensor, ),
+        "keypoints1": [keypoints1_tensor],
+        "descriptors1": [descriptors1_tensor],
+        "scores1": (scores1_tensor, ),
+        "image0":img_o_tensor,
+        "image1":img_r_tensor,
+    }
+    
+    pred, t_matching_b, t_matching_a = matching(data)
+    kpt1 = keypoints0_tensor.cpu().numpy()
+    kpt1 = np.hstack((kpt1, np.ones((kpt1.shape[0], 1))))
+    kpt2 = keypoints1_tensor.cpu().numpy()
+    kpt2 = np.hstack((kpt2, np.ones((kpt2.shape[0], 1))))
+    matches1 = pred[0]["matches0"][0].cpu().numpy()
+    matches2 = pred[0]["matches1"][0].cpu().numpy()
+    for i in range(len(matches1)):
+        if matches1[i] == -1: continue
+        x1_.append(kpt1[i])
+        x2_.append(kpt2[matches1[i]])
+    s_pts1, s_pts2 = np.array(kpt1), np.array(kpt2)
+    x1_, x2_ = np.array(x1_), np.array(x2_)
+
+    return s_pts1, s_pts2, x1_, x2_, t_matching_b, t_matching_a
+
+
+def lightglue_matching(pts1, pts2, desc1, desc2, scores1, scores2, device):
+    matcher = LightGlue(features="superpoint").eval().to(device)
+    x1_, x2_ = [], []
+    keypoints0 = np.delete(pts1, 2, axis=1)
+    keypoints0_tensor = torch.tensor(keypoints0,dtype=torch.float).unsqueeze(0).to('cuda:0')
+    keypoints1 = np.delete(pts2, 2, axis=1)
+    keypoints1_tensor = torch.tensor(keypoints1,dtype=torch.float).unsqueeze(0).to('cuda:0')
+    descriptors0_tensor = torch.tensor(desc1,dtype=torch.float).unsqueeze(0).to('cuda:0')
+    descriptors1_tensor = torch.tensor(desc2,dtype=torch.float).unsqueeze(0).to('cuda:0')
+    scores0_tensor = scores1.squeeze().to('cuda:0')
+    scores1_tensor = scores2.squeeze().to('cuda:0')
+    data = {
+        "image0":{
+            "keypoints": keypoints0_tensor,
+            "keypoint_scores": scores0_tensor,
+            "descriptors": descriptors0_tensor
+        },
+        "image1":{
+            "keypoints": keypoints1_tensor,
+            "keypoint_scores": scores1_tensor,
+            "descriptors": descriptors1_tensor
+        }
+    }
+
+    t_matching_b = time.perf_counter()
+    pred = matcher(data)
+    matches = pred['matches']
+    
+    matches1 = keypoints0[matches[0][:, 0].cpu().numpy(), :] 
+    matches2 = keypoints1[matches[0][:, 1].cpu().numpy(), :] 
+    for i in range(len(matches1)):
+        x1_.append(matches1[i])
+        x2_.append(matches2[i])
+    t_matching_a = time.perf_counter()
+
+    s_pts1, s_pts2 = np.array(keypoints0), np.array(keypoints1)
+    x1_, x2_ = np.array(x1_), np.array(x2_)
+
+    return s_pts1, s_pts2, x1_, x2_, t_matching_b, t_matching_a
 
 def sort_key(pts1, pts2, desc1, desc2, points):
 
@@ -286,6 +425,12 @@ def get_descriptor(descriptor):
         return 'superpoint', 'tangent', 512, 10
     elif descriptor == 'Ftspoint':
         return 'superpoint', 'tangent', 512, 11
+    elif descriptor == 'superglue':
+        return 'superpoint', 'tangent', 512, 100
+    elif descriptor == 'lightglue':
+        return 'superpoint', 'tangent', 512, 101
+    elif descriptor == 'sphereglue':
+        return 'superpoint', 'tangent', 512, 102
 
 
 

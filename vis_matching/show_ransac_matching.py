@@ -61,7 +61,7 @@ def main():
     t0 = time.time()
     descriptor = args.descriptor
 
-    opt, mode, sphered, use_our_method = get_descriptor(descriptor)
+    opt, mode, sphered, method_idx = get_descriptor(descriptor)
     base_order = 0  # Base sphere resolution
     sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
     scale_factor = 1.0  # How much to scale input equirectangular image by
@@ -152,7 +152,7 @@ def main():
     if len(pts1.shape) == 1:
         pts1 = pts1.reshape(1,-1)
 
-    s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
+    s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=method_idx)
     x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
     s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
 

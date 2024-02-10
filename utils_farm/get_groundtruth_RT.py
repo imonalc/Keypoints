@@ -70,7 +70,7 @@ def main():
     for path in tqdm(paths):
         print(path)
         try:
-            opt, mode, sphered, use_our_method = get_descriptor(descriptor)
+            opt, mode, sphered, method_idx = get_descriptor(descriptor)
             base_order = 0  # Base sphere resolution
             sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
             scale_factor = 1.0  # How much to scale input equirectangular image by
@@ -138,7 +138,7 @@ def main():
                 pts2 = pts2.reshape(1,-1)
 
             if pts1.shape[0] > 0 or pts2.shape[0] >0:
-                s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=use_our_method)
+                s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=method_idx)
                 x1,x2 = coord_3d(x1, dim), coord_3d(x2, dim)
                 s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
 
@@ -169,7 +169,7 @@ def main():
             R_quat_l.append(mat2quat(R))
             T_l.append(T)
         except:     
-            print("Unexpected error:", opt, use_our_method)
+            print("Unexpected error:", opt, method_idx)
 
 
     RQ_true_value = mean_quat(R_quat_l)
