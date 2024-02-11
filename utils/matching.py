@@ -18,6 +18,8 @@ from SuperGluePretrainedNetwork.models.superglue import SuperGlue
 
 from LightGlue.lightglue import LightGlue
 
+sys.path.append('..'+'/SphereGlue')
+from SphereGlue.model.sphereglue import SphereGlue
 
 
 class Matching(torch.nn.Module):
@@ -106,8 +108,8 @@ def superpoint_superglue(img_o, img_r, device):
 def superglue_matching(pts1, pts2, desc1, desc2, scores1, scores2, img_o, img_r, device):
     config = {
         'superglue': {
-            'weights': "indoor",
-            'match_threshold': 0.03
+            #'weights': "indoor",
+            #'match_threshold': 0.03
         }
     }
     x1_, x2_ = [], []
@@ -198,6 +200,88 @@ def lightglue_matching(pts1, pts2, desc1, desc2, scores1, scores2, device):
     x1_, x2_ = np.array(x1_), np.array(x2_)
 
     return s_pts1, s_pts2, x1_, x2_, t_matching_b, t_matching_a
+
+
+
+def sphereglue_matching(pts1, pts2, desc1, desc2, scores1, scores2, points, device):
+    config = {'K': 2, 
+              'GNN_layers': ['cross'], 
+              'match_threshold': 0.2, 
+              'sinkhorn_iterations': 20, 
+              'aggr': 'add', 
+              'knn': 20, 
+              'max_kpts': points,
+              'descriptor_dim': 256, 
+              'output_dim': 512
+    }
+    matching = SphereGlue(config).to(device)
+    model_path = '../SphereGlue/model_weights/superpoint/autosaved.pt'
+    ckpt_data = torch.load(model_path)
+    matching.load_state_dict(ckpt_data["MODEL_STATE_DICT"])
+    matching.eval()
+    x1_, x2_ = [], []
+    
+    
+    keypoints0 = np.delete(pts1, 2, axis=1)
+    keypoints0_c = convert_to_spherical_coordinates(keypoints0, 1024, 512)
+    keypoints0_tensor = torch.tensor(keypoints0_c,dtype=torch.float).unsqueeze(0).to(device)
+    keypoints1 = np.delete(pts2, 2, axis=1)
+    keypoints1_c = convert_to_spherical_coordinates(keypoints1, 1024, 512)
+    keypoints1_tensor = torch.tensor(keypoints1_c,dtype=torch.float).unsqueeze(0).to(device)
+    
+    descriptors0_tensor = torch.tensor(desc1,dtype=torch.float).unsqueeze(0).to(device)
+    descriptors1_tensor = torch.tensor(desc2,dtype=torch.float).unsqueeze(0).to(device)
+    
+    scores0_tensor = scores1.squeeze(1).unsqueeze(0).to(device)
+    scores1_tensor = scores2.squeeze(1).unsqueeze(0).to(device)
+    
+    data = {
+        "unitCartesian1": keypoints0_tensor,
+        "h1": descriptors0_tensor,
+        "scores1": scores0_tensor,
+        "unitCartesian2": keypoints1_tensor,
+        "h2": descriptors1_tensor,
+        "scores2": scores1_tensor,
+    }
+
+    t_matching_b = time.perf_counter()
+    pred = matching(data)
+    t_matching_a = time.perf_counter()
+
+    kpt1 = keypoints0.copy()
+    kpt1 = np.hstack((kpt1, np.ones((kpt1.shape[0], 1))))
+    kpt2 = keypoints1.copy()
+    kpt2 = np.hstack((kpt2, np.ones((kpt2.shape[0], 1))))
+    matches1 = pred["matches0"].cpu().numpy()
+    
+    for i in range(len(matches1[0])):
+        if matches1[0][i] == -1: continue
+        x1_.append(kpt1[i])
+        x2_.append(kpt2[matches1[0][i]])
+    s_pts1, s_pts2 = np.array(kpt1), np.array(kpt2)
+    x1_, x2_ = np.array(x1_), np.array(x2_)
+
+    return s_pts1, s_pts2, x1_, x2_, t_matching_b, t_matching_a
+
+
+
+def convert_to_spherical_coordinates(keypoints, image_width, image_height, device="cuda"):
+    longitude = (keypoints[:, 0] / image_width) * 360 - 180
+    latitude = (keypoints[:, 1] / image_height) * 180 - 90
+
+    lon_rad = np.deg2rad(longitude)
+    lat_rad = np.deg2rad(latitude)
+
+    x = np.cos(lat_rad) * np.cos(lon_rad)
+    y = np.cos(lat_rad) * np.sin(lon_rad)
+    z = np.sin(lat_rad)
+
+    keypoints3D = np.stack([x, y, z], axis=-1)
+    keypoints3D_tensor = torch.tensor(keypoints3D, dtype=torch.float).to(device)
+
+    return keypoints3D_tensor
+
+
 
 def sort_key(pts1, pts2, desc1, desc2, points):
 

@@ -5,6 +5,7 @@ import build.fivep as f
 import time
 import torch
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
 from spherical_distortion.functional import create_tangent_images, unresample
 from spherical_distortion.util import *
 import matplotlib.pyplot as plt
@@ -49,7 +50,9 @@ from LightGlue.lightglue import LightGlue, SuperPoint, DISK
 from LightGlue.lightglue.utils import load_image, rbd
 from LightGlue.lightglue import viz2d
 
+sys.path.append('.'+'/SphereGlue')
 from SphereGlue.model.sphereglue import SphereGlue
+from SphereGlue.utils.demo_mydataset import MyDataset 
 
 
 def main():
@@ -121,21 +124,32 @@ def main():
     if method_idx < 100:
         s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=method_idx)
     elif method_idx == 102:
-        config = {
-            "K": 2,
-            "descriptor_dim": 256,
-            "output_dim": 256*2,
-            "aggr": "add",
-            "GNN_layers": "cross",
-            "max_kpts": args.points,
+        s_pts1, s_pts2, x1_, x2_, _, _ = sphereglue_matching(pts1, pts2, desc1, desc2, scores1, scores2, args.points, device)
+    elif method_idx == 1002:
+        config = {'K': 2, 
+                  'GNN_layers': ['cross'], 
+                  'match_threshold': 0.2, 
+                  'sinkhorn_iterations': 20, 
+                  'aggr': 'add', 
+                  'knn': 20, 
+                  'max_kpts': args.points,
+                  'descriptor_dim': 256, 
+                  'output_dim': 512
         }
+        
         matching_test = SphereGlue(config).to(device)
+        model_path = './SphereGlue/model_weights/superpoint/autosaved.pt'
+        ckpt_data = torch.load(model_path)
+        matching_test.load_state_dict(ckpt_data["MODEL_STATE_DICT"])
+        matching_test.eval()
         x1_, x2_ = [], []
 
         keypoints0 = np.delete(pts1, 2, axis=1)
-        keypoints0_tensor = torch.tensor(keypoints0,dtype=torch.float).unsqueeze(0).to(device)
+        keypoints0_c = convert_to_spherical_coordinates(keypoints0, 1024, 512)
+        keypoints0_tensor = torch.tensor(keypoints0_c,dtype=torch.float).unsqueeze(0).to(device)
         keypoints1 = np.delete(pts2, 2, axis=1)
-        keypoints1_tensor = torch.tensor(keypoints1,dtype=torch.float).unsqueeze(0).to(device)
+        keypoints1_c = convert_to_spherical_coordinates(keypoints1, 1024, 512)
+        keypoints1_tensor = torch.tensor(keypoints1_c,dtype=torch.float).unsqueeze(0).to(device)
         print("keypoints", type(keypoints0_tensor), keypoints0_tensor.shape)
 
         descriptors0_tensor = torch.tensor(desc1,dtype=torch.float).unsqueeze(0).to(device)
@@ -156,6 +170,36 @@ def main():
         }
         print(111)
         pred = matching_test(data)
+
+        print(3333)
+        #print(pred)
+
+        print("pred_corr", type(pred["matches0"]), pred["matches0"].shape)
+        print("matching_scores", type(pred["matching_scores0"]), pred["matching_scores0"].shape)
+
+        #print(pred["matches0"])
+
+    
+        kpt1 = keypoints0.copy()
+        kpt1 = np.hstack((kpt1, np.ones((kpt1.shape[0], 1))))
+        kpt2 = keypoints1.copy()
+        kpt2 = np.hstack((kpt2, np.ones((kpt2.shape[0], 1))))
+        matches1 = pred["matches0"].cpu().numpy()
+        print(matches1[0].shape)
+        for i in range(len(matches1[0])):
+            if matches1[0][i] == -1: continue
+            x1_.append(kpt1[i])
+            x2_.append(kpt2[matches1[0][i]])
+        s_pts1, s_pts2 = np.array(kpt1), np.array(kpt2)
+        x1_, x2_ = np.array(x1_), np.array(x2_)
+        
+        print(8888)
+        print(type(x1_), x1_.shape)
+        #print(x1_)
+        #aaa = [np.min(x1_, axis=0), np.max(x1_, axis=0), np.min(x1_, axis=1), np.max(x1_, axis=1)]
+        #print("x1_", aaa)
+
+
     elif method_idx == 101:
         matcher = LightGlue(features="superpoint").eval().to(device)
         x1_, x2_ = [], []
@@ -391,6 +435,39 @@ def plot_keypoints(image, kpts, radius=2, color=(0, 0, 255)):
         x0, y0 = kpt
         cv2.circle(out, (x0, y0), 4, color, -1, lineType=cv2.LINE_4)
     return out
+
+
+def convert_to_spherical_coordinates(keypoints, image_width, image_height, device="cuda"):
+    """
+    全天球画像上の2Dキーポイントを単位球面上の3D座標に変換する関数。
+
+    Args:
+        keypoints (np.ndarray): 全天球画像上の2Dキーポイント。形状は[N, 2]。
+        image_width (int): 全天球画像の幅。
+        image_height (int): 全天球画像の高さ。
+        device (str): 変換後のテンソルを配置するデバイス（例: 'cpu', 'cuda:0'）。
+
+    Returns:
+        torch.Tensor: 単位球面上の3D座標。形状は[N, 3]。
+    """
+    # 座標を経度と緯度に変換
+    longitude = (keypoints[:, 0] / image_width) * 360 - 180
+    latitude = (keypoints[:, 1] / image_height) * 180 - 90
+
+    # 経度と緯度をラジアンに変換
+    lon_rad = np.deg2rad(longitude)
+    lat_rad = np.deg2rad(latitude)
+
+    # 単位球面上の3D座標に変換
+    x = np.cos(lat_rad) * np.cos(lon_rad)
+    y = np.cos(lat_rad) * np.sin(lon_rad)
+    z = np.sin(lat_rad)
+
+    # 結果をテンソルに変換して、デバイスに移動
+    keypoints3D = np.stack([x, y, z], axis=-1)  # [N, 3]の形状
+    keypoints3D_tensor = torch.tensor(keypoints3D, dtype=torch.float).to(device)
+
+    return keypoints3D_tensor
 
 
 
