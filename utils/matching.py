@@ -390,7 +390,10 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
         s_desc2 = s_desc2.astype(np.uint8)
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
-    elif use_new_method in [1, 2, 3, 4, 5, 6, 7]:
+    elif use_new_method in [1, 2, 3, 4, 5, 6]:
+        matches_idx = mnn_matcher_old(s_desc1, s_desc2, use_new_method)
+        matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
+    elif use_new_method == 7:
         matches_idx = mnn_matcher(s_desc1, s_desc2, use_new_method)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
     elif use_new_method == 10:
