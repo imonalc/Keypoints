@@ -345,7 +345,6 @@ def mnn_matcher(desc1, desc2, use_new_method):
     d1_square = np.sum(np.square(desc1), axis=1, keepdims=True)
     d2_square = np.sum(np.square(desc2), axis=1, keepdims=True)
     distances = np.sqrt(d1_square - 2 * np.dot(desc1, desc2.T) + d2_square.T)
-
     distances = (distances - np.min(distances)) / (np.max(distances) - np.min(distances))
 
     if use_new_method == 1:
@@ -353,7 +352,7 @@ def mnn_matcher(desc1, desc2, use_new_method):
     elif use_new_method == 2:
         dec = 0.1
     elif use_new_method == 3:
-        dec = 0.5
+        dec = 0.01
     elif use_new_method == 4:
         dec = 3
     elif use_new_method == 5:
@@ -370,6 +369,44 @@ def mnn_matcher(desc1, desc2, use_new_method):
     ids1 = np.arange(0, distances.shape[0])
     mask = (ids1 == nn21[nn12])
     matches = np.stack([ids1[mask], nn12[mask]])
+
+    return matches.transpose()
+
+
+def mnn_matcher_new(desc1, desc2, use_new_method):
+    d1_square = np.sum(np.square(desc1), axis=1, keepdims=True)
+    d2_square = np.sum(np.square(desc2), axis=1, keepdims=True)
+    distances = np.sqrt(d1_square - 2 * np.dot(desc1, desc2.T) + d2_square.T)
+    distances = (distances - np.min(distances)) / (np.max(distances) - np.min(distances))
+
+    nn12 = np.argmin(distances, axis=1)
+    nn21 = np.argmin(distances, axis=0)
+    ids1 = np.arange(0, distances.shape[0])
+    mask = (ids1 == nn21[nn12])
+    matches = np.stack([ids1[mask], nn12[mask]])
+    matched_distances = distances[ids1[mask], nn12[mask]]
+
+    matches_with_distances = np.hstack([matches.transpose(), matched_distances[:, np.newaxis]])
+    sorted_matches_with_distances = matches_with_distances[matches_with_distances[:, 2].argsort()]
+    if use_new_method == 1001:
+        dec = 0.1
+    if use_new_method == 1002:
+        dec = 0.05
+    if use_new_method == 1003:
+        dec = 0.2
+    if use_new_method == 1004:
+        dec = 0.3
+    if use_new_method == 10001:
+        dec = 0.1
+    if use_new_method == 10002:
+        dec = 0.05
+    if use_new_method == 10003:
+        dec = 0.2
+    if use_new_method == 10004:
+        dec = 0.3
+    num_to_remove = int(len(sorted_matches_with_distances) * dec)
+    matches = sorted_matches_with_distances[:-num_to_remove, :2].transpose().astype(int)
+
     return matches.transpose()
 
 
@@ -390,11 +427,11 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
         s_desc2 = s_desc2.astype(np.uint8)
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
-    elif use_new_method in [1, 2, 3, 4, 5, 6]:
-        matches_idx = mnn_matcher_old(s_desc1, s_desc2, use_new_method)
-        matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
-    elif use_new_method == 7:
+    elif use_new_method in [1, 2, 3, 4, 5, 6, 7, 8]:
         matches_idx = mnn_matcher(s_desc1, s_desc2, use_new_method)
+        matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
+    elif use_new_method in [1001, 1002, 1003, 1004, 10001, 10002, 10003, 10004]:
+        matches_idx = mnn_matcher_new(s_desc1, s_desc2, use_new_method)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
     elif use_new_method == 10:
         thresh = 0.75
@@ -495,19 +532,21 @@ def get_descriptor(descriptor):
     elif descriptor == 'talike':
         return 'alike', 'tangent', 512, 0
     elif descriptor == 'Proposed1':
-        return 'superpoint', 'tangent', 512, 1
+        return 'superpoint', 'erp', 512, 1  ##
     elif descriptor == 'Proposed01':
-        return 'superpoint', 'tangent', 512, 2
-    elif descriptor == 'Proposed05':
-        return 'superpoint', 'tangent', 512, 3
+        return 'superpoint', 'erp', 512, 2  ##
+    elif descriptor == 'Proposed001':
+        return 'superpoint', 'erp', 512, 3  ##
     elif descriptor == 'Proposed3':
         return 'superpoint', 'tangent', 512, 4
     elif descriptor == 'Proposed5':
-        return 'superpoint', 'tangent', 512, 5
+        return 'superpoint', 'erp', 512, 5  ##
     elif descriptor == 'Proposed10':
-        return 'superpoint', 'tangent', 512, 6 
+        return 'superpoint', 'erp', 512, 6  ## 
     elif descriptor == 'Proposed_nolimit':
-        return 'superpoint', 'tangent', 512, 7
+        return 'superpoint', 'erp', 512, 7  ##
+    elif descriptor == 'Proposed_nolimit2':
+        return 'superpoint', 'tangent', 512, 7  ##
     elif descriptor == 'Ltspoint':
         return 'superpoint', 'tangent', 512, 10
     elif descriptor == 'Ftspoint':
@@ -518,6 +557,22 @@ def get_descriptor(descriptor):
         return 'superpoint', 'tangent', 512, 101
     elif descriptor == 'sphereglue':
         return 'superpoint', 'tangent', 512, 102
+    elif descriptor == 'Proposed2_1':
+        return 'superpoint', 'erp', 512, 1001  ##
+    elif descriptor == 'Proposed2_2':
+        return 'superpoint', 'erp', 512, 1002  ##
+    elif descriptor == 'Proposed2_3':
+        return 'superpoint', 'erp', 512, 1003  ##
+    elif descriptor == 'Proposed2_4':
+        return 'superpoint', 'erp', 512, 1004  ##
+    elif descriptor == 'Proposed3_1':
+        return 'superpoint', 'tangent', 512, 10001  ##
+    elif descriptor == 'Proposed3_2':
+        return 'superpoint', 'tangent', 512, 10002  ##
+    elif descriptor == 'Proposed3_3':
+        return 'superpoint', 'tangent', 512, 10003  ##
+    elif descriptor == 'Proposed3_4':
+        return 'superpoint', 'tangent', 512, 10004  ##
 
 
 

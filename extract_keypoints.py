@@ -23,6 +23,9 @@ from os import listdir
 from os.path import isfile, join, isdir
 from tqdm import tqdm
 
+from PIL import Image
+import random
+
 sys.path.append(os.getcwd()+'/SPHORB-master')
 
 import build1.sphorb_cpp as sphorb
@@ -64,6 +67,7 @@ def main():
 
     METRICS = np.zeros((len(DESCRIPTORS),2))
 
+    np.random.seed(0)
     data = get_data(DATAS)
     for data in DATAS:
 
@@ -73,6 +77,33 @@ def main():
         std = []
 
         for path in tqdm(paths):
+            make_BCG = not os.path.isfile(path + '/R_BCG1.png')
+            if False:
+                path_r = path + '/R.png'
+                base_order = 0  # Base sphere resolution
+                sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
+                scale_factor = 1.0  # How much to scale input equirectangular image by
+                img_r = load_torch_img(path_r)[:3, ...].float()
+                img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+                img_r = torch2numpy(img_r.byte())
+                img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
+                ###  change brightness and contrast
+                alpha = np.random.uniform(0.5, 2.0)
+                beta = np.random.randint(-50, 50)
+                img_r = cv2.convertScaleAbs(img_r, alpha=alpha, beta=beta)
+                mean, stddev = np.random.uniform(0, 50),  np.random.uniform(5, 50)
+                gaussian_noise = np.random.normal(mean, stddev, img_r.shape)
+                gaussian_noise = np.clip(gaussian_noise, 0, 255).astype('uint8')
+                #print(img_r[0:2, 0:2, :])
+                #print(gaussian_noise[0:2, 0:2, :])
+                img_r = cv2.add(img_r, gaussian_noise)
+                img_r = np.clip(img_r, 0, 255).astype(np.uint8)
+                img_r_pil = Image.fromarray(img_r)
+                img_r_pil.save(path + "/R_BCG1.png")
+                img_r = load_torch_img(path_r)[:3, ...].float()
+                img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+                img_r = torch2numpy(img_r.byte())
+                img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
 
             for indicador, descriptor in enumerate(DESCRIPTORS):
 
@@ -88,7 +119,7 @@ def main():
                     dim = np.array([2*sphered, sphered])
 
                     path_o = path + '/O.png'
-                    path_r = path + '/R.png'
+                    path_r = path + '/R_BCG1.png' ###
 
                     if opt == 'sphorb':
                         os.chdir('SPHORB-master/')
@@ -193,15 +224,16 @@ def main():
 
 
         for indicador, descriptor in enumerate(DESCRIPTORS):
-            os.system('mkdir -p '+f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver)
-            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
-            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
-            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_FP.csv',np.array(TIMES_FP[indicador]),delimiter=",")
-            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_MC.csv',np.array(TIMES_MC[indicador]),delimiter=",")
-            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/MATCHING_SCORE.csv',np.array(MATCHING_SCORE[indicador]),delimiter=",")
-            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/MEAN_MATCHING_ACCURCY.csv',np.array(MEAN_MATCHING_ACCURCY[indicador]),delimiter=",")
-            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/MATCHING_NUM.csv',np.array(MATCHING_NUM[indicador]),delimiter=",")
-            np.savetxt(f'results/FP_{args.points}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/FP_NUM.csv',np.array(FP_NUM[indicador]),delimiter=",")
+            base_path = f'results/FP_{args.points}_BCG1/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver
+            os.system('mkdir -p '+base_path)
+            np.savetxt(base_path+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
+            np.savetxt(base_path+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
+            np.savetxt(base_path+'/TIMES_FP.csv',np.array(TIMES_FP[indicador]),delimiter=",")
+            np.savetxt(base_path+'/TIMES_MC.csv',np.array(TIMES_MC[indicador]),delimiter=",")
+            np.savetxt(base_path+'/MATCHING_SCORE.csv',np.array(MATCHING_SCORE[indicador]),delimiter=",")
+            np.savetxt(base_path+'/MEAN_MATCHING_ACCURCY.csv',np.array(MEAN_MATCHING_ACCURCY[indicador]),delimiter=",")
+            np.savetxt(base_path+'/MATCHING_NUM.csv',np.array(MATCHING_NUM[indicador]),delimiter=",")
+            np.savetxt(base_path+'/FP_NUM.csv',np.array(FP_NUM[indicador]),delimiter=",")
 
 
 
