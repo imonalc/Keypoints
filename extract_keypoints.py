@@ -66,7 +66,7 @@ def main():
 
 
     METRICS = np.zeros((len(DESCRIPTORS),2))
-
+    data_name = "_BC2"
     np.random.seed(0)
     data = get_data(DATAS)
     for data in DATAS:
@@ -77,8 +77,26 @@ def main():
         std = []
 
         for path in tqdm(paths):
-            make_BCG = not os.path.isfile(path + '/R_BCG1.png')
-            if False:
+            make_BCG = not os.path.isfile(path + f'/R{data_name}.png')
+            if make_BCG:
+                path_o = path + '/O.png'
+                base_order = 0  # Base sphere resolution
+                sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
+                scale_factor = 1.0  # How much to scale input equirectangular image by
+                img_o = load_torch_img(path_o)[:3, ...].float()
+                img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+                img_o = torch2numpy(img_o.byte())
+                img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
+                alpha = np.random.uniform(1/2, 2.0)
+                beta = np.random.randint(-50, 50)
+                img_o = cv2.convertScaleAbs(img_o, alpha=alpha, beta=beta)
+                img_o_pil = Image.fromarray(img_o)
+                img_o_pil.save(path + f"/O{data_name}.png")
+                img_o = load_torch_img(path_o)[:3, ...].float()
+                img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+                img_o = torch2numpy(img_o.byte())
+                img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
+
                 path_r = path + '/R.png'
                 base_order = 0  # Base sphere resolution
                 sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
@@ -87,19 +105,11 @@ def main():
                 img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
                 img_r = torch2numpy(img_r.byte())
                 img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
-                ###  change brightness and contrast
                 alpha = np.random.uniform(0.5, 2.0)
                 beta = np.random.randint(-50, 50)
                 img_r = cv2.convertScaleAbs(img_r, alpha=alpha, beta=beta)
-                mean, stddev = np.random.uniform(0, 50),  np.random.uniform(5, 50)
-                gaussian_noise = np.random.normal(mean, stddev, img_r.shape)
-                gaussian_noise = np.clip(gaussian_noise, 0, 255).astype('uint8')
-                #print(img_r[0:2, 0:2, :])
-                #print(gaussian_noise[0:2, 0:2, :])
-                img_r = cv2.add(img_r, gaussian_noise)
-                img_r = np.clip(img_r, 0, 255).astype(np.uint8)
                 img_r_pil = Image.fromarray(img_r)
-                img_r_pil.save(path + "/R_BCG1.png")
+                img_r_pil.save(path + f"/R{data_name}.png")
                 img_r = load_torch_img(path_r)[:3, ...].float()
                 img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
                 img_r = torch2numpy(img_r.byte())
@@ -118,8 +128,8 @@ def main():
                     save_ply = False  # Whether to save the PLY visualizations too
                     dim = np.array([2*sphered, sphered])
 
-                    path_o = path + '/O.png'
-                    path_r = path + '/R_BCG1.png' ###
+                    path_o = path + f'/O{data_name}.png'
+                    path_r = path + f'/R{data_name}.png'
 
                     if opt == 'sphorb':
                         os.chdir('SPHORB-master/')
@@ -156,7 +166,6 @@ def main():
 
                     if pts1.shape[0] > 0 or pts2.shape[0] >0:
                         if method_idx == 100:
-                            print(1111)
                             img_o = load_torch_img(path_o)[:3, ...].float()
                             img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
                             img_r = load_torch_img(path_r)[:3, ...].float()
@@ -167,12 +176,8 @@ def main():
                             img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
                             img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
                             s_pts1, s_pts2, x1_, x2, t_matching_b, t_matching_a = superglue_matching(pts1, pts2, desc1, desc2, score1, score2, img_o, img_r, device)
-                            print(2222)
-                            
                         elif method_idx == 101:
-                            print(3333)
                             s_pts1, s_pts2, x1_, x2, t_matching_b, t_matching_a = lightglue_matching(pts1, pts2, desc1, desc2, score1, score2, device)
-                            print(4444)
                         else:
                             t_matching_b = time.perf_counter()
                             s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=method_idx)
@@ -224,7 +229,7 @@ def main():
 
 
         for indicador, descriptor in enumerate(DESCRIPTORS):
-            base_path = f'results/FP_{args.points}_BCG1/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver
+            base_path = f'results/FP_{args.points}{data_name}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver
             os.system('mkdir -p '+base_path)
             np.savetxt(base_path+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
             np.savetxt(base_path+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")

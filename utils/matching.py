@@ -352,7 +352,7 @@ def mnn_matcher(desc1, desc2, use_new_method):
     elif use_new_method == 2:
         dec = 0.1
     elif use_new_method == 3:
-        dec = 0.01
+        dec = 0.5
     elif use_new_method == 4:
         dec = 3
     elif use_new_method == 5:
@@ -361,8 +361,13 @@ def mnn_matcher(desc1, desc2, use_new_method):
         dec = 10
     elif use_new_method == 7:
         dec = 100
+    elif use_new_method == 8:
+        dec = 2
+    elif use_new_method == 9:
+        dec = 4
     threshold = np.percentile(distances, dec) 
     distances[distances > threshold] = np.max(distances)
+    #print("border:", threshold)
 
     nn12 = np.argmin(distances, axis=1)
     nn21 = np.argmin(distances, axis=0)
@@ -388,14 +393,16 @@ def mnn_matcher_new(desc1, desc2, use_new_method):
 
     matches_with_distances = np.hstack([matches.transpose(), matched_distances[:, np.newaxis]])
     sorted_matches_with_distances = matches_with_distances[matches_with_distances[:, 2].argsort()]
+    if use_new_method == 1000:
+        dec = 0.01
     if use_new_method == 1001:
-        dec = 0.1
+        dec = 0.03
     if use_new_method == 1002:
         dec = 0.05
     if use_new_method == 1003:
-        dec = 0.2
+        dec = 0.1
     if use_new_method == 1004:
-        dec = 0.3
+        dec = 0.2
     if use_new_method == 10001:
         dec = 0.1
     if use_new_method == 10002:
@@ -404,8 +411,11 @@ def mnn_matcher_new(desc1, desc2, use_new_method):
         dec = 0.2
     if use_new_method == 10004:
         dec = 0.3
+    if use_new_method == 10000:
+        return sorted_matches_with_distances[:, :2].transpose().astype(int).transpose()
     num_to_remove = int(len(sorted_matches_with_distances) * dec)
     matches = sorted_matches_with_distances[:-num_to_remove, :2].transpose().astype(int)
+    #print("border:", sorted_matches_with_distances[-num_to_remove-1:-num_to_remove, :])
 
     return matches.transpose()
 
@@ -427,10 +437,10 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
         s_desc2 = s_desc2.astype(np.uint8)
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
         matches = bf.match(s_desc1, s_desc2)
-    elif use_new_method in [1, 2, 3, 4, 5, 6, 7, 8]:
+    elif use_new_method in [1, 2, 3, 4, 5, 6, 7, 8, 9]:
         matches_idx = mnn_matcher(s_desc1, s_desc2, use_new_method)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
-    elif use_new_method in [1001, 1002, 1003, 1004, 10001, 10002, 10003, 10004]:
+    elif use_new_method in [1000, 1001, 1002, 1003, 1004, 10001, 10002, 10003, 10004, 10000]:
         matches_idx = mnn_matcher_new(s_desc1, s_desc2, use_new_method)
         matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
     elif use_new_method == 10:
@@ -535,16 +545,20 @@ def get_descriptor(descriptor):
         return 'superpoint', 'erp', 512, 1  ##
     elif descriptor == 'Proposed01':
         return 'superpoint', 'erp', 512, 2  ##
-    elif descriptor == 'Proposed001':
+    elif descriptor == 'Proposed05':
         return 'superpoint', 'erp', 512, 3  ##
+    elif descriptor == 'Proposed2':
+        return 'superpoint', 'erp', 512, 8
     elif descriptor == 'Proposed3':
-        return 'superpoint', 'tangent', 512, 4
+        return 'superpoint', 'erp', 512, 4
+    elif descriptor == 'Proposed4':
+        return 'superpoint', 'erp', 512, 9
     elif descriptor == 'Proposed5':
         return 'superpoint', 'erp', 512, 5  ##
     elif descriptor == 'Proposed10':
         return 'superpoint', 'erp', 512, 6  ## 
     elif descriptor == 'Proposed_nolimit':
-        return 'superpoint', 'erp', 512, 7  ##
+        return 'superpoint', 'erp', 512, 10000  ##
     elif descriptor == 'Proposed_nolimit2':
         return 'superpoint', 'tangent', 512, 7  ##
     elif descriptor == 'Ltspoint':
@@ -557,13 +571,15 @@ def get_descriptor(descriptor):
         return 'superpoint', 'tangent', 512, 101
     elif descriptor == 'sphereglue':
         return 'superpoint', 'tangent', 512, 102
-    elif descriptor == 'Proposed2_1':
+    elif descriptor == 'Proposed2_001':
+        return 'superpoint', 'erp', 512, 1000  ##
+    elif descriptor == 'Proposed2_003':
         return 'superpoint', 'erp', 512, 1001  ##
-    elif descriptor == 'Proposed2_2':
+    elif descriptor == 'Proposed2_005':
         return 'superpoint', 'erp', 512, 1002  ##
-    elif descriptor == 'Proposed2_3':
+    elif descriptor == 'Proposed2_01':
         return 'superpoint', 'erp', 512, 1003  ##
-    elif descriptor == 'Proposed2_4':
+    elif descriptor == 'Proposed2_02':
         return 'superpoint', 'erp', 512, 1004  ##
     elif descriptor == 'Proposed3_1':
         return 'superpoint', 'tangent', 512, 10001  ##

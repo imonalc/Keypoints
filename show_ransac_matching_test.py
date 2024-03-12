@@ -109,22 +109,13 @@ def main():
     #img_r = np.clip(img_r, 0, 255).astype(np.uint8)
     #img_r_pil = Image.fromarray(img_r)
     #img_r_pil.save(args.path + "/R_BCG.png")
-    path_r = args.path + '/R_BCG.png'
-    img_r = load_torch_img(path_r)[:3, ...].float()
-    img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-    img_r = torch2numpy(img_r.byte())
-    img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
-
-
-    ###  add gaussian noise
-    #img_r = torch.from_numpy(img_r).float()
-    #std_dev = 0.05
-    #noise = torch.randn_like(img_r) * std_dev
-    #img_r_noisy = img_r + noise / 100
-    #img_r_noisy_clamped = torch.clamp(img_r_noisy, 0, 255)
-    #img_r = img_r_noisy_clamped.numpy()
+    #path_r = args.path + '/R_BCG1.png'
+    #img_r = load_torch_img(path_r)[:3, ...].float()
+    #img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+    #img_r = torch2numpy(img_r.byte())
     #img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
-#
+
+
 
     if opt != 'sphorb':
         corners = tangent_image_corners(base_order, sample_order)
@@ -144,8 +135,7 @@ def main():
         os.chdir('../')
 
     #pts1, pts2, desc1, desc2, _, _ = sort_key(pts1, pts2, desc1, desc2, args.points)
-    #pts1, desc1 = mask_cameraman(pts1, desc1, img_o.shape)
-    #pts2, desc2 = mask_cameraman(pts2, desc2, img_o.shape)
+    pts1, pts2, desc1, desc2 = mask_cameraman(pts1, pts2, desc1, desc2, img_o.shape)
 
 
 
@@ -363,10 +353,10 @@ def main():
 
 
 
-def mask_cameraman(pts1, desc1, img_o_shape):
+def mask_cameraman(pts1, pts2, desc1, desc2, img_o_shape):
     height_threshold = 0.75 * img_o_shape[0]
     cond1_1 = (pts1[:, 1] < height_threshold)
-    #cond2_1 = (pts2[:, 1] < height_threshold)
+    cond2_1 = (pts2[:, 1] < height_threshold)
         # pose1
     # cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 840))  & (pts1[:, 1] > 400))
     # cond1_3 = ~(((680 < pts1[:, 0]) &(pts1[:, 0] < 800)) & ((220< pts1[:, 1])))
@@ -383,21 +373,21 @@ def mask_cameraman(pts1, desc1, img_o_shape):
     #cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 300))
     #cond2_3 = ~(((200 < pts2[:, 0]) &(pts2[:, 0] < 400)) & ((250< pts2[:, 1])))
         # pose4
-    #cond1_2 = ~(((500 < pts1[:, 0]) &(pts1[:, 0] < 1000))  & (pts1[:, 1] > 360))
-    #cond1_3 = ~(((800 < pts1[:, 0]) &(pts1[:, 0] < 1000)) & ((240< pts1[:, 1])))
-    #cond2_2 = ~((pts2[:, 0] < 300) & (pts2[:, 1] > 300))
-    #cond2_3 = ~(((60 < pts2[:, 0]) &(pts2[:, 0] < 240)) & ((250< pts2[:, 1])))
+    cond1_2 = ~(((500 < pts1[:, 0]) &(pts1[:, 0] < 1000))  & (pts1[:, 1] > 360))
+    cond1_3 = ~(((800 < pts1[:, 0]) &(pts1[:, 0] < 1000)) & ((240< pts1[:, 1])))
+    cond2_2 = ~((pts2[:, 0] < 300) & (pts2[:, 1] > 300))
+    cond2_3 = ~(((60 < pts2[:, 0]) &(pts2[:, 0] < 240)) & ((250< pts2[:, 1])))
         # pose5
     #cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 900))  & (pts1[:, 1] > 360))
     #cond1_3 = ~(((650 < pts1[:, 0]) &(pts1[:, 0] < 850)) & ((240< pts1[:, 1])))
     #cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 400))
     #cond2_3 = ~(((100 < pts2[:, 0]) &(pts2[:, 0] < 350)) & ((250< pts2[:, 1])))
-    #valid_idx1 = cond1_1 & cond1_2 &cond1_3
-    #pts1 =  pts1[valid_idx1]
-    #desc1 = desc1[valid_idx1]
-    #valid_idx2 = cond2_1 & cond2_2 &cond2_3
-    #pts2 =  pts2[valid_idx2]
-    #desc2 = desc2[valid_idx2]
+    valid_idx1 = cond1_1 & cond1_2 &cond1_3
+    pts1 =  pts1[valid_idx1]
+    desc1 = desc1[valid_idx1]
+    valid_idx2 = cond2_1 & cond2_2 &cond2_3
+    pts2 =  pts2[valid_idx2]
+    desc2 = desc2[valid_idx2]
 
     #valid_idx1 = cond1_1
     #pts1 =  pts1[valid_idx1]
@@ -405,7 +395,7 @@ def mask_cameraman(pts1, desc1, img_o_shape):
     #valid_idx2 = cond2_1
     #pts2 =  pts2[valid_idx2]
     #desc2 = desc2[valid_idx2]
-    return pts1, desc1
+    return pts1, pts2, desc1, desc2
 
 
 
