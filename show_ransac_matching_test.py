@@ -59,6 +59,16 @@ from SphereGlue.model.sphereglue import SphereGlue
 from SphereGlue.utils.demo_mydataset import MyDataset 
 
 
+
+MATCHING_METHODS_LIST = ['BF', 'BF_KNN', 'FLANN_KNN', 'MNN']
+MATCHING_CONSTANT_DICT = {
+    'BF': [0.75, 0.8],
+    'BF_KNN': [0.75, 0.8],
+    'FLANN_KNN': [0.75, 0.8],
+    'MNN': [0],
+}
+
+
 def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
@@ -78,7 +88,7 @@ def main():
     descriptor = args.descriptor
 
     opt, mode, sphered = get_descriptor(descriptor)
-    method_idx = 0.1
+    method_idx = 0.0
     base_order = 0  # Base sphere resolution
     sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
     scale_factor = 1.0  # How much to scale input equirectangular image by
@@ -135,8 +145,7 @@ def main():
         pts2[pts2[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
         os.chdir('../')
 
-    #pts1, pts2, desc1, desc2, _, _ = sort_key(pts1, pts2, desc1, desc2, args.points)
-    pts1, pts2, desc1, desc2 = mask_cameraman(pts1, pts2, desc1, desc2, img_o.shape)
+    #pts1, pts2, desc1, desc2 = mask_cameraman(pts1, pts2, desc1, desc2, img_o.shape)
 
 
 
@@ -145,194 +154,6 @@ def main():
 
 
     s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, match=args.match, constant=method_idx)
-    #elif method_idx == 102:
-    #    s_pts1, s_pts2, x1_, x2_, _, _ = sphereglue_matching(pts1, pts2, desc1, desc2, scores1, scores2, args.points, device)
-    #elif method_idx == 1002:
-    #    config = {'K': 2, 
-    #              'GNN_layers': ['cross'], 
-    #              'match_threshold': 0.2, 
-    #              'sinkhorn_iterations': 20, 
-    #              'aggr': 'add', 
-    #              'knn': 20, 
-    #              'max_kpts': args.points,
-    #              'descriptor_dim': 256, 
-    #              'output_dim': 512
-    #    }
-    #    
-    #    matching_test = SphereGlue(config).to(device)
-    #    model_path = './SphereGlue/model_weights/superpoint/autosaved.pt'
-    #    ckpt_data = torch.load(model_path)
-    #    matching_test.load_state_dict(ckpt_data["MODEL_STATE_DICT"])
-    #    matching_test.eval()
-    #    x1_, x2_ = [], []
-#
-    #    keypoints0 = np.delete(pts1, 2, axis=1)
-    #    keypoints0_c = convert_to_spherical_coordinates(keypoints0, 1024, 512)
-    #    keypoints0_tensor = torch.tensor(keypoints0_c,dtype=torch.float).unsqueeze(0).to(device)
-    #    keypoints1 = np.delete(pts2, 2, axis=1)
-    #    keypoints1_c = convert_to_spherical_coordinates(keypoints1, 1024, 512)
-    #    keypoints1_tensor = torch.tensor(keypoints1_c,dtype=torch.float).unsqueeze(0).to(device)
-    #    print("keypoints", type(keypoints0_tensor), keypoints0_tensor.shape)
-#
-    #    descriptors0_tensor = torch.tensor(desc1,dtype=torch.float).unsqueeze(0).to(device)
-    #    descriptors1_tensor = torch.tensor(desc2,dtype=torch.float).unsqueeze(0).to(device)
-    #    print("descriptor", type(descriptors0_tensor), descriptors0_tensor.shape)
-#
-    #    scores0_tensor = scores1.squeeze(1).unsqueeze(0).to(device)
-    #    scores1_tensor = scores2.squeeze(1).unsqueeze(0).to(device)
-    #    print("score", type(scores0_tensor), scores0_tensor.shape)
-#
-    #    data = {
-    #        "unitCartesian1": keypoints0_tensor,
-    #        "h1": descriptors0_tensor,
-    #        "scores1": scores0_tensor,
-    #        "unitCartesian2": keypoints1_tensor,
-    #        "h2": descriptors1_tensor,
-    #        "scores2": scores1_tensor,
-    #    }
-    #    print(111)
-    #    pred = matching_test(data)
-
-    #    print(3333)
-    #    #print(pred)
-#
-    #    print("pred_corr", type(pred["matches0"]), pred["matches0"].shape)
-    #    print("matching_scores", type(pred["matching_scores0"]), pred["matching_scores0"].shape)
-#
-    #    #print(pred["matches0"])
-#
-    #
-    #    kpt1 = keypoints0.copy()
-    #    kpt1 = np.hstack((kpt1, np.ones((kpt1.shape[0], 1))))
-    #    kpt2 = keypoints1.copy()
-    #    kpt2 = np.hstack((kpt2, np.ones((kpt2.shape[0], 1))))
-    #    matches1 = pred["matches0"].cpu().numpy()
-    #    print(matches1[0].shape)
-    #    for i in range(len(matches1[0])):
-    #        if matches1[0][i] == -1: continue
-    #        x1_.append(kpt1[i])
-    #        x2_.append(kpt2[matches1[0][i]])
-    #    s_pts1, s_pts2 = np.array(kpt1), np.array(kpt2)
-    #    x1_, x2_ = np.array(x1_), np.array(x2_)
-    #    
-    #    print(8888)
-    #    print(type(x1_), x1_.shape)
-    #    #print(x1_)
-    #    #aaa = [np.min(x1_, axis=0), np.max(x1_, axis=0), np.min(x1_, axis=1), np.max(x1_, axis=1)]
-    #    #print("x1_", aaa)
-#
-
-    #elif method_idx == 101:
-    #    matcher = LightGlue(features="superpoint").eval().to(device)
-    #    x1_, x2_ = [], []
-#
-    #    keypoints0 = np.delete(pts1, 2, axis=1)
-    #    keypoints0_tensor = torch.tensor(keypoints0,dtype=torch.float).unsqueeze(0).to('cuda:0')
-    #    keypoints1 = np.delete(pts2, 2, axis=1)
-    #    keypoints1_tensor = torch.tensor(keypoints1,dtype=torch.float).unsqueeze(0).to('cuda:0')
-    #    
-#
-    #    descriptors0_tensor = torch.tensor(desc1,dtype=torch.float).unsqueeze(0).to('cuda:0')
-    #    descriptors1_tensor = torch.tensor(desc2,dtype=torch.float).unsqueeze(0).to('cuda:0')
-    #    
-#
-    #    scores0_tensor = scores1.squeeze().to('cuda:0')
-    #    scores1_tensor = scores2.squeeze().to('cuda:0')
-    #    
-#
-    #    data = {
-    #        "image0":{
-    #            "keypoints": keypoints0_tensor,
-    #            "keypoint_scores": scores0_tensor,
-    #            "descriptors": descriptors0_tensor
-    #        },
-    #        "image1":{
-    #            "keypoints": keypoints1_tensor,
-    #            "keypoint_scores": scores1_tensor,
-    #            "descriptors": descriptors1_tensor
-    #        }
-    #    }
-    #    print(time.perf_counter())
-    #    pred = matcher(data)
-    #    matches = pred['matches']
-    #    
-    #    matches1 = keypoints0[matches[0][:, 0].cpu().numpy(), :] 
-    #    matches2 = keypoints1[matches[0][:, 1].cpu().numpy(), :] 
-    #    for i in range(len(matches1)):
-    #        x1_.append(matches1[i])
-    #        x2_.append(matches2[i])
-    #    s_pts1, s_pts2 = np.array(keypoints0), np.array(keypoints1)
-    #    x1_, x2_ = np.array(x1_), np.array(x2_)
-    #    print(time.perf_counter())
-    #elif method_idx == 100:
-    #    config = {
-    #        'descriptor_dim': 256,
-    #        'weights': 'indoor',  # 'indoor' または 'outdoor'
-    #        'keypoint_encoder': [32, 64, 128, 256],
-    #        'GNN_layers': ['self', 'cross'] * 9,
-    #        'sinkhorn_iterations': 100,
-    #        'match_threshold': 0.2,
-    #    }
-    #    x1_, x2_ = [], []
-    #    matching = Matching(config).eval().to(device)
-    #    img_o_tensor = torch.from_numpy(img_o).float()/255.0
-    #    img_o_tensor = img_o_tensor.permute(2, 0, 1).unsqueeze(0).to(device)
-    #    img_r_tensor = torch.from_numpy(img_r).float()/255.0
-    #    img_r_tensor = img_r_tensor.permute(2, 0, 1).unsqueeze(0).to(device)
-    #    img_o_tensor = img_o_tensor[:, 0:1, :, :]
-    #    img_r_tensor = img_r_tensor[:, 0:1, :, :]
-    #    
-    #    
-    #    print(1000)
-    #    print("image", type(img_o_tensor), img_o_tensor.shape)
-#
-    #    keypoints0 = np.delete(pts1, 2, axis=1)
-    #    keypoints0_tensor = torch.tensor(keypoints0,dtype=torch.float).to(device)
-    #    keypoints1 = np.delete(pts2, 2, axis=1)
-    #    keypoints1_tensor = torch.tensor(keypoints1,dtype=torch.float).to(device)
-    #    print("keypoints", type(keypoints0_tensor), keypoints0_tensor.shape)
-#
-    #    descriptors0_tensor = torch.tensor(desc1.T,dtype=torch.float).to(device)
-    #    descriptors1_tensor = torch.tensor(desc2.T,dtype=torch.float).to(device)
-    #    print("descriptor", type(descriptors0_tensor), descriptors0_tensor.shape)
-#
-    #    scores0_tensor = scores1.squeeze(1).to(device)
-    #    scores1_tensor = scores2.squeeze(1).to(device)
-    #    print("score", type(scores0_tensor), scores0_tensor.shape)
-    #    print(1111)
-#
-    #    data = {
-    #        "keypoints0": [keypoints0_tensor],
-    #        "descriptors0": [descriptors0_tensor],
-    #        "scores0": (scores0_tensor, ),
-    #        "keypoints1": [keypoints1_tensor],
-    #        "descriptors1": [descriptors1_tensor],
-    #        "scores1": (scores1_tensor, ),
-    #        "image0":img_o_tensor,
-    #        "image1":img_r_tensor,
-    #    }
-#
-    #    #print(data["keypoints0"][0].device)
-    #    #print(data["descriptors0"][0].device)
-    #    #print(data["scores0"][0].device)
-    #    
-    #    pred = matching(data)
-    #    #print(pred[0].keys())
-#
-    #    kpt1 = keypoints0_tensor.cpu().numpy()
-    #    #kpt1 = pred[0]["keypoints0"][0].cpu().numpy()
-    #    kpt1 = np.hstack((kpt1, np.ones((kpt1.shape[0], 1))))
-    #    kpt2 = keypoints1_tensor.cpu().numpy()
-    #    #kpt2 = pred[0]["keypoints1"][0].cpu().numpy()
-    #    kpt2 = np.hstack((kpt2, np.ones((kpt2.shape[0], 1))))
-    #    matches1 = pred[0]["matches0"][0].cpu().numpy()
-    #    matches2 = pred[0]["matches1"][0].cpu().numpy()
-    #    for i in range(len(matches1)):
-    #        if matches1[i] == -1: continue
-    #        x1_.append(kpt1[i])
-    #        x2_.append(kpt2[matches1[i]])
-    #    s_pts1, s_pts2 = np.array(kpt1), np.array(kpt2)
-    #    x1_, x2_ = np.array(x1_), np.array(x2_)
 
 
     print(x1_.shape, s_pts1.shape)
