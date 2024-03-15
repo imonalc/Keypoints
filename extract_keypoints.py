@@ -118,9 +118,9 @@ def main():
             for indicador, descriptor in enumerate(DESCRIPTORS):
 
 
-
                 try:
-                    opt, mode, sphered, method_idx = get_descriptor(descriptor)
+                    opt, mode, sphered = get_descriptor(descriptor)
+                    method_idx = 0
 
                     base_order = 0  # Base sphere resolution
                     sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)

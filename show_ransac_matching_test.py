@@ -63,7 +63,7 @@ def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
     parser.add_argument('--points', type=int, default = 1000)
-    parser.add_argument('--match', default="ratio")
+    parser.add_argument('--match', default="BF")
     parser.add_argument('--g_metrics',default="False")
     parser.add_argument('--solver', default="GSM_wRT")
     parser.add_argument('--inliers', default="8PA")
@@ -77,7 +77,8 @@ def main():
     t0 = time.time()
     descriptor = args.descriptor
 
-    opt, mode, sphered, method_idx = get_descriptor(descriptor)
+    opt, mode, sphered = get_descriptor(descriptor)
+    method_idx = 0.1
     base_order = 0  # Base sphere resolution
     sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
     scale_factor = 1.0  # How much to scale input equirectangular image by
@@ -143,7 +144,7 @@ def main():
         pts1 = pts1.reshape(1,-1)
 
 
-    s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=method_idx)
+    s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, match=args.match, constant=method_idx)
     #elif method_idx == 102:
     #    s_pts1, s_pts2, x1_, x2_, _, _ = sphereglue_matching(pts1, pts2, desc1, desc2, scores1, scores2, args.points, device)
     #elif method_idx == 1002:
@@ -343,8 +344,8 @@ def main():
     R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
     print("True:", sum(inlier_idx), len(inlier_idx), ", ratio:", sum(inlier_idx) / len(inlier_idx))
 
-    print(R_)
-    print(T_)
+    #print(R_)
+    #print(T_)
     
     vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1_[:, :2], x2_[:, :2], inlier_idx)
     vis_img = cv2.resize(vis_img,dsize=(512,512))

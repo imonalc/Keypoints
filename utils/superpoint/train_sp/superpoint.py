@@ -88,9 +88,11 @@ class SuperPointFrontend(object):
       self.net = self.net.cuda()
     else:
       # Train on GPU, deploy on CPU.
-      checkpoint = torch.load(weights_path, map_location=lambda storage, loc: storage)
-      #print(checkpoint)
-      self.net.load_state_dict(checkpoint['model_state_dict'])
+      #checkpoint = torch.load(weights_path, map_location=lambda storage, loc: storage)
+      #self.net.load_state_dict(checkpoint['model_state_dict'])
+      checkpoint = torch.load(weights_path, map_location=torch.device('cpu'))  # CPU用に重みをロード
+      self.net.load_state_dict(checkpoint['model_state_dict'])  # 状態辞書をロード
+      self.net = self.net.to(torch.device('cpu'))  # モデルをCPUに明示的に移動
     self.net.eval()
 
   def nms_fast(self, in_corners, H, W, dist_thresh):
@@ -176,6 +178,8 @@ class SuperPointFrontend(object):
     inp = torch.autograd.Variable(inp).view(1, 1, H, W)
     if self.cuda:
       inp = inp.cuda()
+    else:
+      inp = inp.to(torch.device('cpu')) 
     # Forward pass of network.
     outs = self.net.forward(inp)
     semi, coarse_desc = outs[0], outs[1]

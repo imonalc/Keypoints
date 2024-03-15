@@ -29,13 +29,11 @@ def process_img(img):
     return grayim
 
 def computes_superpoint_keypoints(img, opt, nms_dist=4, conf_thresh = 0.015, nn_thresh =0.7, cuda = True):
-
-    #if opt.enswith('.pth'):
-    #fe = magic_sp.SuperPointFrontend(weights_path = 'models/superpoint_v1.pth', nms_dist= nms_dist, conf_thresh= conf_thresh, nn_thresh= nn_thresh,cuda= cuda )
-
-    #else:
-
-    fe = train_sp.SuperPointFrontend(weights_path = 'utils/models/superpoint-trained.pth.tar', nms_dist= nms_dist, conf_thresh = conf_thresh, nn_thresh= nn_thresh, cuda = cuda )
+    fe = train_sp.SuperPointFrontend(weights_path = 'utils/models/superpoint-trained.pth.tar', 
+                                     nms_dist= nms_dist, 
+                                     conf_thresh = conf_thresh, 
+                                     nn_thresh= nn_thresh, 
+                                     cuda = cuda )
 
 
     pts, desc, heatmap = fe.run(img)
@@ -102,6 +100,19 @@ def computes_orb_keypoints(img):
     if len(keypoints) > 0:
         return format_keypoints(keypoints, desc)
     return None
+
+
+def computes_akaze_keypoints(img):
+    img = torch2numpy(img.byte())
+
+    akaze = cv2.AKAZE_create()
+
+    keypoints, descriptors = akaze.detectAndCompute(img, None)
+
+    if len(keypoints) > 0:
+        return format_keypoints(keypoints, descriptors)
+    return None
+
 
 def computes_surf_keypoints(img):
 
@@ -171,6 +182,9 @@ def keypoint_tangent_images(tex_image, base_order, sample_order, image_shape, op
         
         if opt == 'alike':
             kp_details = computes_alike_keypoints(img)
+        
+        if opt == 'akaze':
+            kp_details = computes_akaze_keypoints(img)
 
         if kp_details is not None:
             valid_mask = get_valid_coordinates(base_order,
@@ -233,6 +247,9 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
 
     if opt == 'alike':
         erp_kp_details = computes_alike_keypoints(img)
+
+    if opt == 'akaze':
+        erp_kp_details = computes_akaze_keypoints(img)
 
     erp_kp = erp_kp_details[0]
     erp_desc = erp_kp_details[1]

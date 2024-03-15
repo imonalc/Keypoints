@@ -8,6 +8,7 @@ from utils.ransac   import *
 from utils.keypoint import *
 from utils.metrics  import *
 from utils.camera_recovering import *
+from scipy.spatial import distance
 
 import time
 
@@ -419,8 +420,96 @@ def mnn_matcher_new(desc1, desc2, use_new_method):
 
     return matches.transpose()
 
+def bfknn_matcher(s_desc1, s_desc2, distance_eval, constant):
+    thresh = 0.9
+    bf = cv2.BFMatcher(distance_eval, False)
+    matches = bf.knnMatch(s_desc1,s_desc2, k=2)
+    good = []
+    for m,n in matches:
+        if m.distance < thresh * n.distance:
+            good.append(m)
+    matches = good
 
-def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_new_method=0):
+    return matches
+
+
+def flannknn_matcher(s_desc1, s_desc2, distance_eval, constant):
+    thresh = 0.9
+    index_params = dict(algorithm=distance_eval, trees=5)
+    search_params = dict(checks = 50)
+    flann = cv2.FlannBasedMatcher(index_params, search_params)
+    matches = flann.knnMatch(s_desc1, s_desc2, k=2)
+    good = []
+    for m,n in matches:
+        if m.distance < thresh * n.distance:
+            good.append(m)
+    matches = good
+
+    return matches
+
+
+def hamming_distance(x, y):
+    return np.sum(x != y, axis=-1)
+
+def mnn_matcher_hamming(desc1, desc2, constant_cut):
+    desc1 = np.unpackbits(desc1, axis=1)
+    desc2 = np.unpackbits(desc2, axis=1)
+    distances = distance.cdist(desc1, desc2, metric=hamming_distance)
+
+
+    nn12 = np.argmin(distances, axis=1)
+    nn21 = np.argmin(distances, axis=0)
+    ids1 = np.arange(desc1.shape[0])
+    mask = (ids1 == nn21[nn12])
+    
+    matches = np.stack([ids1[mask], nn12[mask]], axis=1)
+    matched_distances = distances[ids1[mask], nn12[mask]]
+
+    matches_with_distances = np.hstack([matches, matched_distances[:, np.newaxis]])
+    sorted_matches_with_distances = matches_with_distances[matches_with_distances[:, 2].argsort()]
+
+    if constant_cut == 0:
+        matches = sorted_matches_with_distances[:, :2].transpose().astype(int)
+    else:
+        num_to_remove = int(len(sorted_matches_with_distances) * constant_cut)
+        matches = sorted_matches_with_distances[:-num_to_remove, :2].transpose().astype(int)
+    
+    matches_idx = matches.transpose()
+    matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
+
+    return matches
+
+
+
+def mnn_matcher_L2(desc1, desc2, constant_cut):
+    d1_square = np.sum(np.square(desc1), axis=1, keepdims=True)
+    d2_square = np.sum(np.square(desc2), axis=1, keepdims=True)
+    distances = np.sqrt(d1_square - 2 * np.dot(desc1, desc2.T) + d2_square.T)
+    distances = (distances - np.min(distances)) / (np.max(distances) - np.min(distances))
+
+    nn12 = np.argmin(distances, axis=1)
+    nn21 = np.argmin(distances, axis=0)
+    ids1 = np.arange(0, distances.shape[0])
+    mask = (ids1 == nn21[nn12])
+    matches = np.stack([ids1[mask], nn12[mask]])
+    matched_distances = distances[ids1[mask], nn12[mask]]
+
+    matches_with_distances = np.hstack([matches.transpose(), matched_distances[:, np.newaxis]])
+    sorted_matches_with_distances = matches_with_distances[matches_with_distances[:, 2].argsort()]
+
+    if constant_cut == 0:
+        matches = sorted_matches_with_distances[:, :2].transpose().astype(int)
+    else:
+        num_to_remove = int(len(sorted_matches_with_distances) * constant_cut)
+        matches = sorted_matches_with_distances[:-num_to_remove, :2].transpose().astype(int)
+    matches_idx = matches.transpose()
+    matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
+
+    return matches
+
+
+
+def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match="BF", constant=0):
     if opt[-1] == 'p':
         porce = int(opt[:-1])
         n_key = int(porce/100 * pts1.shape[0])
@@ -435,7 +524,206 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
     if 'orb' in args_opt:
         s_desc1 = s_desc1.astype(np.uint8)
         s_desc2 = s_desc2.astype(np.uint8)
-        bf = cv2.BFMatcher(cv2.NORM_HAMMING, True)
+        distance_eval = cv2.NORM_HAMMING
+        distance_eval_FLANN = 6
+    else:
+        distance_eval = cv2.NORM_L2
+        distance_eval_FLANN = 1
+    
+
+    if match == 'BF':
+        bf = cv2.BFMatcher(distance_eval, True)
+        matches = bf.match(s_desc1, s_desc2)
+    elif match == 'BF_KNN':
+        matches = bfknn_matcher(s_desc1, s_desc2, distance_eval, constant)
+    elif match == 'FLANN_KNN':
+        matches = bfknn_matcher(s_desc1, s_desc2, distance_eval_FLANN, constant)
+    elif match == 'MNN':
+        if 'orb' in args_opt:
+            matches = mnn_matcher_hamming(desc1, desc2, constant)
+        else:
+            matches = mnn_matcher_L2(s_desc1, s_desc2, constant)
+    elif match == 'Proposed':
+        if 'orb' in args_opt:
+            matches = mnn_matcher_hamming(desc1, desc2, constant)
+        else:
+            matches = mnn_matcher_L2(s_desc1, s_desc2, constant)
+    else:
+        raise ValueError("Invalid matching method specified.")
+    
+
+    M = np.zeros((2,len(matches)))
+    for ind, match in zip(np.arange(len(matches)),matches):
+        M[0,ind] = match.queryIdx
+        M[1,ind] = match.trainIdx
+
+
+    return s_pts1, s_pts2, s_pts1[M[0,:].astype(int),:3], s_pts2[M[1,:].astype(int),:3]
+
+
+def get_error(x1, x2, Rx, Tx):
+
+    S = computeEssentialMatrixByRANSAC(x1, x2)
+    I = S[1]
+    I = I.astype(np.int64)
+
+    x1 = x1[I,:]
+    x2 = x2[I,:]
+
+    F = calc_ematrix(x1,x2)
+
+
+    R1,R2,T1,T2 = decomposeE(F)
+
+    R,T = choose_rt(R1,R2,T1,T2,x1,x2)
+
+    R_error = r_error(Rx,R)
+    T_error = t_error(Tx,T)
+
+    return R_error, T_error
+
+
+
+def get_descriptor(descriptor):
+    descriptor_main = descriptor
+    image_mode = 'erp'
+    if descriptor[0] == 't':
+        descriptor_main = descriptor_main[1:]
+        image_mode = 'tangent'
+    descriptor_configs = {
+        'Proposed': ('superpoint', image_mode, 512),
+        'sphorb': ('sphorb', image_mode, 640),
+        'sift': ('sift', image_mode, 512),
+        'orb': ('orb', image_mode, 512),
+        'spoint': ('superpoint', image_mode, 512),
+        'akaze': ('akaze', image_mode, 512),
+        'alike': ('alike', image_mode, 512),
+    }
+
+    return descriptor_configs.get(descriptor_main, ('unknown', 'unknown', 0,))
+
+
+MATCHING_METHODS_LIST = ['KNN_L', 'FLANN', 'MNN', 'Proposed']
+MATCHING_CONSTANT_DICT = {
+    'KNN_L': [0.75, 0.8],
+    'FLANN': [0],
+    'MNN': [0],
+    'Proposed': [0.05, 0.1, 0.2]
+}
+
+
+
+
+def AUC(ROT, TRA, MET, L):
+
+    RAUC  = np.zeros(len(L))
+    TAUC  = np.zeros(len(L))
+
+    for index, t in enumerate(L):
+        ids = np.where(ROT<np.radians(t))[0]
+        RAUC[index] = len(ids)/len(ROT)
+
+    for index, t in enumerate(L):
+        ids = np.where(TRA<np.radians(t))[0]
+        TAUC[index] = len(ids)/len(TRA)
+
+    return RAUC, TAUC, np.array(MET)
+
+
+
+def get_data(DATAS):
+    if len(DATAS) == 1:
+        data = DATAS[0]
+    elif set(['Urban1','Urban2','Urban3','Urban4']) == set(DATAS):
+        data = 'Outdoor'
+    elif set(['Realistic','Interior1','Interior2','Room','Classroom']) == set(DATAS):
+        data = 'Indoor'
+    elif set(['Urban1_R','Urban2_R','Urban3_R','Urban4_R','Realistic_R','Interior1_R','Interior2_R','Room_R','Classroom_R']) == set(DATAS):
+        data = 'OnlyRot'
+    elif set(['Urban1_T','Urban2_T','Urban3_T','Urban4_T','Realistic_T','Interior1_T','Interior2_T','Room_T','Classroom_T']) == set(DATAS):
+        data = 'OnlyTra'
+    else:
+        data = ''
+        for DA in DATAS:
+            data+=DA
+
+    return data
+
+
+
+def get_kd(array):
+
+    array = np.array(array)
+    delimiter = int(array[-1])
+    A = array[:-1]
+    K = A[:delimiter].reshape(-1,3)
+    D = A[delimiter:].reshape(-1,32)
+    return K,D
+
+
+
+### legacy
+
+def get_descriptor2(descriptor):
+    descriptor_configs = {
+        'sphorb': ('sphorb', 'erp', 640, 0),
+        'sift': ('sift', 'erp', 512, 0),
+        'tsift': ('sift', 'tangent', 512, 0),
+        'orb': ('orb', 'erp', 512, 0),
+        'torb': ('orb', 'tangent', 512, 0),
+        'spoint': ('superpoint', 'erp', 512, 0),
+        'tspoint': ('superpoint', 'tangent', 512, 0),
+        'akaze': ('akaze', 'erp', 512, 0),
+        'takaze': ('akaze', 'tangent', 512, 0),
+        'alike': ('alike', 'erp', 512, 0),
+        'talike': ('alike', 'tangent', 512, 0),
+        'Proposed1': ('superpoint', 'erp', 512, 1),
+        'Proposed01': ('superpoint', 'erp', 512, 2),
+        'Proposed05': ('superpoint', 'erp', 512, 3),
+        'Proposed2': ('superpoint', 'erp', 512, 8),
+        'Proposed3': ('superpoint', 'erp', 512, 4),
+        'Proposed4': ('superpoint', 'erp', 512, 9),
+        'Proposed5': ('superpoint', 'erp', 512, 5),
+        'Proposed10': ('superpoint', 'erp', 512, 6),
+        'Proposed_nolimit': ('superpoint', 'erp', 512, 10000),
+        'Proposed_nolimit2': ('superpoint', 'tangent', 512, 7),
+        'Ltspoint': ('superpoint', 'tangent', 512, 10),
+        'Ftspoint': ('superpoint', 'tangent', 512, 11),
+        'superglue': ('superpoint', 'tangent', 512, 100),
+        'lightglue': ('superpoint', 'tangent', 512, 101),
+        'sphereglue': ('superpoint', 'tangent', 512, 102),
+        'Proposed2_001': ('superpoint', 'erp', 512, 1000),
+        'Proposed2_003': ('superpoint', 'erp', 512, 1001),
+        'Proposed2_005': ('superpoint', 'erp', 512, 1002),
+        'Proposed2_01': ('superpoint', 'erp', 512, 1003),
+        'Proposed2_02': ('superpoint', 'erp', 512, 1004),
+        'Proposed3_1': ('superpoint', 'tangent', 512, 10001),
+        'Proposed3_2': ('superpoint', 'tangent', 512, 10002),
+        'Proposed3_3': ('superpoint', 'tangent', 512, 10003),
+        'Proposed3_4': ('superpoint', 'tangent', 512, 10004)
+    }
+
+    return descriptor_configs.get(descriptor, ('unknown', 'unknown', 0, -1))
+
+
+
+def matched_points2(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_new_method=0):
+    if opt[-1] == 'p':
+        porce = int(opt[:-1])
+        n_key = int(porce/100 * pts1.shape[0])
+    else:
+        n_key = int(opt)
+
+    s_pts1  = pts1.copy()[:n_key,:]
+    s_pts2  = pts2.copy()[:n_key,:]
+    s_desc1 = desc1.copy().astype('float32')[:n_key,:]
+    s_desc2 = desc2.copy().astype('float32')[:n_key,:]
+
+    if 'orb' in args_opt:
+        s_desc1 = s_desc1.astype(np.uint8)
+        s_desc2 = s_desc2.astype(np.uint8)
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, True) ##orb
+        #bf = cv2.BFMatcher(cv2.NORM_L2, True)
         matches = bf.match(s_desc1, s_desc2)
     elif use_new_method in [1, 2, 3, 4, 5, 6, 7, 8, 9]:
         matches_idx = mnn_matcher(s_desc1, s_desc2, use_new_method)
@@ -496,144 +784,3 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio', use_n
 
 
     return s_pts1, s_pts2, s_pts1[M[0,:].astype(int),:3], s_pts2[M[1,:].astype(int),:3]
-
-
-
-def get_error(x1, x2, Rx, Tx):
-
-    S = computeEssentialMatrixByRANSAC(x1, x2)
-    I = S[1]
-    I = I.astype(np.int64)
-
-    x1 = x1[I,:]
-    x2 = x2[I,:]
-
-    F = calc_ematrix(x1,x2)
-
-
-    R1,R2,T1,T2 = decomposeE(F)
-
-    R,T = choose_rt(R1,R2,T1,T2,x1,x2)
-
-    R_error = r_error(Rx,R)
-    T_error = t_error(Tx,T)
-
-    return R_error, T_error
-
-
-
-def get_descriptor(descriptor):
-    if descriptor == 'sphorb':
-        return 'sphorb', 'erp', 640, 0
-    elif descriptor == 'sift':
-        return 'sift', 'erp', 512, 0
-    elif descriptor == 'tsift':
-        return 'sift', 'tangent', 512, 0
-    elif descriptor == 'orb':
-        return 'orb', 'erp', 512, 0
-    elif descriptor == 'torb':
-        return 'orb', 'tangent', 512, 0
-    elif descriptor == 'spoint':
-        return 'superpoint', 'erp', 512, 0
-    elif descriptor == 'tspoint':
-        return 'superpoint', 'tangent', 512, 0
-    elif descriptor == 'alike':
-        return 'alike', 'erp', 512, 0
-    elif descriptor == 'talike':
-        return 'alike', 'tangent', 512, 0
-    elif descriptor == 'Proposed1':
-        return 'superpoint', 'erp', 512, 1  ##
-    elif descriptor == 'Proposed01':
-        return 'superpoint', 'erp', 512, 2  ##
-    elif descriptor == 'Proposed05':
-        return 'superpoint', 'erp', 512, 3  ##
-    elif descriptor == 'Proposed2':
-        return 'superpoint', 'erp', 512, 8
-    elif descriptor == 'Proposed3':
-        return 'superpoint', 'erp', 512, 4
-    elif descriptor == 'Proposed4':
-        return 'superpoint', 'erp', 512, 9
-    elif descriptor == 'Proposed5':
-        return 'superpoint', 'erp', 512, 5  ##
-    elif descriptor == 'Proposed10':
-        return 'superpoint', 'erp', 512, 6  ## 
-    elif descriptor == 'Proposed_nolimit':
-        return 'superpoint', 'erp', 512, 10000  ##
-    elif descriptor == 'Proposed_nolimit2':
-        return 'superpoint', 'tangent', 512, 7  ##
-    elif descriptor == 'Ltspoint':
-        return 'superpoint', 'tangent', 512, 10
-    elif descriptor == 'Ftspoint':
-        return 'superpoint', 'tangent', 512, 11
-    elif descriptor == 'superglue':
-        return 'superpoint', 'tangent', 512, 100
-    elif descriptor == 'lightglue':
-        return 'superpoint', 'tangent', 512, 101
-    elif descriptor == 'sphereglue':
-        return 'superpoint', 'tangent', 512, 102
-    elif descriptor == 'Proposed2_001':
-        return 'superpoint', 'erp', 512, 1000  ##
-    elif descriptor == 'Proposed2_003':
-        return 'superpoint', 'erp', 512, 1001  ##
-    elif descriptor == 'Proposed2_005':
-        return 'superpoint', 'erp', 512, 1002  ##
-    elif descriptor == 'Proposed2_01':
-        return 'superpoint', 'erp', 512, 1003  ##
-    elif descriptor == 'Proposed2_02':
-        return 'superpoint', 'erp', 512, 1004  ##
-    elif descriptor == 'Proposed3_1':
-        return 'superpoint', 'tangent', 512, 10001  ##
-    elif descriptor == 'Proposed3_2':
-        return 'superpoint', 'tangent', 512, 10002  ##
-    elif descriptor == 'Proposed3_3':
-        return 'superpoint', 'tangent', 512, 10003  ##
-    elif descriptor == 'Proposed3_4':
-        return 'superpoint', 'tangent', 512, 10004  ##
-
-
-
-def AUC(ROT, TRA, MET, L):
-
-    RAUC  = np.zeros(len(L))
-    TAUC  = np.zeros(len(L))
-
-    for index, t in enumerate(L):
-        ids = np.where(ROT<np.radians(t))[0]
-        RAUC[index] = len(ids)/len(ROT)
-
-    for index, t in enumerate(L):
-        ids = np.where(TRA<np.radians(t))[0]
-        TAUC[index] = len(ids)/len(TRA)
-
-    return RAUC, TAUC, np.array(MET)
-
-
-
-def get_data(DATAS):
-    if len(DATAS) == 1:
-        data = DATAS[0]
-    elif set(['Urban1','Urban2','Urban3','Urban4']) == set(DATAS):
-        data = 'Outdoor'
-    elif set(['Realistic','Interior1','Interior2','Room','Classroom']) == set(DATAS):
-        data = 'Indoor'
-    elif set(['Urban1_R','Urban2_R','Urban3_R','Urban4_R','Realistic_R','Interior1_R','Interior2_R','Room_R','Classroom_R']) == set(DATAS):
-        data = 'OnlyRot'
-    elif set(['Urban1_T','Urban2_T','Urban3_T','Urban4_T','Realistic_T','Interior1_T','Interior2_T','Room_T','Classroom_T']) == set(DATAS):
-        data = 'OnlyTra'
-    else:
-        data = ''
-        for DA in DATAS:
-            data+=DA
-
-    return data
-
-
-
-def get_kd(array):
-
-    array = np.array(array)
-    delimiter = int(array[-1])
-    A = array[:-1]
-    K = A[:delimiter].reshape(-1,3)
-    D = A[delimiter:].reshape(-1,32)
-    return K,D
