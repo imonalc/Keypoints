@@ -94,6 +94,20 @@ def main():
     img = torch2numpy(img.byte())
     print(img.shape)
 
+    height_threshold1 = 0.5 * img.shape[0]
+    height_threshold2 = 0.9 * img.shape[0]
+    width_threshold1 = 0.3 * img.shape[1]
+    width_threshold2 = 0.5 * img.shape[1]
+
+    cond1_1 = (pts1[:, 1] > height_threshold1)
+    cond1_2 = (pts1[:, 1] < height_threshold2)
+    cond1_3 = (pts1[:, 0] > width_threshold1)
+    cond1_4 = (pts1[:, 0] < width_threshold2)
+
+    valid_idx1 = cond1_1 & cond1_2 &cond1_3 & cond1_4
+    pts1 =  pts1[valid_idx1]
+    desc1 = desc1[valid_idx1]
+
 
 
     fig, ax = plt.subplots(1, 1)

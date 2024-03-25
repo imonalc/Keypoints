@@ -72,7 +72,7 @@ MATCHING_CONSTANT_DICT = {
 def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
-    parser.add_argument('--points', type=int, default = 1000)
+    parser.add_argument('--points', type=int, default = 10000)
     parser.add_argument('--match', default="BF")
     parser.add_argument('--g_metrics',default="False")
     parser.add_argument('--solver', default="GSM_wRT")
@@ -109,30 +109,19 @@ def main():
 
     img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
     img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
-
-    ###  change brightness and contrast
-    #alpha = 1  # コントラストの倍率（1より大きい値でコントラストが上がる）
-    #beta = 1  # 明るさの調整値（正の値で明るくなる
-    #img_r = cv2.convertScaleAbs(img_r, alpha=alpha, beta=beta)
-    #mean, stddev = 2, 5
-    #gaussian_noise = np.random.normal(mean, stddev, img_r.shape).astype('uint8')
-    #img_r = cv2.add(img_r, gaussian_noise)
-    #img_r = np.clip(img_r, 0, 255).astype(np.uint8)
-    #img_r_pil = Image.fromarray(img_r)
-    #img_r_pil.save(args.path + "/R_BCG.png")
-    #path_r = args.path + '/R_BCG1.png'
-    #img_r = load_torch_img(path_r)[:3, ...].float()
-    #img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-    #img_r = torch2numpy(img_r.byte())
-    #img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
-
+    
 
 
     if opt != 'sphorb':
         corners = tangent_image_corners(base_order, sample_order)
+        t_featurepoint_b = time.perf_counter()
         pts1_, desc1_ = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
         pts2_, desc2_ = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
-        pts1, pts2, desc1, desc2, scores1, scores2 = sort_key(pts1_, pts2_, desc1_, desc2_, args.points)
+        t_featurepoint_a = time.perf_counter()
+        pts1_, desc1_ = adjust_vertical_intensity(pts1_, desc1_, img_o.shape)
+        pts2_, desc2_ = adjust_vertical_intensity(pts2_, desc2_, img_o.shape)
+        #pts1, pts2, desc1, desc2, scores1, scores2 = sort_key(pts1_, pts2_, desc1_, desc2_, args.points)
+        pts1, pts2, desc1, desc2, scores1, scores2 = sort_key(pts1_, pts2_, desc1_, desc2_, int(pts1_.shape[0]*0.9))
         
 
     else:           
@@ -152,11 +141,11 @@ def main():
     if len(pts1.shape) == 1:
         pts1 = pts1.reshape(1,-1)
 
-
+    t_matching_b = time.perf_counter()
     s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, match=args.match, constant=method_idx)
-
-
-    print(x1_.shape, s_pts1.shape)
+    t_matching_a = time.perf_counter()
+    
+    print(x1_.shape, s_pts1.shape, pts1_.shape)
     x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
     s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
 
@@ -164,6 +153,8 @@ def main():
     R1_,R2_,T1_,T2_ = decomposeE(E.T)
     R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
     print("True:", sum(inlier_idx), len(inlier_idx), ", ratio:", sum(inlier_idx) / len(inlier_idx))
+    print("FP:", "{:.4g}".format((t_featurepoint_a-t_featurepoint_b)/2))
+    print("MC:", "{:.4g}".format((t_matching_a-t_matching_b)))
 
     #print(R_)
     #print(T_)
@@ -250,13 +241,25 @@ def plot_matches(image0,
     mkpts1 = np.round(mkpts1).astype(int)
 
     mkpts1[:, 1] += H0
+
+
+    if image0.shape[0] > 2000:
+        thickness = 10
+    if image0.shape[0] > 1000:
+        thickness = 5
+    else:
+        thickness = 2
     
     for kpt0, kpt1, mt in zip(mkpts0, mkpts1, match_true):
         (x0, y0), (x1, y1) = kpt0, kpt1
-        mcolor = (0, 0, 255) if mt == 0 else (0, 255, 0)  # Red for outliers, Green for inliers
-        cv2.line(out, (x0, y0), (x1, y1),
+        if mt == 0 :
+            continue
+            mcolor = (0, 0, 255) 
+        else :
+            mcolor = (0, 255, 0)
+        cv2.line(out, (x0%W0, y0), (x1%W1, y1),
                  color=mcolor,
-                 thickness=2,
+                 thickness=thickness,
                  lineType=cv2.LINE_AA)
 
     return out
@@ -313,8 +316,45 @@ def convert_to_spherical_coordinates(keypoints, image_width, image_height, devic
     return keypoints3D_tensor
 
 
+    ###  change brightness and contrast
+    #alpha = 1  # コントラストの倍率（1より大きい値でコントラストが上がる）
+    #beta = 1  # 明るさの調整値（正の値で明るくなる
+    #img_r = cv2.convertScaleAbs(img_r, alpha=alpha, beta=beta)
+    #mean, stddev = 2, 5
+    #gaussian_noise = np.random.normal(mean, stddev, img_r.shape).astype('uint8')
+    #img_r = cv2.add(img_r, gaussian_noise)
+    #img_r = np.clip(img_r, 0, 255).astype(np.uint8)
+    #img_r_pil = Image.fromarray(img_r)
+    #img_r_pil.save(args.path + "/R_BCG.png")
+    #path_r = args.path + '/R_BCG1.png'
+    #img_r = load_torch_img(path_r)[:3, ...].float()
+    #img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+    #img_r = torch2numpy(img_r.byte())
+    #img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
+
+def adjust_vertical_intensity(pts1_, desc1_, img_shape):
+    # 画像の高さに関する情報が必要
+    img_height = img_shape[0]  # 仮定した値。実際の画像の高さに置き換えてください。
+
+    # 中心のY座標
+    center_y = img_height / 2.0
+
+    # 強度の補正
+    for i, pt in enumerate(pts1_):
+        # 縦方向の位置に基づく補正
+        distance_from_center_y = abs(pt[1] - center_y)
+        adjustment_factor = np.sqrt(1 - (distance_from_center_y / center_y)**2)
+        #adjustment_factor = 1 - (distance_from_center_y / center_y)
+        
+        # 真ん中の行では1をかける、それ以外は距離に比例して補正
+        if distance_from_center_y == center_y:  # 最上行または最下行
+            adjustment_factor = 1 - 1
+        
+        # 強度を補正
+        pts1_[i, 2] *= adjustment_factor
+    
+    return pts1_, desc1_
+
 
 if __name__ == '__main__':
     main()
-
-

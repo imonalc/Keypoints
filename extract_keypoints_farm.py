@@ -32,12 +32,13 @@ import build1.sphorb_cpp as sphorb
 def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
-    parser.add_argument('--points', type=int, default = 500)
-    parser.add_argument('--match', default="ratio")
+    parser.add_argument('--points', type=int, default = 10000)
+    parser.add_argument('--match', default="BF")
     parser.add_argument('--g_metrics',default="False")
     parser.add_argument('--solver', default="GSM_wRT")
     parser.add_argument('--inliers', default="8PA")
     parser.add_argument('--pose'      , default="pose_test")
+    parser.add_argument('--scene'      , default="Room")
     parser.add_argument('--descriptors', nargs='+')
     args = parser.parse_args()
 
@@ -63,113 +64,84 @@ def main():
     METRICS = np.zeros((len(DESCRIPTORS),2))
 
     pose = args.pose
-    TIMES = []
-    st = time.time()
-    path_true_value = os.path.join("./data/Farm/new/Calibration/", pose)
-    RQ_true_value = np.genfromtxt(path_true_value + "/RQ_true_value.csv", delimiter=',')
-    T_true_value = np.genfromtxt(path_true_value + "/T_true_value.csv", delimiter=',')
-    Rx = np.genfromtxt(path_true_value + "/Rm_true_value.csv", delimiter=',')
-    Tx = np.genfromtxt(path_true_value + "/T_true_value.csv", delimiter=',')
+    scene = args.scene
+    path_true_value = os.path.join(f"./data/data_real/Calibration/", pose)
+    Rx = np.load(path_true_value + "/R.npy")
+    Tx = np.load(path_true_value + "/T.npy")
 
-    mypath = os.path.join('./data/Farm/new',pose)
-    paths  = [os.path.join('./data/Farm/new/',pose,f) for f in listdir('./data/Farm/new/'+pose) if isdir(join(mypath, f))]
-    print(os.path.join('./data/Farm/new',pose))
+    mypath = os.path.join(f'./data/data_real/{scene}/',pose)
+    paths  = [os.path.join(f'./data/data_real/{scene}/',pose,f) for f in listdir(f'./data/data_real/{scene}/'+pose) if isdir(join(mypath, f))]
+    print(os.path.join(f'./data/data_real/{scene}/',pose))
     NUM = NUM + len(paths)
-    print(paths)
+    #print(paths)
 
     std = []
     for path in tqdm(paths):
-        #print(path)
 
         for indicador, descriptor in enumerate(DESCRIPTORS):
 
-
             try:
-                opt, mode, sphered = get_descriptor(descriptor)
+                if descriptor[:-1] == "Proposed":
+                    opt, mode, sphered = get_descriptor("spoint")
+                else:
+                    opt, mode, sphered = get_descriptor(descriptor)
                 method_idx = 0
                 base_order = 0  # Base sphere resolution
                 sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
                 scale_factor = 1.0  # How much to scale input equirectangular image by
                 save_ply = False  # Whether to save the PLY visualizations too
                 dim = np.array([2*sphered, sphered])
-                path_o = path + '/O.png'
-                path_r = path + '/R.png'
-                if opt != 'sphorb':
-                    # ----------------------------------------------
-                    # Compute necessary data
-                    # ----------------------------------------------
-                    # 80 baricenter points
+                path_o = path + f'/O.png'
+                path_r = path + f'/R.png'
+
+                if opt == 'sphorb':
+                    os.chdir('SPHORB-master/')
+                    t_featurepoint_b = time.perf_counter()
+                    pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
+                    pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
+                    t_featurepoint_a = time.perf_counter()
+                    os.chdir('../')
+                else:
                     corners = tangent_image_corners(base_order, sample_order)
                     t_featurepoint_b = time.perf_counter()
                     pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
                     pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
                     t_featurepoint_a = time.perf_counter()
-                    pts1, pts2, desc1, desc2, _, _ = sort_key(pts1, pts2, desc1, desc2, args.points)
+                    if descriptor == "Proposed1":
+                        pts1, desc1 = adjust_vertical_intensity(pts1, desc1, (512, 1024, 3))
+                        pts2, desc2 = adjust_vertical_intensity(pts2, desc2, (512, 1024, 3))
+                        pts1, pts2, desc1, desc2, scores1, scores2 = sort_key(pts1, pts2, desc1, desc2, int(pts1.shape[0]*0.7))
+                    elif descriptor == "Proposed2":
+                        pts1, desc1 = adjust_vertical_intensity(pts1, desc1, (512, 1024, 3))
+                        pts2, desc2 = adjust_vertical_intensity(pts2, desc2, (512, 1024, 3))
+                        pts1, pts2, desc1, desc2, scores1, scores2 = sort_key(pts1, pts2, desc1, desc2, int(pts1.shape[0]*0.8))
+                    elif descriptor == "Proposed3":
+                        pts1, desc1 = adjust_vertical_intensity(pts1, desc1, (512, 1024, 3))
+                        pts2, desc2 = adjust_vertical_intensity(pts2, desc2, (512, 1024, 3))
+                        pts1, pts2, desc1, desc2, scores1, scores2 = sort_key(pts1, pts2, desc1, desc2, int(pts1.shape[0]*0.9))   
+                    elif descriptor == "Proposed4":
+                        pts1, desc1 = adjust_vertical_intensity(pts1, desc1, (512, 1024, 3))
+                        pts2, desc2 = adjust_vertical_intensity(pts2, desc2, (512, 1024, 3))
+                        pts1, pts2, desc1, desc2, scores1, scores2 = sort_key(pts1, pts2, desc1, desc2, int(pts1.shape[0]*0.95))                
+                    else:
+                        pts1, pts2, desc1, desc2, score1, score2 = sort_key(pts1, pts2, desc1, desc2, args.points)
+
                     
-                else:
-                    os.chdir('SPHORB-master/')
-                    t_featurepoint_b = time.perf_counter()
-                    path_o = "."+path_o
-                    path_r = "."+path_r
-                    pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
-                    pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
-                    t_featurepoint_a = time.perf_counter()
-                    os.chdir('../')
                 
-                len_pts = (len(pts1) + len(pts2)) / 2
-
-                #print(pts1.shape, desc1.shape)
-
-                height_threshold = 512*0.9
-                cond1_1 = (pts1[:, 1] < height_threshold)
-                cond2_1 = (pts2[:, 1] < height_threshold)
-                if pose == "pose1":
-                    cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 840))  & (pts1[:, 1] > 400))
-                    cond1_3 = ~(((680 < pts1[:, 0]) &(pts1[:, 0] < 800)) & ((220< pts1[:, 1])))
-                    cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 350))
-                    cond2_3 = ~(((220 < pts2[:, 0]) &(pts2[:, 0] < 320)) & ((250< pts2[:, 1])))
-                elif pose == "pose2":
-                    cond1_2 = ~(((500 < pts1[:, 0]) &(pts1[:, 0] < 1000))  & (pts1[:, 1] > 360))
-                    cond1_3 = ~(((800 < pts1[:, 0]) &(pts1[:, 0] < 1000)) & ((220< pts1[:, 1])))
-                    cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 350))
-                    cond2_3 = ~(((100 < pts2[:, 0]) &(pts2[:, 0] < 250)) & ((250< pts2[:, 1])))
-                elif pose == "pose3":
-                    cond1_2 = ~(((200 < pts1[:, 0]) &(pts1[:, 0] < 700))  & (pts1[:, 1] > 360))
-                    cond1_3 = ~(((500 < pts1[:, 0]) &(pts1[:, 0] < 750)) & ((240< pts1[:, 1])))
-                    cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 300))
-                    cond2_3 = ~(((200 < pts2[:, 0]) &(pts2[:, 0] < 400)) & ((250< pts2[:, 1])))
-                elif pose == "pose4":
-                    cond1_2 = ~(((500 < pts1[:, 0]) &(pts1[:, 0] < 1000))  & (pts1[:, 1] > 360))
-                    cond1_3 = ~(((800 < pts1[:, 0]) &(pts1[:, 0] < 1000)) & ((240< pts1[:, 1])))
-                    cond2_2 = ~((pts2[:, 0] < 300) & (pts2[:, 1] > 300))
-                    cond2_3 = ~(((60 < pts2[:, 0]) &(pts2[:, 0] < 240)) & ((250< pts2[:, 1])))
-                elif pose == "pose5":
-                    cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 900))  & (pts1[:, 1] > 360))
-                    cond1_3 = ~(((650 < pts1[:, 0]) &(pts1[:, 0] < 850)) & ((240< pts1[:, 1])))
-                    cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 400))
-                    cond2_3 = ~(((100 < pts2[:, 0]) &(pts2[:, 0] < 350)) & ((250< pts2[:, 1])))
-    
-                valid_idx1 = cond1_1 & cond1_2 &cond1_3
-                pts1 =  pts1[valid_idx1]
-                desc1 = desc1[valid_idx1]
-                valid_idx2 = cond2_1 & cond2_2 &cond2_3
-                pts2 =  pts2[valid_idx2]
-                desc2 = desc2[valid_idx2]
-
-
                 if len(pts1.shape) == 1:
                     pts1 = pts1.reshape(1,-1)
                 if len(pts2.shape) == 1:
                     pts2 = pts2.reshape(1,-1)
 
-
+                len_pts = (len(pts1) + len(pts2)) / 2
                 if pts1.shape[0] > 0 or pts2.shape[0] >0:
                     t_matching_b = time.perf_counter()
-                    s_pts1, s_pts2, x1, x2 = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=method_idx)
+                    s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, method_idx)
                     t_matching_a = time.perf_counter()
-                    x1,x2 = coord_3d(x1, dim), coord_3d(x2, dim)
+                        
+                    x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
                     s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
-                    
+
                     if x1.shape[0] < 8:
                         R_error, T_error = 3.14, 3.14
                     else:
@@ -185,17 +157,12 @@ def main():
                         elif args.solver == 'GSM_SK':
                             E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                         t_poseestimate_a = time.perf_counter()
-                        #print("True:", sum(inlier_idx), len(inlier_idx), ", ratio:", sum(inlier_idx) / len(inlier_idx))
                         R1_,R2_,T1_,T2_ = decomposeE(E.T)
                         R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
-                        
-
-                        #print(R_)
-                        #print(T_)
+                        R_error, T_error = r_error(Rx,R_), t_error(Tx,T_)
+                        count_inliers = np.sum(inlier_idx == 1)
 
                     
-                    R_error, T_error = r_error(Rx,R_), t_error(Tx,T_)
-                    count_inliers = np.sum(inlier_idx == 1)
 
                     R_ERROR[indicador].append(R_error)
                     T_ERROR[indicador].append(T_error)
@@ -210,34 +177,35 @@ def main():
                     std.append(x1.shape[0])
             except:     
                 print("Unexpected error:",indicador, opt, method_idx)
+
+
     for indicador, descriptor in enumerate(DESCRIPTORS):
-        os.system('mkdir -p '+f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver)
-        np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
-        np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
-        np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_FP.csv',np.array(TIMES_FP[indicador]),delimiter=",")
-        np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_MC.csv',np.array(TIMES_MC[indicador]),delimiter=",")
-        np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/TIMES_PE.csv',np.array(TIMES_PE[indicador]),delimiter=",")
-        np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/MATCHING_SCORE.csv',np.array(MATCHING_SCORE[indicador]),delimiter=",")
-        np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/MEAN_MATCHING_ACCURCY.csv',np.array(MEAN_MATCHING_ACCURCY[indicador]),delimiter=",")
-        np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/MATCHING_NUM.csv',np.array(MATCHING_NUM[indicador]),delimiter=",")
-        np.savetxt(f'results/FP_{args.points}/values/'+args.pose+'_'+descriptor+'_'+args.inliers+'_'+args.solver+'/FP_NUM.csv',np.array(FP_NUM[indicador]),delimiter=",")
+        base_path = f'results/data_real/FP_{args.points}/values/{scene}/{args.pose}/'+descriptor+'_'+args.inliers+'_'+args.solver
+        os.system('mkdir -p '+base_path)
+        np.savetxt(base_path+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
+        np.savetxt(base_path+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
+        np.savetxt(base_path+'/TIMES_FP.csv',np.array(TIMES_FP[indicador]),delimiter=",")
+        np.savetxt(base_path+'/TIMES_MC.csv',np.array(TIMES_MC[indicador]),delimiter=",")
+        np.savetxt(base_path+'/TIMES_PE.csv',np.array(TIMES_PE[indicador]),delimiter=",")
+        np.savetxt(base_path+'/MATCHING_SCORE.csv',np.array(MATCHING_SCORE[indicador]),delimiter=",")
+        np.savetxt(base_path+'/MEAN_MATCHING_ACCURCY.csv',np.array(MEAN_MATCHING_ACCURCY[indicador]),delimiter=",")
+        np.savetxt(base_path+'/MATCHING_NUM.csv',np.array(MATCHING_NUM[indicador]),delimiter=",")
+        np.savetxt(base_path+'/FP_NUM.csv',np.array(FP_NUM[indicador]),delimiter=",")
 print('finish')
 
+def adjust_vertical_intensity(pts1_, desc1_, img_shape):
+    img_height = img_shape[0]
+    center_y = img_height / 2.0
 
+    for i, pt in enumerate(pts1_):
+        distance_from_center_y = abs(pt[1] - center_y)
+        adjustment_factor = np.sqrt(1 - (distance_from_center_y / center_y)**2)
+        if distance_from_center_y == center_y:
+            adjustment_factor = 1 - 1
 
-
-def mat2quat(mat):
-    rot = Rotation.from_matrix(mat)
-    quat = rot.as_quat()
-    return quat
-
-
-def mean_quat(R_quat_list):
-    x = np.array([R_quat for R_quat in R_quat_list])
-    m = x.T @ x
-    w, v = np.linalg.eig(m)
-    return v[:, np.argmax(w)]
-
+        pts1_[i, 2] *= adjustment_factor
+    
+    return pts1_, desc1_
 
 
 if __name__ == '__main__':

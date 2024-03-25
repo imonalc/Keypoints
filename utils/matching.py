@@ -235,13 +235,6 @@ def get_descriptor(descriptor):
     return descriptor_configs.get(descriptor_main, ('unknown', 'unknown', 0,))
 
 
-MATCHING_METHODS_LIST = ['KNN_L', 'FLANN', 'MNN', 'Proposed']
-MATCHING_CONSTANT_DICT = {
-    'KNN_L': [0.75, 0.8],
-    'FLANN': [0],
-    'MNN': [0],
-    'Proposed': [0.05, 0.1, 0.2]
-}
 
 
 
@@ -316,7 +309,6 @@ class Matching(torch.nn.Module):
             pred = {**pred, **{k+'0': v for k, v in pred0.items()}}
             #print(pred)
         if 'keypoints1' not in data:
-            print(3333)
             pred1 = self.superpoint({'image': data['image1']})
             pred = {**pred, **{k+'1': v for k, v in pred1.items()}}
 

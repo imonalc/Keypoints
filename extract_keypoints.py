@@ -64,9 +64,8 @@ def main():
         MATCHING_NUM.append([])
         FP_NUM.append([])
 
-
     METRICS = np.zeros((len(DESCRIPTORS),2))
-    data_name = "_BC2"
+    data_name = ""
     np.random.seed(0)
     data = get_data(DATAS)
     for data in DATAS:
@@ -77,53 +76,13 @@ def main():
         std = []
 
         for path in tqdm(paths):
-            make_BCG = not os.path.isfile(path + f'/R{data_name}.png')
-            if make_BCG:
-                path_o = path + '/O.png'
-                base_order = 0  # Base sphere resolution
-                sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
-                scale_factor = 1.0  # How much to scale input equirectangular image by
-                img_o = load_torch_img(path_o)[:3, ...].float()
-                img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-                img_o = torch2numpy(img_o.byte())
-                img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
-                alpha = np.random.uniform(1/2, 2.0)
-                beta = np.random.randint(-50, 50)
-                img_o = cv2.convertScaleAbs(img_o, alpha=alpha, beta=beta)
-                img_o_pil = Image.fromarray(img_o)
-                img_o_pil.save(path + f"/O{data_name}.png")
-                img_o = load_torch_img(path_o)[:3, ...].float()
-                img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-                img_o = torch2numpy(img_o.byte())
-                img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
-
-                path_r = path + '/R.png'
-                base_order = 0  # Base sphere resolution
-                sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
-                scale_factor = 1.0  # How much to scale input equirectangular image by
-                img_r = load_torch_img(path_r)[:3, ...].float()
-                img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-                img_r = torch2numpy(img_r.byte())
-                img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
-                alpha = np.random.uniform(0.5, 2.0)
-                beta = np.random.randint(-50, 50)
-                img_r = cv2.convertScaleAbs(img_r, alpha=alpha, beta=beta)
-                img_r_pil = Image.fromarray(img_r)
-                img_r_pil.save(path + f"/R{data_name}.png")
-                img_r = load_torch_img(path_r)[:3, ...].float()
-                img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-                img_r = torch2numpy(img_r.byte())
-                img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
-
             for indicador, descriptor in enumerate(DESCRIPTORS):
-
 
                 try:
                     opt, mode, sphered = get_descriptor(descriptor)
                     method_idx = 0
-
                     base_order = 0  # Base sphere resolution
-                    sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
+                    sample_order = 6  # Determines sample resolution (10 = 2048 x 4096)
                     scale_factor = 1.0  # How much to scale input equirectangular image by
                     save_ply = False  # Whether to save the PLY visualizations too
                     dim = np.array([2*sphered, sphered])
@@ -229,7 +188,7 @@ def main():
 
 
         for indicador, descriptor in enumerate(DESCRIPTORS):
-            base_path = f'results/FP_{args.points}{data_name}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver
+            base_path = f'results/data_100/FP_{args.points}{data_name}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver
             os.system('mkdir -p '+base_path)
             np.savetxt(base_path+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
             np.savetxt(base_path+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
@@ -239,8 +198,6 @@ def main():
             np.savetxt(base_path+'/MEAN_MATCHING_ACCURCY.csv',np.array(MEAN_MATCHING_ACCURCY[indicador]),delimiter=",")
             np.savetxt(base_path+'/MATCHING_NUM.csv',np.array(MATCHING_NUM[indicador]),delimiter=",")
             np.savetxt(base_path+'/FP_NUM.csv',np.array(FP_NUM[indicador]),delimiter=",")
-
-
 
     print('finish')
 
@@ -252,4 +209,41 @@ if __name__ == '__main__':
 
 
 
-
+            #make_BCG = not os.path.isfile(path + f'/R{data_name}.png')
+            #if make_BCG:
+            #    path_o = path + '/O.png'
+            #    base_order = 0  # Base sphere resolution
+            #    sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
+            #    scale_factor = 1.0  # How much to scale input equirectangular image by
+            #    img_o = load_torch_img(path_o)[:3, ...].float()
+            #    img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+            #    img_o = torch2numpy(img_o.byte())
+            #    img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
+            #    alpha = np.random.uniform(1/2, 2.0)
+            #    beta = np.random.randint(-50, 50)
+            #    img_o = cv2.convertScaleAbs(img_o, alpha=alpha, beta=beta)
+            #    img_o_pil = Image.fromarray(img_o)
+            #    img_o_pil.save(path + f"/O{data_name}.png")
+            #    img_o = load_torch_img(path_o)[:3, ...].float()
+            #    img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+            #    img_o = torch2numpy(img_o.byte())
+            #    img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
+#
+            #    path_r = path + '/R.png'
+            #    base_order = 0  # Base sphere resolution
+            #    sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
+            #    scale_factor = 1.0  # How much to scale input equirectangular image by
+            #    img_r = load_torch_img(path_r)[:3, ...].float()
+            #    img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+            #    img_r = torch2numpy(img_r.byte())
+            #    img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
+            #    alpha = np.random.uniform(0.5, 2.0)
+            #    beta = np.random.randint(-50, 50)
+            #    img_r = cv2.convertScaleAbs(img_r, alpha=alpha, beta=beta)
+            #    img_r_pil = Image.fromarray(img_r)
+            #    img_r_pil.save(path + f"/R{data_name}.png")
+            #    img_r = load_torch_img(path_r)[:3, ...].float()
+            #    img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+            #    img_r = torch2numpy(img_r.byte())
+            #    img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
+#
