@@ -320,6 +320,40 @@ def get_kd(array):
     return K,D
 
 
+def remap_image(image_path, output_path):
+    if os.path.exists(output_path):
+        return
+    
+    img = cv2.imread(image_path)
+    if img is None:
+        raise FileNotFoundError(f"The specified image file at {image_path} could not be loaded.")
+    
+    h, w = img.shape[:2]
+    w_half = int(w / 2)
+    h_half = int(h / 2)
+
+    phi, theta = np.meshgrid(np.linspace(-np.pi, np.pi, w_half*2),
+                             np.linspace(-np.pi/2, np.pi/2, h_half*2))
+
+    x = np.cos(theta) * np.cos(phi)
+    y = np.cos(theta) * np.sin(phi)
+    z = np.sin(theta)
+
+    rot = np.pi / 2
+    xx = x * np.cos(rot) + z * np.sin(rot)
+    yy = y
+    zz = -x * np.sin(rot) + z * np.cos(rot)
+    theta = np.arcsin(zz)
+    phi = np.arctan2(yy, xx)
+
+    Y = 2 * theta / np.pi * h_half + h_half
+    X = phi / np.pi * w_half + w_half
+
+    out = cv2.remap(img, X.astype(np.float32), Y.astype(np.float32), cv2.INTER_LINEAR, borderMode=cv2.BORDER_WRAP)
+    cv2.imwrite(output_path, out)
+
+
+    
 
 
 

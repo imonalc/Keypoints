@@ -53,7 +53,7 @@ def main():
 
     NUM = 0
     METRICS = np.zeros((len(DESCRIPTORS),2))
-    data_name = "_512"
+    data_name = ""
     np.random.seed(0)
     data = get_data(DATAS)
     for data in DATAS:
@@ -78,14 +78,7 @@ def main():
             for indicador, descriptor in enumerate(DESCRIPTORS):
 
                 try:
-                    if descriptor[-2] == 'P':
-                        descriptor2 = descriptor[-1]
-                        descriptor = descriptor[:-3]
-                    else:
-                        descriptor2 = ""    
                     opt, mode, sphered = get_descriptor(descriptor)
-                    if data_name == "_512":
-                        sphered = 256
                     method_idx = 0
                     base_order = 1  # Base sphere resolution
                     sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
@@ -95,6 +88,12 @@ def main():
 
                     path_o = path + f'/O{data_name}.png'
                     path_r = path + f'/R{data_name}.png'
+
+                    path_o2 = path + f'/O2{data_name}.png'
+                    path_r2 = path + f'/R2{data_name}.png'
+
+                    #remap_image(path_o, path_o2)
+                    #remap_image(path_r, path_r2)
 
 
                     if opt == 'sphorb':
@@ -113,26 +112,11 @@ def main():
                         t_featurepoint_a = time.perf_counter()
 
                     num_points = args.points
-                    num_points_std = 1.0
-                    img_shape =(256, 512, 3)
-                    if descriptor2 != '':
-                        pts1, desc1 = adjust_vertical_intensity(pts1, desc1, img_shape)
-                        pts2, desc2 = adjust_vertical_intensity(pts2, desc2, img_shape)
-                        if descriptor2 == '1':
-                            num_points_std = 0.7
-                        elif descriptor2 == '2':
-                            num_points_std = 0.8
-                        elif descriptor2 == '3':
-                            num_points_std = 0.9
-                        elif descriptor2 == '4':
-                            num_points_std = 0.95
-
-                    num_points_1 = int(pts1.shape[0]*num_points_std)
-                    num_points_2 = int(pts2.shape[0]*num_points_std)
+                    num_points_1 = num_points
+                    num_points_2 = num_points
                     if args.match == 'MNN':
                         num_points_1 = min(num_points_1, 3000)
                         num_points_2 = min(num_points_2, 3000)
-                    #pts1, pts2, desc1, desc2, score1, score2 = sort_key(pts1, pts2, desc1, desc2, num_points)
                     pts1, desc1, score1 = sort_key_div(pts1, desc1, num_points_1)   
                     pts2, desc2, score2 = sort_key_div(pts2, desc2, num_points_2)             
                     
@@ -150,26 +134,9 @@ def main():
 
 
                     if pts1.shape[0] > 0 or pts2.shape[0] >0:
-                        if method_idx == 100:
-                            img_o = load_torch_img(path_o)[:3, ...].float()
-                            img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-                            img_r = load_torch_img(path_r)[:3, ...].float()
-                            img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-                            img_o = torch2numpy(img_o.byte())
-                            img_r = torch2numpy(img_r.byte())
-
-                            img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
-                            img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
-                            s_pts1, s_pts2, x1_, x2_, t_matching_b, t_matching_a = superglue_matching(pts1, pts2, desc1, desc2, score1, score2, img_o, img_r, device)
-                        elif method_idx == 101:
-                            s_pts1, s_pts2, x1_, x2_, t_matching_b, t_matching_a = lightglue_matching(pts1, pts2, desc1, desc2, score1, score2, device)
-                        else:
-                            t_matching_b = time.perf_counter()
-                            s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, method_idx)
-                            t_matching_a = time.perf_counter()
-                            
-
-
+                        t_matching_b = time.perf_counter()
+                        s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, method_idx)
+                        t_matching_a = time.perf_counter()
                         x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
 
                         s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
@@ -229,47 +196,41 @@ def main():
 
 
 
+def remap_image(image_path, output_path):
+    if os.path.exists(output_path):
+        return
+    
+    img = cv2.imread(image_path)
+    if img is None:
+        raise FileNotFoundError(f"The specified image file at {image_path} could not be loaded.")
+    
+    h, w = img.shape[:2]
+    w_half = int(w / 2)
+    h_half = int(h / 2)
+
+    phi, theta = np.meshgrid(np.linspace(-np.pi, np.pi, w_half*2),
+                             np.linspace(-np.pi/2, np.pi/2, h_half*2))
+
+    x = np.cos(theta) * np.cos(phi)
+    y = np.cos(theta) * np.sin(phi)
+    z = np.sin(theta)
+
+    rot = np.pi / 2
+    xx = x * np.cos(rot) + z * np.sin(rot)
+    yy = y
+    zz = -x * np.sin(rot) + z * np.cos(rot)
+    theta = np.arcsin(zz)
+    phi = np.arctan2(yy, xx)
+
+    Y = 2 * theta / np.pi * h_half + h_half
+    X = phi / np.pi * w_half + w_half
+
+    out = cv2.remap(img, X.astype(np.float32), Y.astype(np.float32), cv2.INTER_LINEAR, borderMode=cv2.BORDER_WRAP)
+    cv2.imwrite(output_path, out)
+
+
 
 if __name__ == '__main__':
     main()
 
 
-
-            #make_BCG = not os.path.isfile(path + f'/R{data_name}.png')
-            #if make_BCG:
-            #    path_o = path + '/O.png'
-            #    base_order = 0  # Base sphere resolution
-            #    sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
-            #    scale_factor = 1.0  # How much to scale input equirectangular image by
-            #    img_o = load_torch_img(path_o)[:3, ...].float()
-            #    img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-            #    img_o = torch2numpy(img_o.byte())
-            #    img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
-            #    alpha = np.random.uniform(1/2, 2.0)
-            #    beta = np.random.randint(-50, 50)
-            #    img_o = cv2.convertScaleAbs(img_o, alpha=alpha, beta=beta)
-            #    img_o_pil = Image.fromarray(img_o)
-            #    img_o_pil.save(path + f"/O{data_name}.png")
-            #    img_o = load_torch_img(path_o)[:3, ...].float()
-            #    img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-            #    img_o = torch2numpy(img_o.byte())
-            #    img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
-#
-            #    path_r = path + '/R.png'
-            #    base_order = 0  # Base sphere resolution
-            #    sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
-            #    scale_factor = 1.0  # How much to scale input equirectangular image by
-            #    img_r = load_torch_img(path_r)[:3, ...].float()
-            #    img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-            #    img_r = torch2numpy(img_r.byte())
-            #    img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
-            #    alpha = np.random.uniform(0.5, 2.0)
-            #    beta = np.random.randint(-50, 50)
-            #    img_r = cv2.convertScaleAbs(img_r, alpha=alpha, beta=beta)
-            #    img_r_pil = Image.fromarray(img_r)
-            #    img_r_pil.save(path + f"/R{data_name}.png")
-            #    img_r = load_torch_img(path_r)[:3, ...].float()
-            #    img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-            #    img_r = torch2numpy(img_r.byte())
-            #    img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
-#

@@ -97,6 +97,11 @@ def main():
 
     path_o = args.path + '/O.png'
     path_r = args.path + '/R.png'
+    path_o2 = args.path + f'/O2.png'
+    path_r2 = args.path + f'/R2.png'
+    remap_image(path_o, path_o2)
+    remap_image(path_r, path_r2)
+    
     print(path_o)
     img_o = load_torch_img(path_o)[:3, ...].float()
     img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
@@ -111,17 +116,32 @@ def main():
     img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
     
 
-
+    coords_int = 1
     if opt != 'sphorb':
         corners = tangent_image_corners(base_order, sample_order)
         t_featurepoint_b = time.perf_counter()
         pts1_, desc1_ = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
         pts2_, desc2_ = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
         t_featurepoint_a = time.perf_counter()
-        pts1_, desc1_ = adjust_vertical_intensity(pts1_, desc1_, img_o.shape)
-        pts2_, desc2_ = adjust_vertical_intensity(pts2_, desc2_, img_o.shape)
-        #pts1, pts2, desc1, desc2, scores1, scores2 = sort_key(pts1_, pts2_, desc1_, desc2_, args.points)
-        pts1, pts2, desc1, desc2, scores1, scores2 = sort_key(pts1_, pts2_, desc1_, desc2_, int(pts1_.shape[0]*0.9))
+        pts12_, desc12_ = process_image_to_keypoints(path_o2, corners, scale_factor, base_order, sample_order, opt, mode)
+        pts22_, desc22_ = process_image_to_keypoints(path_r2, corners, scale_factor, base_order, sample_order, opt, mode)
+
+        if coords_int:
+            pts1_ = round_coordinates(pts1_)
+            pts2_ = round_coordinates(pts2_)
+            pts1_, desc1_ = filter_middle_latitude(pts1_, desc1_, 1024, 512)
+            pts2_, desc2_ = filter_middle_latitude(pts2_, desc2_, 1024, 512)
+        
+
+
+        num_points = args.points
+        num_points_1 = num_points
+        num_points_2 = num_points
+        if args.match == 'MNN':
+            num_points_1 = min(num_points_1, 3000)
+            num_points_2 = min(num_points_2, 3000)
+        pts1, desc1, score1 = sort_key_div(pts1_, desc1_, num_points_1)   
+        pts2, desc2, score2 = sort_key_div(pts2_, desc2_, num_points_2)  
         
 
     else:           
@@ -133,8 +153,6 @@ def main():
         pts1[pts1[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
         pts2[pts2[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
         os.chdir('../')
-
-    #pts1, pts2, desc1, desc2 = mask_cameraman(pts1, pts2, desc1, desc2, img_o.shape)
 
 
 
@@ -163,52 +181,6 @@ def main():
     vis_img = cv2.resize(vis_img,dsize=(512,512))
     cv2.imshow("aaa", vis_img)
     c = cv2.waitKey()
-
-
-
-def mask_cameraman(pts1, pts2, desc1, desc2, img_o_shape):
-    height_threshold = 0.75 * img_o_shape[0]
-    cond1_1 = (pts1[:, 1] < height_threshold)
-    cond2_1 = (pts2[:, 1] < height_threshold)
-        # pose1
-    # cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 840))  & (pts1[:, 1] > 400))
-    # cond1_3 = ~(((680 < pts1[:, 0]) &(pts1[:, 0] < 800)) & ((220< pts1[:, 1])))
-    # cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 350))
-    # cond2_3 = ~(((220 < pts2[:, 0]) &(pts2[:, 0] < 320)) & ((250< pts2[:, 1])))
-        # pose2
-    # cond1_2 = ~(((500 < pts1[:, 0]) &(pts1[:, 0] < 1000))  & (pts1[:, 1] > 360))
-    # cond1_3 = ~(((800 < pts1[:, 0]) &(pts1[:, 0] < 1000)) & ((220< pts1[:, 1])))
-    # cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 350))
-    # cond2_3 = ~(((100 < pts2[:, 0]) &(pts2[:, 0] < 250)) & ((250< pts2[:, 1])))
-        # pose3
-    #cond1_2 = ~(((200 < pts1[:, 0]) &(pts1[:, 0] < 700))  & (pts1[:, 1] > 360))
-    #cond1_3 = ~(((500 < pts1[:, 0]) &(pts1[:, 0] < 750)) & ((240< pts1[:, 1])))
-    #cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 300))
-    #cond2_3 = ~(((200 < pts2[:, 0]) &(pts2[:, 0] < 400)) & ((250< pts2[:, 1])))
-        # pose4
-    cond1_2 = ~(((500 < pts1[:, 0]) &(pts1[:, 0] < 1000))  & (pts1[:, 1] > 360))
-    cond1_3 = ~(((800 < pts1[:, 0]) &(pts1[:, 0] < 1000)) & ((240< pts1[:, 1])))
-    cond2_2 = ~((pts2[:, 0] < 300) & (pts2[:, 1] > 300))
-    cond2_3 = ~(((60 < pts2[:, 0]) &(pts2[:, 0] < 240)) & ((250< pts2[:, 1])))
-        # pose5
-    #cond1_2 = ~(((400 < pts1[:, 0]) &(pts1[:, 0] < 900))  & (pts1[:, 1] > 360))
-    #cond1_3 = ~(((650 < pts1[:, 0]) &(pts1[:, 0] < 850)) & ((240< pts1[:, 1])))
-    #cond2_2 = ~((pts2[:, 0] < 400) & (pts2[:, 1] > 400))
-    #cond2_3 = ~(((100 < pts2[:, 0]) &(pts2[:, 0] < 350)) & ((250< pts2[:, 1])))
-    valid_idx1 = cond1_1 & cond1_2 &cond1_3
-    pts1 =  pts1[valid_idx1]
-    desc1 = desc1[valid_idx1]
-    valid_idx2 = cond2_1 & cond2_2 &cond2_3
-    pts2 =  pts2[valid_idx2]
-    desc2 = desc2[valid_idx2]
-
-    #valid_idx1 = cond1_1
-    #pts1 =  pts1[valid_idx1]
-    #desc1 = desc1[valid_idx1]
-    #valid_idx2 = cond2_1
-    #pts2 =  pts2[valid_idx2]
-    #desc2 = desc2[valid_idx2]
-    return pts1, pts2, desc1, desc2
 
 
 
@@ -316,44 +288,35 @@ def convert_to_spherical_coordinates(keypoints, image_width, image_height, devic
     return keypoints3D_tensor
 
 
-    ###  change brightness and contrast
-    #alpha = 1  # コントラストの倍率（1より大きい値でコントラストが上がる）
-    #beta = 1  # 明るさの調整値（正の値で明るくなる
-    #img_r = cv2.convertScaleAbs(img_r, alpha=alpha, beta=beta)
-    #mean, stddev = 2, 5
-    #gaussian_noise = np.random.normal(mean, stddev, img_r.shape).astype('uint8')
-    #img_r = cv2.add(img_r, gaussian_noise)
-    #img_r = np.clip(img_r, 0, 255).astype(np.uint8)
-    #img_r_pil = Image.fromarray(img_r)
-    #img_r_pil.save(args.path + "/R_BCG.png")
-    #path_r = args.path + '/R_BCG1.png'
-    #img_r = load_torch_img(path_r)[:3, ...].float()
-    #img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-    #img_r = torch2numpy(img_r.byte())
-    #img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
 
-def adjust_vertical_intensity(pts1_, desc1_, img_shape):
-    # 画像の高さに関する情報が必要
-    img_height = img_shape[0]  # 仮定した値。実際の画像の高さに置き換えてください。
+def round_coordinates(tensor):
+    coords_int = tensor[:, :2].int()
+    other_data = tensor[:, 2:]
+    rounded_tensor = torch.cat((coords_int, other_data), dim=1)
+    return rounded_tensor
 
-    # 中心のY座標
-    center_y = img_height / 2.0
 
-    # 強度の補正
-    for i, pt in enumerate(pts1_):
-        # 縦方向の位置に基づく補正
-        distance_from_center_y = abs(pt[1] - center_y)
-        adjustment_factor = np.sqrt(1 - (distance_from_center_y / center_y)**2)
-        #adjustment_factor = 1 - (distance_from_center_y / center_y)
-        
-        # 真ん中の行では1をかける、それ以外は距離に比例して補正
-        if distance_from_center_y == center_y:  # 最上行または最下行
-            adjustment_factor = 1 - 1
-        
-        # 強度を補正
-        pts1_[i, 2] *= adjustment_factor
-    
-    return pts1_, desc1_
+def filter_middle_latitude(pts_, desc_, img_width, img_height):
+    spherical_coords = equirectangular_to_spherical_coords(img_width, img_height)
+    x_indices = pts_[:, 0].long()
+    y_indices = pts_[:, 1].long()
+
+    theta_values = spherical_coords[y_indices, x_indices, 0]
+    mask = (torch.pi/4 <= theta_values) & (theta_values < 3*torch.pi/4)
+    pts = pts_[mask]
+    desc = desc_.T[mask].T
+
+
+    return pts, desc
+
+
+def equirectangular_to_spherical_coords(img_width, img_height, device='cpu'):
+    theta = torch.linspace(0, np.pi, img_height, device=device)  # 0からπ
+    phi = torch.linspace(0, 2 * np.pi, img_width, device=device)  # 0から2π
+    phi_grid, theta_grid = torch.meshgrid(phi, theta, indexing="xy")
+    return torch.stack([theta_grid, phi_grid, torch.ones_like(theta_grid)], dim=-1)
+
+
 
 
 if __name__ == '__main__':
