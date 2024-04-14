@@ -78,7 +78,7 @@ def main():
     parser.add_argument('--solver', default="GSM_wRT")
     parser.add_argument('--inliers', default="8PA")
     parser.add_argument('--descriptor', default = 'sift')
-    parser.add_argument('--path', default = "./data/Farm/new")
+    parser.add_argument('--path', default = "./data/data_100/Room/97")
     args = parser.parse_args()
 
 

@@ -36,8 +36,8 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
-    parser.add_argument('--points', type=int, default = 12000)
-    parser.add_argument('--match', default="ratio")
+    parser.add_argument('--points', type=int, default = 10000)
+    parser.add_argument('--match', default="BF")
     parser.add_argument('--solver', default="None")
     parser.add_argument('--inliers', default="8PA")
     parser.add_argument('--datas'      , nargs='+')
@@ -52,23 +52,22 @@ def main():
     # ----------------------------------------------
 
     NUM = 0
-    R_ERROR, T_ERROR, TIMES_FP, TIMES_MC, TIMES_PE, MATCHING_SCORE, MEAN_MATCHING_ACCURCY, MATCHING_NUM, FP_NUM = [], [], [], [], [], [], [], [], []
-    for i in range(len(DESCRIPTORS)):
-        R_ERROR.append([])
-        T_ERROR.append([])
-        TIMES_FP.append([])
-        TIMES_MC.append([])
-        TIMES_PE.append([])
-        MATCHING_SCORE.append([])
-        MEAN_MATCHING_ACCURCY.append([])
-        MATCHING_NUM.append([])
-        FP_NUM.append([])
-
     METRICS = np.zeros((len(DESCRIPTORS),2))
-    data_name = ""
+    data_name = "_512"
     np.random.seed(0)
     data = get_data(DATAS)
     for data in DATAS:
+        R_ERROR, T_ERROR, TIMES_FP, TIMES_MC, TIMES_PE, MATCHING_SCORE, MEAN_MATCHING_ACCURCY, MATCHING_NUM, FP_NUM = [], [], [], [], [], [], [], [], []
+        for i in range(len(DESCRIPTORS)):
+            R_ERROR.append([])
+            T_ERROR.append([])
+            TIMES_FP.append([])
+            TIMES_MC.append([])
+            TIMES_PE.append([])
+            MATCHING_SCORE.append([])
+            MEAN_MATCHING_ACCURCY.append([])
+            MATCHING_NUM.append([])
+            FP_NUM.append([])
 
         mypath = os.path.join('data/data_100',data)
         paths  = [os.path.join(os.getcwd(),'data/data_100',data,f) for f in listdir('data/data_100/'+data) if isdir(join(mypath, f))]
@@ -79,16 +78,24 @@ def main():
             for indicador, descriptor in enumerate(DESCRIPTORS):
 
                 try:
+                    if descriptor[-2] == 'P':
+                        descriptor2 = descriptor[-1]
+                        descriptor = descriptor[:-3]
+                    else:
+                        descriptor2 = ""    
                     opt, mode, sphered = get_descriptor(descriptor)
+                    if data_name == "_512":
+                        sphered = 256
                     method_idx = 0
-                    base_order = 0  # Base sphere resolution
-                    sample_order = 6  # Determines sample resolution (10 = 2048 x 4096)
+                    base_order = 1  # Base sphere resolution
+                    sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
                     scale_factor = 1.0  # How much to scale input equirectangular image by
                     save_ply = False  # Whether to save the PLY visualizations too
                     dim = np.array([2*sphered, sphered])
 
                     path_o = path + f'/O{data_name}.png'
                     path_r = path + f'/R{data_name}.png'
+
 
                     if opt == 'sphorb':
                         os.chdir('SPHORB-master/')
@@ -105,10 +112,29 @@ def main():
                         pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
                         t_featurepoint_a = time.perf_counter()
 
-                        pts1, pts2, desc1, desc2, score1, score2 = sort_key(pts1, pts2, desc1, desc2, args.points)
+                    num_points = args.points
+                    num_points_std = 1.0
+                    img_shape =(256, 512, 3)
+                    if descriptor2 != '':
+                        pts1, desc1 = adjust_vertical_intensity(pts1, desc1, img_shape)
+                        pts2, desc2 = adjust_vertical_intensity(pts2, desc2, img_shape)
+                        if descriptor2 == '1':
+                            num_points_std = 0.7
+                        elif descriptor2 == '2':
+                            num_points_std = 0.8
+                        elif descriptor2 == '3':
+                            num_points_std = 0.9
+                        elif descriptor2 == '4':
+                            num_points_std = 0.95
 
-
-                    
+                    num_points_1 = int(pts1.shape[0]*num_points_std)
+                    num_points_2 = int(pts2.shape[0]*num_points_std)
+                    if args.match == 'MNN':
+                        num_points_1 = min(num_points_1, 3000)
+                        num_points_2 = min(num_points_2, 3000)
+                    #pts1, pts2, desc1, desc2, score1, score2 = sort_key(pts1, pts2, desc1, desc2, num_points)
+                    pts1, desc1, score1 = sort_key_div(pts1, desc1, num_points_1)   
+                    pts2, desc2, score2 = sort_key_div(pts2, desc2, num_points_2)             
                     
 
                     if len(pts1.shape) == 1:
@@ -134,12 +160,12 @@ def main():
 
                             img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
                             img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
-                            s_pts1, s_pts2, x1_, x2, t_matching_b, t_matching_a = superglue_matching(pts1, pts2, desc1, desc2, score1, score2, img_o, img_r, device)
+                            s_pts1, s_pts2, x1_, x2_, t_matching_b, t_matching_a = superglue_matching(pts1, pts2, desc1, desc2, score1, score2, img_o, img_r, device)
                         elif method_idx == 101:
-                            s_pts1, s_pts2, x1_, x2, t_matching_b, t_matching_a = lightglue_matching(pts1, pts2, desc1, desc2, score1, score2, device)
+                            s_pts1, s_pts2, x1_, x2_, t_matching_b, t_matching_a = lightglue_matching(pts1, pts2, desc1, desc2, score1, score2, device)
                         else:
                             t_matching_b = time.perf_counter()
-                            s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, use_new_method=method_idx)
+                            s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, method_idx)
                             t_matching_a = time.perf_counter()
                             
 
@@ -188,7 +214,7 @@ def main():
 
 
         for indicador, descriptor in enumerate(DESCRIPTORS):
-            base_path = f'results/data_100/FP_{args.points}{data_name}/values/'+data+'_'+descriptor+'_'+args.inliers+'_'+args.solver
+            base_path = f'results/data_100/FP_{args.points}{data_name}/values/'+data+'/'+descriptor+'/'+args.match+'_'+args.inliers+'_'+args.solver
             os.system('mkdir -p '+base_path)
             np.savetxt(base_path+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
             np.savetxt(base_path+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")

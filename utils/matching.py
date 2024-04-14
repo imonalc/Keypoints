@@ -52,10 +52,21 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 
     return pts1, pts2, desc1, desc2, scores1, scores2
 
+def sort_key_div(pts1, desc1, points):
+    ind1 = np.argsort(pts1[:,2].numpy(),axis = 0)[::-1]
+    max1 = np.min([points,ind1.shape[0]])
+    ind1 = ind1[:max1]
+    pts1 = pts1[ind1.copy(),:]
+    scores1 = pts1[:, 2:3].clone()
+    desc1 = desc1[:,ind1.copy()]
+    pts1 = np.concatenate((pts1[:,:2], np.ones((pts1.shape[0],1))), axis = 1 )
+    desc1 = np.transpose(desc1,[1,0]).numpy()
+
+    return pts1, desc1, scores1,
 
 
 def bfknn_matcher(s_desc1, s_desc2, distance_eval, constant):
-    thresh = 0.95
+    thresh = constant
     bf = cv2.BFMatcher(distance_eval, False)
     matches = bf.knnMatch(s_desc1,s_desc2, k=2)
     good = []
@@ -83,6 +94,9 @@ def flannknn_matcher(s_desc1, s_desc2, distance_eval, constant):
     return matches
 
 
+def hamming_distance_optimized(desc1, desc2):
+    return np.bitwise_xor(desc1[:, None, :], desc2).sum(axis=-1)
+
 
 def hamming_distance(x, y):
     return np.sum(x != y, axis=-1)
@@ -90,7 +104,8 @@ def hamming_distance(x, y):
 def mnn_matcher_hamming(desc1, desc2, constant_cut):
     desc1 = np.unpackbits(desc1, axis=1)
     desc2 = np.unpackbits(desc2, axis=1)
-    distances = distance.cdist(desc1, desc2, metric=hamming_distance)
+    #distances = distance.cdist(desc1, desc2, metric=hamming_distance)
+    distances = hamming_distance_optimized(desc1, desc2)
 
 
     nn12 = np.argmin(distances, axis=1)
@@ -171,6 +186,12 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match="BF", constant
         bf = cv2.BFMatcher(distance_eval, True)
         matches = bf.match(s_desc1, s_desc2)
     elif match == 'BF_KNN':
+        if args_opt == "superpoint":
+            constant = 0.95
+        elif args_opt == "orb":
+            constant = 0.9
+        else:
+            constant = 0.75
         matches = bfknn_matcher(s_desc1, s_desc2, distance_eval, constant)
     elif match == 'FLANN_KNN':
         matches = flannknn_matcher(s_desc1, s_desc2, distance_eval_FLANN, constant)
@@ -235,6 +256,20 @@ def get_descriptor(descriptor):
     return descriptor_configs.get(descriptor_main, ('unknown', 'unknown', 0,))
 
 
+
+def adjust_vertical_intensity(pts1_, desc1_, img_shape):
+    img_height = img_shape[0]
+    center_y = img_height / 2.0
+
+    for i, pt in enumerate(pts1_):
+        distance_from_center_y = abs(pt[1] - center_y)
+        adjustment_factor = np.sqrt(1 - (distance_from_center_y / center_y)**2)
+        if distance_from_center_y == center_y:
+            adjustment_factor = 1 - 1
+
+        pts1_[i, 2] *= adjustment_factor
+    
+    return pts1_, desc1_
 
 
 

@@ -86,7 +86,7 @@ def main():
                 else:
                     opt, mode, sphered = get_descriptor(descriptor)
                 method_idx = 0
-                base_order = 0  # Base sphere resolution
+                base_order = 1  # Base sphere resolution
                 sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
                 scale_factor = 1.0  # How much to scale input equirectangular image by
                 save_ply = False  # Whether to save the PLY visualizations too
@@ -107,24 +107,23 @@ def main():
                     pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
                     pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
                     t_featurepoint_a = time.perf_counter()
-                    if descriptor == "Proposed1":
-                        pts1, desc1 = adjust_vertical_intensity(pts1, desc1, (512, 1024, 3))
-                        pts2, desc2 = adjust_vertical_intensity(pts2, desc2, (512, 1024, 3))
-                        pts1, pts2, desc1, desc2, scores1, scores2 = sort_key(pts1, pts2, desc1, desc2, int(pts1.shape[0]*0.7))
-                    elif descriptor == "Proposed2":
-                        pts1, desc1 = adjust_vertical_intensity(pts1, desc1, (512, 1024, 3))
-                        pts2, desc2 = adjust_vertical_intensity(pts2, desc2, (512, 1024, 3))
-                        pts1, pts2, desc1, desc2, scores1, scores2 = sort_key(pts1, pts2, desc1, desc2, int(pts1.shape[0]*0.8))
-                    elif descriptor == "Proposed3":
-                        pts1, desc1 = adjust_vertical_intensity(pts1, desc1, (512, 1024, 3))
-                        pts2, desc2 = adjust_vertical_intensity(pts2, desc2, (512, 1024, 3))
-                        pts1, pts2, desc1, desc2, scores1, scores2 = sort_key(pts1, pts2, desc1, desc2, int(pts1.shape[0]*0.9))   
-                    elif descriptor == "Proposed4":
-                        pts1, desc1 = adjust_vertical_intensity(pts1, desc1, (512, 1024, 3))
-                        pts2, desc2 = adjust_vertical_intensity(pts2, desc2, (512, 1024, 3))
-                        pts1, pts2, desc1, desc2, scores1, scores2 = sort_key(pts1, pts2, desc1, desc2, int(pts1.shape[0]*0.95))                
-                    else:
-                        pts1, pts2, desc1, desc2, score1, score2 = sort_key(pts1, pts2, desc1, desc2, args.points)
+
+                num_points = args.points
+                if descriptor[:-1] == "Proposed" and descriptor[-1] in ['1', '2', '3', '4']:
+                    pts1, desc1 = adjust_vertical_intensity(pts1, desc1, (512, 1024, 3))
+                    pts2, desc2 = adjust_vertical_intensity(pts2, desc2, (512, 1024, 3))
+                    if descriptor[-1] == '1':
+                        num_points = int(pts1.shape[0]*0.7)
+                    elif descriptor[-1] == '2':
+                        num_points = int(pts1.shape[0]*0.8)
+                    elif descriptor[-1] == '3':
+                        num_points = int(pts1.shape[0]*0.9)
+                    elif descriptor[-1] == '4':
+                        num_points = int(pts1.shape[0]*0.95)
+                        
+                if args.match == 'MNN':
+                    num_points = min(num_points, 3000)
+                pts1, pts2, desc1, desc2, score1, score2 = sort_key(pts1, pts2, desc1, desc2, num_points)       
 
                     
                 
@@ -180,7 +179,7 @@ def main():
 
 
     for indicador, descriptor in enumerate(DESCRIPTORS):
-        base_path = f'results/data_real/FP_{args.points}/values/{scene}/{args.pose}/'+descriptor+'_'+args.inliers+'_'+args.solver
+        base_path = f'results/data_real/FP_{args.points}/values/{scene}/{args.pose}/'+descriptor+'/'+args.match+'_'+args.inliers+'_'+args.solver
         os.system('mkdir -p '+base_path)
         np.savetxt(base_path+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
         np.savetxt(base_path+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
@@ -193,19 +192,6 @@ def main():
         np.savetxt(base_path+'/FP_NUM.csv',np.array(FP_NUM[indicador]),delimiter=",")
 print('finish')
 
-def adjust_vertical_intensity(pts1_, desc1_, img_shape):
-    img_height = img_shape[0]
-    center_y = img_height / 2.0
-
-    for i, pt in enumerate(pts1_):
-        distance_from_center_y = abs(pt[1] - center_y)
-        adjustment_factor = np.sqrt(1 - (distance_from_center_y / center_y)**2)
-        if distance_from_center_y == center_y:
-            adjustment_factor = 1 - 1
-
-        pts1_[i, 2] *= adjustment_factor
-    
-    return pts1_, desc1_
 
 
 if __name__ == '__main__':
