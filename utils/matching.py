@@ -353,6 +353,108 @@ def remap_image(image_path, output_path):
     cv2.imwrite(output_path, out)
 
 
+
+
+def round_coordinates(tensor):
+    coords_int = tensor[:, :2].int()
+    other_data = tensor[:, 2:]
+    rounded_tensor = torch.cat((coords_int, other_data), dim=1)
+    return rounded_tensor
+
+
+def filter_middle_latitude(pts_, desc_, img_hw, invert_mask=False):
+    spherical_coords = equirectangular_to_spherical_coords(img_hw)
+    x_indices = pts_[:, 0].long()
+    y_indices = pts_[:, 1].long()
+
+    theta_values = spherical_coords[y_indices, x_indices, 0]
+    mask = (torch.pi/4 <= theta_values) & (theta_values < 3*torch.pi/4)
+    if invert_mask:
+        mask = ~mask
+
+    pts = pts_[mask]
+    desc = desc_.T[mask].T
+
+    return pts, desc
+
+
+def equirectangular_to_spherical_coords(img_hw, device='cpu'):
+    img_height = img_hw[0]
+    img_width = img_hw[1]
+    theta = torch.linspace(0, np.pi, img_height, device=device)
+    phi = torch.linspace(0, 2 * np.pi, img_width, device=device) 
+    phi_grid, theta_grid = torch.meshgrid(phi, theta, indexing="xy")
+    return torch.stack([theta_grid, phi_grid, torch.ones_like(theta_grid)], dim=-1)
+
+
+def spherical_to_cartesian(phi, theta):
+    x = np.cos(theta) * np.cos(phi)
+    y = np.cos(theta) * np.sin(phi)
+    z = np.sin(theta)
+    return x, y, z
+
+def rotate_coordinates(x, y, z, angle=np.pi/2):
+    xx = x * np.cos(angle) + z * np.sin(angle)
+    yy = y
+    zz = -x * np.sin(angle) + z * np.cos(angle)
+    return xx, yy, zz
+
+def cartesian_to_spherical(x, y, z):
+    theta = np.arcsin(z)
+    phi = np.arctan2(y, x)
+    return phi, theta
+
+
+def convert_coordinate(input_xy, image_size_hw):
+    h, w = image_size_hw
+    w_half = w / 2
+    h_half = h / 2
+    
+    phi = (input_xy[0] - w_half) * np.pi * 2 /w
+    theta = (input_xy[1] - h_half) * np.pi /h
+    
+    x, y, z = spherical_to_cartesian(phi, theta)
+    xx, yy, zz = rotate_coordinates(x, y, z)
+    new_phi, new_theta = cartesian_to_spherical(xx, yy, zz)
+
+    new_y = 2*new_theta * h_half / np.pi + h_half
+    new_x = new_phi * w_half / np.pi + w_half
+    
+    return new_x, new_y
+
+
+def convert_coordinates_vectorized(tensor, image_size_hw):
+    h, w = image_size_hw
+    w_half = w / 2
+    h_half = h / 2
+
+    x_coords = tensor[:, 0]
+    y_coords = tensor[:, 1]
+
+    phi = (x_coords - w_half) * np.pi * 2 / w
+    theta = (y_coords - h_half) * np.pi / h
+    
+    x = np.cos(theta) * np.cos(phi)
+    y = np.cos(theta) * np.sin(phi)
+    z = np.sin(theta)
+
+    angle = np.pi / 2
+    xx = x * np.cos(angle) + z * np.sin(angle)
+    yy = y
+    zz = -x * np.sin(angle) + z * np.cos(angle)
+
+    new_theta = np.arcsin(zz)
+    new_phi = np.arctan2(yy, xx)
+
+    new_y = new_theta * h_half / (np.pi/2) + h_half
+    new_x = new_phi * w_half / np.pi + w_half
+    
+    transformed_tensor = tensor
+    transformed_tensor[:, 0] = new_x
+    transformed_tensor[:, 1] = new_y
+    
+    return transformed_tensor
+
     
 
 

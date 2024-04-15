@@ -4,8 +4,8 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/imonalc/anaconda3/envs/keyglue/lib
 # test
 #python3 extract_keypoints.py --datas Room --descriptors orb --solver GSM_wRT  --points 10000
 #python3 extract_keypoints.py --datas Room Classroom Realistic Interior1 Interior2 --descriptors spoint spoint_P1 spoint_P2 spoint_P3 spoint_P4 --solver GSM_wRT  --match BF_KNN
-#python3 extract_keypoints.py --datas Room Classroom Realistic Interior1 Interior2 --descriptors orb --solver GSM_wRT  --points 10000
-#python3 extract_keypoints.py --datas Urban1 Urban2 Urban3 Urban4 --descriptors orb --solver GSM_wRT 
+python3 extract_keypoints.py --datas Room Classroom Realistic Interior1 Interior2 --descriptors orb --solver GSM_wRT  --points 10000
+python3 extract_keypoints.py --datas Urban1 Urban2 Urban3 Urban4 --descriptors orb --solver GSM_wRT 
 
 #python3 extract_keypoints.py --datas Classroom --descriptors tspoint --solver GSM_wRT  --points 10000
 ## main

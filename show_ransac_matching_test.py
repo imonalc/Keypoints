@@ -94,6 +94,7 @@ def main():
     scale_factor = 1.0  # How much to scale input equirectangular image by
     save_ply = False  # Whether to save the PLY visualizations too
     dim = np.array([2*sphered, sphered])
+    img_hw = (512, 1024)
 
     path_o = args.path + '/O.png'
     path_r = args.path + '/R.png'
@@ -116,7 +117,7 @@ def main():
     img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
     
 
-    coords_int = 1
+    coords_int = 0
     if opt != 'sphorb':
         corners = tangent_image_corners(base_order, sample_order)
         t_featurepoint_b = time.perf_counter()
@@ -129,8 +130,20 @@ def main():
         if coords_int:
             pts1_ = round_coordinates(pts1_)
             pts2_ = round_coordinates(pts2_)
-            pts1_, desc1_ = filter_middle_latitude(pts1_, desc1_, 1024, 512)
-            pts2_, desc2_ = filter_middle_latitude(pts2_, desc2_, 1024, 512)
+            pts1_, desc1_ = filter_middle_latitude(pts1_, desc1_, img_hw)
+            pts2_, desc2_ = filter_middle_latitude(pts2_, desc2_, img_hw)
+            pts12_, desc12_ = filter_middle_latitude(pts12_, desc12_, img_hw)
+            pts22_, desc22_ = filter_middle_latitude(pts22_, desc22_, img_hw)
+
+            pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
+            pts22_ = convert_coordinates_vectorized(pts22_, img_hw)
+
+            pts1_ = torch.cat((pts1_, pts12_), dim=0)
+            desc1_ = torch.cat((desc1_, desc12_), dim=1)
+
+            pts2_ = torch.cat((pts2_, pts22_), dim=0)
+            desc2_ = torch.cat((desc2_, desc22_), dim=1)
+
         
 
 
@@ -255,39 +268,6 @@ def plot_keypoints(image, kpts, radius=2, color=(0, 0, 255)):
     return out
 
 
-def convert_to_spherical_coordinates(keypoints, image_width, image_height, device="cuda"):
-    """
-    全天球画像上の2Dキーポイントを単位球面上の3D座標に変換する関数。
-
-    Args:
-        keypoints (np.ndarray): 全天球画像上の2Dキーポイント。形状は[N, 2]。
-        image_width (int): 全天球画像の幅。
-        image_height (int): 全天球画像の高さ。
-        device (str): 変換後のテンソルを配置するデバイス（例: 'cpu', 'cuda:0'）。
-
-    Returns:
-        torch.Tensor: 単位球面上の3D座標。形状は[N, 3]。
-    """
-    # 座標を経度と緯度に変換
-    longitude = (keypoints[:, 0] / image_width) * 360 - 180
-    latitude = (keypoints[:, 1] / image_height) * 180 - 90
-
-    # 経度と緯度をラジアンに変換
-    lon_rad = np.deg2rad(longitude)
-    lat_rad = np.deg2rad(latitude)
-
-    # 単位球面上の3D座標に変換
-    x = np.cos(lat_rad) * np.cos(lon_rad)
-    y = np.cos(lat_rad) * np.sin(lon_rad)
-    z = np.sin(lat_rad)
-
-    # 結果をテンソルに変換して、デバイスに移動
-    keypoints3D = np.stack([x, y, z], axis=-1)  # [N, 3]の形状
-    keypoints3D_tensor = torch.tensor(keypoints3D, dtype=torch.float).to(device)
-
-    return keypoints3D_tensor
-
-
 
 def round_coordinates(tensor):
     coords_int = tensor[:, :2].int()
@@ -296,26 +276,98 @@ def round_coordinates(tensor):
     return rounded_tensor
 
 
-def filter_middle_latitude(pts_, desc_, img_width, img_height):
-    spherical_coords = equirectangular_to_spherical_coords(img_width, img_height)
+def filter_middle_latitude(pts_, desc_, img_hw, invert_mask=False):
+    spherical_coords = equirectangular_to_spherical_coords(img_hw)
     x_indices = pts_[:, 0].long()
     y_indices = pts_[:, 1].long()
 
     theta_values = spherical_coords[y_indices, x_indices, 0]
     mask = (torch.pi/4 <= theta_values) & (theta_values < 3*torch.pi/4)
+    if invert_mask:
+        mask = ~mask
+
     pts = pts_[mask]
     desc = desc_.T[mask].T
-
 
     return pts, desc
 
 
-def equirectangular_to_spherical_coords(img_width, img_height, device='cpu'):
-    theta = torch.linspace(0, np.pi, img_height, device=device)  # 0からπ
-    phi = torch.linspace(0, 2 * np.pi, img_width, device=device)  # 0から2π
+def equirectangular_to_spherical_coords(img_hw, device='cpu'):
+    img_height = img_hw[0]
+    img_width = img_hw[1]
+    theta = torch.linspace(0, np.pi, img_height, device=device)
+    phi = torch.linspace(0, 2 * np.pi, img_width, device=device) 
     phi_grid, theta_grid = torch.meshgrid(phi, theta, indexing="xy")
     return torch.stack([theta_grid, phi_grid, torch.ones_like(theta_grid)], dim=-1)
 
+
+def spherical_to_cartesian(phi, theta):
+    x = np.cos(theta) * np.cos(phi)
+    y = np.cos(theta) * np.sin(phi)
+    z = np.sin(theta)
+    return x, y, z
+
+def rotate_coordinates(x, y, z, angle=np.pi/2):
+    xx = x * np.cos(angle) + z * np.sin(angle)
+    yy = y
+    zz = -x * np.sin(angle) + z * np.cos(angle)
+    return xx, yy, zz
+
+def cartesian_to_spherical(x, y, z):
+    theta = np.arcsin(z)
+    phi = np.arctan2(y, x)
+    return phi, theta
+
+
+def convert_coordinate(input_xy, image_size_hw):
+    h, w = image_size_hw
+    w_half = w / 2
+    h_half = h / 2
+    
+    phi = (input_xy[0] - w_half) * np.pi * 2 /w
+    theta = (input_xy[1] - h_half) * np.pi /h
+    
+    x, y, z = spherical_to_cartesian(phi, theta)
+    xx, yy, zz = rotate_coordinates(x, y, z)
+    new_phi, new_theta = cartesian_to_spherical(xx, yy, zz)
+
+    new_y = 2*new_theta * h_half / np.pi + h_half
+    new_x = new_phi * w_half / np.pi + w_half
+    
+    return new_x, new_y
+
+
+def convert_coordinates_vectorized(tensor, image_size_hw):
+    h, w = image_size_hw
+    w_half = w / 2
+    h_half = h / 2
+
+    x_coords = tensor[:, 0]
+    y_coords = tensor[:, 1]
+
+    phi = (x_coords - w_half) * np.pi * 2 / w
+    theta = (y_coords - h_half) * np.pi / h
+    
+    x = np.cos(theta) * np.cos(phi)
+    y = np.cos(theta) * np.sin(phi)
+    z = np.sin(theta)
+
+    angle = np.pi / 2
+    xx = x * np.cos(angle) + z * np.sin(angle)
+    yy = y
+    zz = -x * np.sin(angle) + z * np.cos(angle)
+
+    new_theta = np.arcsin(zz)
+    new_phi = np.arctan2(yy, xx)
+
+    new_y = new_theta * h_half / (np.pi/2) + h_half
+    new_x = new_phi * w_half / np.pi + w_half
+    
+    transformed_tensor = tensor
+    transformed_tensor[:, 0] = new_x
+    transformed_tensor[:, 1] = new_y
+    
+    return transformed_tensor
 
 
 

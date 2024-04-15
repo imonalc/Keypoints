@@ -40,7 +40,7 @@ import build1.sphorb_cpp as sphorb
 def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
-    parser.add_argument('--points', type=int, default = 500)
+    parser.add_argument('--points', type=int, default = 10000)
     parser.add_argument('--descriptor', default = 'sift')
     parser.add_argument('--path', default = "./data/data_100/Room/0/")
     args = parser.parse_args()
@@ -65,7 +65,7 @@ def main():
         corners = tangent_image_corners(base_order, sample_order)
 
         pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
-        pts1, desc1 = sort_key(pts1, desc1, args.points)
+        #pts1, desc1 = sort_key(pts1, desc1, args.points)
 
     else:
                         
@@ -84,8 +84,7 @@ def main():
 
     if len(pts1.shape) == 1:
         pts1 = pts1.reshape(1,-1)
-
-    print(len(pts1))
+        
 
     img = load_torch_img(path_o)[:3, ...].float()
     img = F.interpolate(img.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
@@ -94,19 +93,10 @@ def main():
     img = torch2numpy(img.byte())
     print(img.shape)
 
-    height_threshold1 = 0.5 * img.shape[0]
-    height_threshold2 = 0.9 * img.shape[0]
-    width_threshold1 = 0.3 * img.shape[1]
-    width_threshold2 = 0.5 * img.shape[1]
-
-    cond1_1 = (pts1[:, 1] > height_threshold1)
-    cond1_2 = (pts1[:, 1] < height_threshold2)
-    cond1_3 = (pts1[:, 0] > width_threshold1)
-    cond1_4 = (pts1[:, 0] < width_threshold2)
-
-    valid_idx1 = cond1_1 & cond1_2 &cond1_3 & cond1_4
-    pts1 =  pts1[valid_idx1]
-    desc1 = desc1[valid_idx1]
+    test = 1
+    if test:
+        pts1 = round_coordinates(pts1)      
+        pts1, desc1 = filter_middle_latitude(pts1, desc1, (512, 1024), invert_mask=True)
 
 
 
@@ -121,6 +111,38 @@ def main():
     plt.axis('off')
 
     plt.show()
+
+
+def filter_middle_latitude(pts_, desc_, img_hw, invert_mask=False):
+    spherical_coords = equirectangular_to_spherical_coords(img_hw)
+    x_indices = pts_[:, 0].long()
+    y_indices = pts_[:, 1].long()
+
+    theta_values = spherical_coords[y_indices, x_indices, 0]
+    mask = (torch.pi/4 <= theta_values) & (theta_values < 3*torch.pi/4)
+    if invert_mask:
+        mask = ~mask
+
+    pts = pts_[mask]
+    desc = desc_.T[mask].T
+
+    return pts, desc
+
+def equirectangular_to_spherical_coords(img_hw, device='cpu'):
+    img_height = img_hw[0]
+    img_width = img_hw[1]
+    theta = torch.linspace(0, np.pi, img_height, device=device)  # 0からπ
+    phi = torch.linspace(0, 2 * np.pi, img_width, device=device)  # 0から2π
+    phi_grid, theta_grid = torch.meshgrid(phi, theta, indexing="xy")
+    return torch.stack([theta_grid, phi_grid, torch.ones_like(theta_grid)], dim=-1)
+
+
+def round_coordinates(tensor):
+    coords_int = tensor[:, :2].int()
+    other_data = tensor[:, 2:]
+    rounded_tensor = torch.cat((coords_int, other_data), dim=1)
+    return rounded_tensor
+
 
 
 def sort_key(pts1, desc1, points):
