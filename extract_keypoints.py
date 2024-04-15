@@ -78,12 +78,18 @@ def main():
             for indicador, descriptor in enumerate(DESCRIPTORS):
 
                 try:
+                    if descriptor[-1] == 'P':
+                        method_flag = 1
+                        descriptor = descriptor[:-2]
+                    else:
+                        method_flag = 0  
                     opt, mode, sphered = get_descriptor(descriptor)
                     method_idx = 0
                     base_order = 1  # Base sphere resolution
                     sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
                     scale_factor = 1.0  # How much to scale input equirectangular image by
                     save_ply = False  # Whether to save the PLY visualizations too
+                    img_hw = (512, 1024)
                     dim = np.array([2*sphered, sphered])
 
                     path_o = path + f'/O{data_name}.png'
@@ -107,9 +113,31 @@ def main():
                     else:
                         corners = tangent_image_corners(base_order, sample_order)
                         t_featurepoint_b = time.perf_counter()
-                        pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
-                        pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
+                        pts1_, desc1_ = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
+                        pts2_, desc2_ = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
                         t_featurepoint_a = time.perf_counter()
+
+                        if method_flag:
+                            pts12_, desc12_ = process_image_to_keypoints(path_o2, corners, scale_factor, base_order, sample_order, opt, mode)
+                            pts22_, desc22_ = process_image_to_keypoints(path_r2, corners, scale_factor, base_order, sample_order, opt, mode)
+
+                            pts1_ = round_coordinates(pts1_)
+                            pts2_ = round_coordinates(pts2_)
+                            pts1_, desc1_ = filter_middle_latitude(pts1_, desc1_, img_hw)
+                            pts2_, desc2_ = filter_middle_latitude(pts2_, desc2_, img_hw)
+                            pts12_, desc12_ = filter_middle_latitude(pts12_, desc12_, img_hw)
+                            pts22_, desc22_ = filter_middle_latitude(pts22_, desc22_, img_hw)
+
+                            pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
+                            pts22_ = convert_coordinates_vectorized(pts22_, img_hw)
+
+                            pts1_ = torch.cat((pts1_, pts12_), dim=0)
+                            desc1_ = torch.cat((desc1_, desc12_), dim=1)
+
+                            pts2_ = torch.cat((pts2_, pts22_), dim=0)
+                            desc2_ = torch.cat((desc2_, desc22_), dim=1)
+                            t_featurepoint_a = time.perf_counter()
+
 
                     num_points = args.points
                     num_points_1 = num_points
@@ -117,8 +145,8 @@ def main():
                     if args.match == 'MNN':
                         num_points_1 = min(num_points_1, 3000)
                         num_points_2 = min(num_points_2, 3000)
-                    pts1, desc1, score1 = sort_key_div(pts1, desc1, num_points_1)   
-                    pts2, desc2, score2 = sort_key_div(pts2, desc2, num_points_2)             
+                    pts1, desc1, score1 = sort_key_div(pts1_, desc1_, num_points_1)   
+                    pts2, desc2, score2 = sort_key_div(pts2_, desc2_, num_points_2)             
                     
 
                     if len(pts1.shape) == 1:

@@ -86,7 +86,11 @@ def main():
 
     t0 = time.time()
     descriptor = args.descriptor
-
+    if descriptor[-1] == 'P':
+        method_flag = 1
+        descriptor = descriptor[:-2]
+    else:
+        method_flag = 0  
     opt, mode, sphered = get_descriptor(descriptor)
     method_idx = 0.0
     base_order = 0  # Base sphere resolution
@@ -117,7 +121,6 @@ def main():
     img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
     
 
-    coords_int = 0
     if opt != 'sphorb':
         corners = tangent_image_corners(base_order, sample_order)
         t_featurepoint_b = time.perf_counter()
@@ -127,7 +130,7 @@ def main():
         pts12_, desc12_ = process_image_to_keypoints(path_o2, corners, scale_factor, base_order, sample_order, opt, mode)
         pts22_, desc22_ = process_image_to_keypoints(path_r2, corners, scale_factor, base_order, sample_order, opt, mode)
 
-        if coords_int:
+        if method_flag:
             pts1_ = round_coordinates(pts1_)
             pts2_ = round_coordinates(pts2_)
             pts1_, desc1_ = filter_middle_latitude(pts1_, desc1_, img_hw)
@@ -140,7 +143,6 @@ def main():
 
             pts1_ = torch.cat((pts1_, pts12_), dim=0)
             desc1_ = torch.cat((desc1_, desc12_), dim=1)
-
             pts2_ = torch.cat((pts2_, pts22_), dim=0)
             desc2_ = torch.cat((desc2_, desc22_), dim=1)
 
@@ -238,7 +240,7 @@ def plot_matches(image0,
     for kpt0, kpt1, mt in zip(mkpts0, mkpts1, match_true):
         (x0, y0), (x1, y1) = kpt0, kpt1
         if mt == 0 :
-            continue
+            #continue
             mcolor = (0, 0, 255) 
         else :
             mcolor = (0, 255, 0)
