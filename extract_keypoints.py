@@ -18,6 +18,7 @@ from utils.keypoint import *
 from utils.metrics  import *
 from utils.camera_recovering import *
 from utils.matching import *
+from utils.spherical_module import *
 
 from os import listdir
 from os.path import isfile, join, isdir
@@ -51,6 +52,10 @@ def main():
     # Parameters
     # ----------------------------------------------
 
+    img_sample = cv2.imread('./data/data_100/Room/0/O.png')
+    img_hw = img_sample.shape[:2]
+    Y_remap, X_remap = make_image_map(img_hw)
+
     NUM = 0
     METRICS = np.zeros((len(DESCRIPTORS),2))
     data_name = ""
@@ -75,6 +80,19 @@ def main():
         std = []
 
         for path in tqdm(paths):
+            method_idx = 0
+            base_order = 1  # Base sphere resolution
+            sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
+            scale_factor = 1.0  # How much to scale input equirectangular image by
+            save_ply = False  # Whether to save the PLY visualizations too
+
+            img_hw = (512, 1024)
+            path_o = path + f'/O{data_name}.png'
+            path_r = path + f'/R{data_name}.png'
+            path_o2 = path + f'/O2{data_name}.png'
+            path_r2 = path + f'/R2{data_name}.png'
+            remap_t1 = remap_image(path_o, path_o2, (Y_remap, X_remap))
+            remap_t2 = remap_image(path_r, path_r2, (Y_remap, X_remap))
             for indicador, descriptor in enumerate(DESCRIPTORS):
 
                 try:
@@ -84,22 +102,7 @@ def main():
                     else:
                         method_flag = 0  
                     opt, mode, sphered = get_descriptor(descriptor)
-                    method_idx = 0
-                    base_order = 1  # Base sphere resolution
-                    sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
-                    scale_factor = 1.0  # How much to scale input equirectangular image by
-                    save_ply = False  # Whether to save the PLY visualizations too
-                    img_hw = (512, 1024)
                     dim = np.array([2*sphered, sphered])
-
-                    path_o = path + f'/O{data_name}.png'
-                    path_r = path + f'/R{data_name}.png'
-
-                    path_o2 = path + f'/O2{data_name}.png'
-                    path_r2 = path + f'/R2{data_name}.png'
-
-                    #remap_image(path_o, path_o2)
-                    #remap_image(path_r, path_r2)
 
 
                     if opt == 'sphorb':
@@ -120,20 +123,19 @@ def main():
                         if method_flag:
                             pts12_, desc12_ = process_image_to_keypoints(path_o2, corners, scale_factor, base_order, sample_order, opt, mode)
                             pts22_, desc22_ = process_image_to_keypoints(path_r2, corners, scale_factor, base_order, sample_order, opt, mode)
-
                             pts1_ = round_coordinates(pts1_)
                             pts2_ = round_coordinates(pts2_)
                             pts1_, desc1_ = filter_middle_latitude(pts1_, desc1_, img_hw)
                             pts2_, desc2_ = filter_middle_latitude(pts2_, desc2_, img_hw)
-                            pts12_, desc12_ = filter_middle_latitude(pts12_, desc12_, img_hw)
-                            pts22_, desc22_ = filter_middle_latitude(pts22_, desc22_, img_hw)
 
                             pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
                             pts22_ = convert_coordinates_vectorized(pts22_, img_hw)
+                            pts12_, desc12_ = filter_middle_latitude(pts12_, desc12_, img_hw, invert_mask=True)
+                            pts22_, desc22_ = filter_middle_latitude(pts22_, desc22_, img_hw, invert_mask=True)
+
 
                             pts1_ = torch.cat((pts1_, pts12_), dim=0)
                             desc1_ = torch.cat((desc1_, desc12_), dim=1)
-
                             pts2_ = torch.cat((pts2_, pts22_), dim=0)
                             desc2_ = torch.cat((desc2_, desc22_), dim=1)
                             t_featurepoint_a = time.perf_counter()
