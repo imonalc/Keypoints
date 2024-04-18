@@ -39,7 +39,7 @@ def main():
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
     parser.add_argument('--points', type=int, default = 10000)
     parser.add_argument('--match', default="BF")
-    parser.add_argument('--solver', default="None")
+    parser.add_argument('--solver', default="GSM_wRT")
     parser.add_argument('--inliers', default="8PA")
     parser.add_argument('--datas'      , nargs='+')
     parser.add_argument('--descriptors', nargs='+')
@@ -121,13 +121,11 @@ def main():
                         t_featurepoint_a = time.perf_counter()
 
                         if method_flag:
-                            pts12_, desc12_ = process_image_to_keypoints(path_o2, corners, scale_factor, base_order, sample_order, opt, mode)
-                            pts22_, desc22_ = process_image_to_keypoints(path_r2, corners, scale_factor, base_order, sample_order, opt, mode)
-                            pts1_ = round_coordinates(pts1_)
-                            pts2_ = round_coordinates(pts2_)
                             pts1_, desc1_ = filter_middle_latitude(pts1_, desc1_, img_hw)
                             pts2_, desc2_ = filter_middle_latitude(pts2_, desc2_, img_hw)
 
+                            pts12_, desc12_ = process_image_to_keypoints(path_o2, corners, scale_factor, base_order, sample_order, opt, mode)
+                            pts22_, desc22_ = process_image_to_keypoints(path_r2, corners, scale_factor, base_order, sample_order, opt, mode)
                             pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
                             pts22_ = convert_coordinates_vectorized(pts22_, img_hw)
                             pts12_, desc12_ = filter_middle_latitude(pts12_, desc12_, img_hw, invert_mask=True)

@@ -27,6 +27,8 @@ from utils.ransac   import *
 from utils.keypoint import *
 from utils.metrics  import *
 from utils.camera_recovering import *
+from utils.matching import *
+from utils.spherical_module import * 
 
 from os import listdir
 from os.path import isfile, join, isdir
@@ -94,9 +96,8 @@ def main():
     print(img.shape)
 
     test = 1
-    if test:
-        pts1 = round_coordinates(pts1)      
-        pts1, desc1 = filter_middle_latitude(pts1, desc1, (512, 1024), invert_mask=True)
+    if test:   
+        pts1, desc1 = filter_middle_latitude(pts1, desc1, (512, 1024),)
 
 
 
@@ -112,36 +113,6 @@ def main():
 
     plt.show()
 
-
-def filter_middle_latitude(pts_, desc_, img_hw, invert_mask=False):
-    spherical_coords = equirectangular_to_spherical_coords(img_hw)
-    x_indices = pts_[:, 0].long()
-    y_indices = pts_[:, 1].long()
-
-    theta_values = spherical_coords[y_indices, x_indices, 0]
-    mask = (torch.pi/4 <= theta_values) & (theta_values < 3*torch.pi/4)
-    if invert_mask:
-        mask = ~mask
-
-    pts = pts_[mask]
-    desc = desc_.T[mask].T
-
-    return pts, desc
-
-def equirectangular_to_spherical_coords(img_hw, device='cpu'):
-    img_height = img_hw[0]
-    img_width = img_hw[1]
-    theta = torch.linspace(0, np.pi, img_height, device=device)  # 0からπ
-    phi = torch.linspace(0, 2 * np.pi, img_width, device=device)  # 0から2π
-    phi_grid, theta_grid = torch.meshgrid(phi, theta, indexing="xy")
-    return torch.stack([theta_grid, phi_grid, torch.ones_like(theta_grid)], dim=-1)
-
-
-def round_coordinates(tensor):
-    coords_int = tensor[:, :2].int()
-    other_data = tensor[:, 2:]
-    rounded_tensor = torch.cat((coords_int, other_data), dim=1)
-    return rounded_tensor
 
 
 
@@ -207,98 +178,7 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match='ratio'):
 
     return s_pts1, s_pts2, s_pts1[M[0,:].astype(int),:3], s_pts2[M[1,:].astype(int),:3]
 
-def get_error(x1, x2, Rx, Tx):
 
-    S = computeEssentialMatrixByRANSAC(x1, x2)
-    I = S[1]
-    I = I.astype(np.int64)
-
-    x1 = x1[I,:]
-    x2 = x2[I,:]
-
-    F = calc_ematrix(x1,x2)
-
-
-    R1,R2,T1,T2 = decomposeE(F)
-
-    R,T = choose_rt(R1,R2,T1,T2,x1,x2)
-
-    R_error = r_error(Rx,R)
-    T_error = t_error(Tx,T)
-
-    return R_error, T_error
-
-def get_descriptor(descriptor):
-    if descriptor == 'sphorb':
-        return 'sphorb', 'erp', 640
-    elif descriptor == 'sift':
-        return 'sift', 'erp', 512
-    elif descriptor == 'tsift':
-        return 'sift', 'tangent', 512
-    elif descriptor == 'csift':
-        return 'sift', 'cube', 512
-    elif descriptor == 'orb':
-        return 'orb', 'erp', 512
-    elif descriptor == 'torb':
-        return 'orb', 'tangent', 512
-    elif descriptor == 'corb':
-        return 'orb', 'cube', 512
-    elif descriptor == 'spoint':
-        return 'superpoint', 'erp', 512
-    elif descriptor == 'tspoint':
-        return 'superpoint', 'tangent', 512
-    elif descriptor == 'cspoint':
-        return 'superpoint', 'cube', 512
-    elif descriptor == 'alike':
-        return 'alike', 'erp', 512
-    elif descriptor == 'talike':
-        return 'alike', 'tangent', 512
-    elif descriptor == 'calike':
-        return 'alike', 'cube', 512
-
-
-def AUC(ROT, TRA, MET, L):
-
-    RAUC  = np.zeros(len(L))
-    TAUC  = np.zeros(len(L))
-
-    for index, t in enumerate(L):
-        ids = np.where(ROT<np.radians(t))[0]
-        RAUC[index] = len(ids)/len(ROT)
-
-    for index, t in enumerate(L):
-        ids = np.where(TRA<np.radians(t))[0]
-        TAUC[index] = len(ids)/len(TRA)
-
-    return RAUC, TAUC, np.array(MET)
-
-def get_data(DATAS):
-    if len(DATAS) == 1:
-        data = DATAS[0]
-    elif set(['Urban1','Urban2','Urban3','Urban4']) == set(DATAS):
-        data = 'Outdoor'
-    elif set(['Realistic','Interior1','Interior2','Room','Classroom']) == set(DATAS):
-        data = 'Indoor'
-    elif set(['Urban1_R','Urban2_R','Urban3_R','Urban4_R','Realistic_R','Interior1_R','Interior2_R','Room_R','Classroom_R']) == set(DATAS):
-        data = 'OnlyRot'
-    elif set(['Urban1_T','Urban2_T','Urban3_T','Urban4_T','Realistic_T','Interior1_T','Interior2_T','Room_T','Classroom_T']) == set(DATAS):
-        data = 'OnlyTra'
-    else:
-        data = ''
-        for DA in DATAS:
-            data+=DA
-
-    return data
-
-
-def get_kd(array):
-
-    array = np.array(array)
-    delimiter = int(array[-1])
-    A = array[:-1]
-    K = A[:delimiter].reshape(-1,3)
-    D = A[delimiter:].reshape(-1,32)
-    return K,D
 
 
 if __name__ == '__main__':
