@@ -327,9 +327,9 @@ def process_image_to_keypoints(image_path, corners, scale_factor, base_order, sa
 
     # Resample the image to N tangent images (out: 3 x N x H x W)
     # N = 80, H, W depend of the sample_order( 2^(sample_order-1) = 512 )
-    tex_image = create_tangent_images(img, base_order, sample_order).byte()
     
     if mode == 'tangent':
+        tex_image = create_tangent_images(img, base_order, sample_order).byte()
         image_kp, image_desc = keypoint_tangent_images(tex_image, base_order, sample_order, img.shape[-2:], opt , 0)
 
     if mode == 'erp':

@@ -81,10 +81,9 @@ def main():
 
         for path in tqdm(paths):
             method_idx = 0
-            base_order = 1  # Base sphere resolution
-            sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
+            base_order = 0  # Base sphere resolution
+            sample_order = 8  # Determines sample resolution (10 = 2048 x 4096) (0, 8): 20*256*256
             scale_factor = 1.0  # How much to scale input equirectangular image by
-            save_ply = False  # Whether to save the PLY visualizations too
 
             img_hw = (512, 1024)
             path_o = path + f'/O{data_name}.png'
@@ -136,7 +135,7 @@ def main():
                             desc1_ = torch.cat((desc1_, desc12_), dim=1)
                             pts2_ = torch.cat((pts2_, pts22_), dim=0)
                             desc2_ = torch.cat((desc2_, desc22_), dim=1)
-                            t_featurepoint_a = time.perf_counter()
+                            t_featurepoint_a = time.perf_counter()+remap_t1+remap_t2
 
 
                     num_points = args.points
