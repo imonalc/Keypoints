@@ -2,17 +2,14 @@ import torch
 import torch.nn.functional as F
 from spherical_distortion.functional import create_tangent_images, unresample
 from spherical_distortion.util import *
-import matplotlib.pyplot as plt
-from skimage import io
-import os
+import time
 
 import numpy as np
-import _spherical_distortion_ext._mesh as _mesh
-import argparse
 
 import utils.superpoint.magic_sp.superpoint as magic_sp
 import utils.superpoint.train_sp.superpoint as train_sp
 from utils.ALIKE.alike import ALike, configs
+
 
 def process_img(img):
     """ Process a image transposing it and convert to grayscale format, Then normalize

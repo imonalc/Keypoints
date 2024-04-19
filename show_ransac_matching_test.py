@@ -63,7 +63,7 @@ def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
     parser.add_argument('--points', type=int, default = 10000)
-    parser.add_argument('--match', default="BF")
+    parser.add_argument('--match', default="BF_KNN")
     parser.add_argument('--g_metrics',default="False")
     parser.add_argument('--solver', default="GSM_wRT")
     parser.add_argument('--inliers', default="8PA")
