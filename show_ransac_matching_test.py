@@ -49,16 +49,6 @@ import build1.sphorb_cpp as sphorb
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
-
-MATCHING_METHODS_LIST = ['BF', 'BF_KNN', 'FLANN_KNN', 'MNN']
-MATCHING_CONSTANT_DICT = {
-    'BF': [0.75, 0.8],
-    'BF_KNN': [0.75, 0.8],
-    'FLANN_KNN': [0.75, 0.8],
-    'MNN': [0],
-}
-
-
 def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
@@ -74,14 +64,19 @@ def main():
 
     print('X')
 
-    t0 = time.time()
+    resolution = ""
     descriptor = args.descriptor
     if descriptor[-1] == 'P':
         method_flag = 1
         descriptor = descriptor[:-2]
+    elif descriptor[-1] == 'p':
+        method_flag = 2
+        resolution = "_800"
+        descriptor = descriptor[:-2]
     else:
         method_flag = 0  
     opt, mode, sphered = get_descriptor(descriptor)
+
     method_idx = 0.0
     base_order = 0  # Base sphere resolution
     sample_order = 8  # Determines sample resolution (10 = 2048 x 4096)
@@ -89,14 +84,26 @@ def main():
     save_ply = False  # Whether to save the PLY visualizations too
     dim = np.array([2*sphered, sphered])
 
-    path_o = args.path + '/O.png'
-    path_r = args.path + '/R.png'
+    path_o = args.path + f'/O.png'
+    path_r = args.path + f'/R.png'
+    if method_flag == 2:
+        dim = np.array([800, 600])
+        img_o = cv2.imread(path_o)
+        img_r = cv2.imread(path_r)
+        new_img_wh = (800, 600)
+        r_img_o = cv2.resize(img_o, new_img_wh, interpolation=cv2.INTER_AREA)
+        r_img_r = cv2.resize(img_r, new_img_wh, interpolation=cv2.INTER_AREA)
+        path_o = args.path + f'/O{resolution}.png'
+        path_r = args.path + f'/R{resolution}.png'
+        cv2.imwrite(path_o, r_img_o)
+        cv2.imwrite(path_r, r_img_r)
+
     img_sample = cv2.imread(path_o)
     img_hw = img_sample.shape[:2]
 
     Y_remap, X_remap = make_image_map(img_hw)
-    path_o2 = args.path + f'/O2.png'
-    path_r2 = args.path + f'/R2.png'
+    path_o2 = args.path + f'/O2{resolution}.png'
+    path_r2 = args.path + f'/R2{resolution}.png'
     remap_image(path_o, path_o2, (Y_remap, X_remap))
     remap_image(path_r, path_r2, (Y_remap, X_remap))
     
@@ -120,6 +127,7 @@ def main():
         pts1_, desc1_ = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
         pts2_, desc2_ = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
         t_featurepoint_a = time.perf_counter()
+        
 
         if method_flag:
             pts1_, desc1_ = filter_middle_latitude(pts1_, desc1_, img_hw)
@@ -136,6 +144,8 @@ def main():
             desc1_ = torch.cat((desc1_, desc12_), dim=1)
             pts2_ = torch.cat((pts2_, pts22_), dim=0)
             desc2_ = torch.cat((desc2_, desc22_), dim=1)
+            t_featurepoint_a = time.perf_counter()
+
 
             #pts1_ = pts12_
             #desc1_ = desc12_

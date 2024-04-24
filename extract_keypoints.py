@@ -39,7 +39,7 @@ def main():
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
     parser.add_argument('--points', type=int, default = 10000)
     parser.add_argument('--match', default="BF")
-    parser.add_argument('--solver', default="GSM_wRT")
+    parser.add_argument('--solver', default="GSM_SK")
     parser.add_argument('--inliers', default="8PA")
     parser.add_argument('--datas'      , nargs='+')
     parser.add_argument('--descriptors', nargs='+')
@@ -55,6 +55,7 @@ def main():
     img_sample = cv2.imread('./data/data_100/Room/0/O.png')
     img_hw = img_sample.shape[:2]
     Y_remap, X_remap = make_image_map(img_hw)
+    Y_remap2, X_remap2 = make_image_map((256, 512))
 
     NUM = 0
     METRICS = np.zeros((len(DESCRIPTORS),2))
@@ -98,6 +99,23 @@ def main():
                     if descriptor[-1] == 'P':
                         method_flag = 1
                         descriptor = descriptor[:-2]
+                    elif descriptor[-1] == 'p':
+                        sphered = 256
+                        method_flag = 2
+                        descriptor = descriptor[:-2]
+                        img_o = cv2.imread(path_o)
+                        img_r = cv2.imread(path_r)
+                        new_img_wh = (512, 256)
+                        r_img_o = cv2.resize(img_o, new_img_wh, interpolation=cv2.INTER_AREA)
+                        r_img_r = cv2.resize(img_r, new_img_wh, interpolation=cv2.INTER_AREA)
+                        path_o = path + f'/O_512.png'
+                        path_r = path + f'/R_512.png'
+                        cv2.imwrite(path_o, r_img_o)
+                        cv2.imwrite(path_r, r_img_r)
+                        path_o2 = path + f'/O2_512.png'
+                        path_r2 = path + f'/R2_512.png'
+                        remap_t1 = remap_image(path_o, path_o2, (Y_remap2, X_remap2))
+                        remap_t2 = remap_image(path_r, path_r2, (Y_remap2, X_remap2))
                     else:
                         method_flag = 0  
                     opt, mode, sphered = get_descriptor(descriptor)
