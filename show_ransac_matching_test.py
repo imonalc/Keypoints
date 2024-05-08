@@ -170,10 +170,12 @@ def main():
         os.chdir('SPHORB-master/')
         path_o = "."+path_o
         path_r = "."+path_r
+        t_featurepoint_b = time.perf_counter()
         pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
         pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
-        pts1[pts1[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
-        pts2[pts2[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
+        t_featurepoint_a = time.perf_counter()
+        #pts1[pts1[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
+        #pts2[pts2[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
         os.chdir('../')
 
 
@@ -185,7 +187,8 @@ def main():
     s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, match=args.match, constant=method_idx)
     t_matching_a = time.perf_counter()
     
-    print(x1_.shape, s_pts1.shape, pts1_.shape)
+    print(x1_.shape, s_pts1.shape)
+    print(x1_)
     x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
     s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
 
@@ -240,14 +243,14 @@ def plot_matches(image0,
     if image0.shape[0] > 2000:
         thickness = 10
     if image0.shape[0] > 1000:
-        thickness = 5
+        thickness = 1
     else:
-        thickness = 2
+        thickness = 1
     
     for kpt0, kpt1, mt in zip(mkpts0, mkpts1, match_true):
         (x0, y0), (x1, y1) = kpt0, kpt1
         if mt == 0 :
-            #continue
+            continue
             mcolor = (0, 0, 255) 
         else :
             mcolor = (0, 255, 0)

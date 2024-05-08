@@ -176,10 +176,12 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match="BF", constant
     elif match == 'BF_KNN':
         if args_opt == "superpoint":
             constant = 0.95
-        elif args_opt == "orb":
+        elif args_opt in ["orb", "sphorb"]:
             constant = 0.9
-        else:
+        elif args_opt == "sift":
             constant = 0.75
+        elif args_opt == "alike":
+            constant = 0.95
         matches = bfknn_matcher(s_desc1, s_desc2, distance_eval, constant)
     elif match == 'FLANN_KNN':
         matches = flannknn_matcher(s_desc1, s_desc2, distance_eval_FLANN, constant)

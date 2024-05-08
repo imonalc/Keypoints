@@ -156,14 +156,14 @@ def main():
                             t_featurepoint_a = time.perf_counter()+remap_t1+remap_t2
 
 
-                    num_points = args.points
-                    num_points_1 = num_points
-                    num_points_2 = num_points
-                    if args.match == 'MNN':
-                        num_points_1 = min(num_points_1, 3000)
-                        num_points_2 = min(num_points_2, 3000)
-                    pts1, desc1, score1 = sort_key_div(pts1_, desc1_, num_points_1)   
-                    pts2, desc2, score2 = sort_key_div(pts2_, desc2_, num_points_2)             
+                        num_points = args.points
+                        num_points_1 = num_points
+                        num_points_2 = num_points
+                        if args.match == 'MNN':
+                            num_points_1 = min(num_points_1, 3000)
+                            num_points_2 = min(num_points_2, 3000)
+                        pts1, desc1, score1 = sort_key_div(pts1_, desc1_, num_points_1)   
+                        pts2, desc2, score2 = sort_key_div(pts2_, desc2_, num_points_2)             
                     
 
                     if len(pts1.shape) == 1:

@@ -2,8 +2,8 @@
 python3 extract_keypoints.py --datas Room --descriptors orb_p
 #python3 extract_keypoints.py --datas Room --descriptors sift spoint
 #python3 extract_keypoints.py --datas Room --descriptors spoint_P
-python3 extract_keypoints.py --datas Classroom Realistic Interior1 Interior2 --descriptors orb_p
-python3 extract_keypoints.py --datas Urban1 Urban2 Urban3 Urban4 --descriptors orb_p
+#python3 extract_keypoints.py --datas Classroom Realistic Interior1 Interior2 --descriptors orb_p
+#python3 extract_keypoints.py --datas Urban1 Urban2 Urban3 Urban4 --descriptors orb_p
 
 
 
@@ -23,5 +23,9 @@ python3 extract_keypoints.py --datas Urban1 Urban2 Urban3 Urban4 --descriptors o
 #python3 extract_keypoints.py --datas Room Classroom Realistic Interior1 Interior2 --descriptors tsift tspoint   --match MNN
 #python3 extract_keypoints.py --datas Urban1 Urban2 Urban3 Urban4 --descriptors tsift tspoint   --match MNN
 
+python3 extract_keypoints.py --datas Room Classroom Realistic Interior1 Interior2 --descriptors sphorb --match BF_KNN
+python3 extract_keypoints.py --datas Urban1 Urban2 Urban3 Urban4 --descriptors sphorb --match BF_KNN
+python3 extract_keypoints.py --datas Room Classroom Realistic Interior1 Interior2 --descriptors sphorb --match MNN
+python3 extract_keypoints.py --datas Urban1 Urban2 Urban3 Urban4 --descriptors sphorb --match MNN
 
 echo "完了"
