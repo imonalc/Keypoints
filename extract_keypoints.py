@@ -55,7 +55,6 @@ def main():
     img_sample = cv2.imread('./data/data_100/Room/0/O.png')
     img_hw = img_sample.shape[:2]
     Y_remap, X_remap = make_image_map(img_hw)
-    #filter_map_hw = create_filter_map(img_hw)
 
 
     NUM = 0
@@ -168,10 +167,6 @@ def main():
 
                             pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
                             pts22_ = convert_coordinates_vectorized(pts22_, img_hw)
-                            #pts1_, desc1_ = filter_keypoints(pts1_, desc1_, filter_map_hw)
-                            #pts2_, desc2_ = filter_keypoints(pts2_, desc2_, filter_map_hw)
-                            #pts12_, desc12_ = filter_keypoints(pts12_, desc12_, filter_map_hw, invert_mask=True)
-                            #pts22_, desc22_ = filter_keypoints(pts22_, desc22_, filter_map_hw, invert_mask=True)
                             pts1_, desc1_ = filter_keypoints(pts1_, desc1_, img_hw)
                             pts2_, desc2_ = filter_keypoints(pts2_, desc2_, img_hw)
                             pts12_, desc12_ = filter_keypoints(pts12_, desc12_, img_hw, invert_mask=True)

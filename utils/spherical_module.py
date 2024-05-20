@@ -67,50 +67,6 @@ def filter_middle_latitude(pts_, desc_, img_hw, invert_mask=False):
     return pts, desc
 
 
-def create_filter_map(img_hw):
-    img_height, img_width = img_hw
-    img_height_half = img_height // 2
-    img_width_half = img_width // 2
-
-    filter_map = [[False for _ in range(img_width)] for _ in range(img_height)]
-    for i in range(img_height):
-        for j in range(img_width):
-            theta = (i - img_height_half) / img_height * np.pi
-            phi = (j - img_width_half) / img_width * 2 * np.pi
-            x, y, z = spherical_to_cartesian(phi, theta)
-            rad = np.pi / 2
-            xx, yy, zz = rotate_yaw(x, y, z, rad)
-            xx, yy, zz = rotate_pitch(xx, yy, zz, rad)
-            xx, yy, zz = rotate_yaw(xx, yy, zz, rad)
-            new_phi, new_theta = cartesian_to_spherical(xx, yy, zz)
-            i2 = int((new_theta / (np.pi / 2) + 1) * img_height_half)
-            j2 = int((new_phi / np.pi + 1) * img_width_half)
-            if abs(j2 - img_width_half) > img_width * 3 // 8:
-                filter_map[i][j] = True
-            elif abs(i - img_height_half) < abs(i2 - img_height_half):
-                filter_map[i][j] = True
-    
-    sum = 0
-    for i in range(img_height):
-        for j in range(img_width):
-            if filter_map[i][j]:
-                sum += 1
-
-    return torch.tensor(filter_map)
-
-
-def filter_keypoints3(pts_, desc_, filter_map, invert_mask=False):
-    x_coords = pts_[:, 0].long()
-    y_coords = pts_[:, 1].long()
-    mask = filter_map[y_coords, x_coords]
-
-    if invert_mask:
-        mask = ~mask
-
-    pts = pts_[mask]
-    desc = desc_[:, mask]
-    return pts, desc
-
 
 def filter_keypoints(pts_, desc_, img_hw, invert_mask=False):
     img_height = img_hw[0]
@@ -128,25 +84,6 @@ def filter_keypoints(pts_, desc_, img_hw, invert_mask=False):
     mask_y = abs(pts_[:, 1] - img_height // 2) < abs(new_i - img_height // 2) 
     mask_x = abs(pts_[:, 0] - img_width // 2) < img_width * 3 // 8
     mask = mask_y & mask_x
-    if invert_mask:
-        mask = ~mask
-
-    pts = pts_[mask]
-    desc = desc_.T[mask].T
-
-    return pts, desc
-
-def filter_keypoints3(pts_, desc_, img_hw, invert_mask=False):
-    img_height = img_hw[0]
-    img_width = img_hw[1]
-
-    theta_values = (pts_[:, 1] / img_height) * np.pi
-    phi_values = (pts_[:, 0] / img_width) * 2 * np.pi  # x座標を使用して経度を計算
-    theta_std = 4
-    phi_std = 4
-    mask_theta = (torch.pi/theta_std <= theta_values) & (theta_values < (theta_std-1)*torch.pi/theta_std)
-    mask_phi = (np.pi/phi_std <= phi_values) & (phi_values < (phi_std*2-1)*np.pi/phi_std)
-    mask = mask_theta & mask_phi
     if invert_mask:
         mask = ~mask
 
