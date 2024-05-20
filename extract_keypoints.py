@@ -39,7 +39,7 @@ def main():
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
     parser.add_argument('--points', type=int, default = 10000)
     parser.add_argument('--match', default="BF")
-    parser.add_argument('--solver', default="GSM_SK")
+    parser.add_argument('--solver', default="SK")
     parser.add_argument('--inliers', default="8PA")
     parser.add_argument('--datas'      , nargs='+')
     parser.add_argument('--descriptors', nargs='+')
@@ -55,7 +55,8 @@ def main():
     img_sample = cv2.imread('./data/data_100/Room/0/O.png')
     img_hw = img_sample.shape[:2]
     Y_remap, X_remap = make_image_map(img_hw)
-    Y_remap2, X_remap2 = make_image_map((256, 512))
+    #filter_map_hw = create_filter_map(img_hw)
+
 
     NUM = 0
     METRICS = np.zeros((len(DESCRIPTORS),2))
@@ -87,10 +88,14 @@ def main():
             scale_factor = 1.0  # How much to scale input equirectangular image by
 
             img_hw = (512, 1024)
-            path_o = path + f'/O{data_name}.png'
-            path_r = path + f'/R{data_name}.png'
-            path_o2 = path + f'/O2{data_name}.png'
-            path_r2 = path + f'/R2{data_name}.png'
+            path_o = path + f'/O.png'
+            path_r = path + f'/R.png'
+            path_o2 = path + f'/O2.png'
+            path_r2 = path + f'/R2.png'
+            path_op = path + f'/Op.png'
+            path_rp = path + f'/Rp.png'
+            path_op2 = path + f'/Op2.png'
+            path_rp2 = path + f'/Rp2.png'
             remap_t1 = remap_image(path_o, path_o2, (Y_remap, X_remap))
             remap_t2 = remap_image(path_r, path_r2, (Y_remap, X_remap))
             for indicador, descriptor in enumerate(DESCRIPTORS):
@@ -100,22 +105,23 @@ def main():
                         method_flag = 1
                         descriptor = descriptor[:-2]
                     elif descriptor[-1] == 'p':
-                        sphered = 256
                         method_flag = 2
                         descriptor = descriptor[:-2]
+                        receptive_field_l = 38
+                        img_hw_crop = (img_hw[0]//2+receptive_field_l*2+4, img_hw[1]*3//4+receptive_field_l*2+4)
+                        crop_start_xy = ((img_hw[0]-img_hw_crop[0])//2, (img_hw[1]-img_hw_crop[1])//2)
                         img_o = cv2.imread(path_o)
                         img_r = cv2.imread(path_r)
-                        new_img_wh = (512, 256)
-                        r_img_o = cv2.resize(img_o, new_img_wh, interpolation=cv2.INTER_AREA)
-                        r_img_r = cv2.resize(img_r, new_img_wh, interpolation=cv2.INTER_AREA)
-                        path_o = path + f'/O_512.png'
-                        path_r = path + f'/R_512.png'
-                        cv2.imwrite(path_o, r_img_o)
-                        cv2.imwrite(path_r, r_img_r)
-                        path_o2 = path + f'/O2_512.png'
-                        path_r2 = path + f'/R2_512.png'
-                        remap_t1 = remap_image(path_o, path_o2, (Y_remap2, X_remap2))
-                        remap_t2 = remap_image(path_r, path_r2, (Y_remap2, X_remap2))
+                        img_o_cropped = img_o[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
+                        img_r_cropped = img_r[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
+                        cv2.imwrite(path_op, img_o_cropped)
+                        cv2.imwrite(path_rp, img_r_cropped)
+                        img_o2 = cv2.imread(path_o2)
+                        img_r2 = cv2.imread(path_r2)
+                        img_o2_cropped = img_o2[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
+                        img_r2_cropped = img_r2[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
+                        cv2.imwrite(path_op2, img_o2_cropped)
+                        cv2.imwrite(path_rp2, img_r2_cropped)
                     else:
                         method_flag = 0  
                     opt, mode, sphered = get_descriptor(descriptor)
@@ -132,23 +138,45 @@ def main():
 
                     else:
                         corners = tangent_image_corners(base_order, sample_order)
-                        t_featurepoint_b = time.perf_counter()
-                        pts1_, desc1_ = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
-                        pts2_, desc2_ = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
-                        t_featurepoint_a = time.perf_counter()
-
-                        if method_flag:
-                            pts1_, desc1_ = filter_middle_latitude(pts1_, desc1_, img_hw)
-                            pts2_, desc2_ = filter_middle_latitude(pts2_, desc2_, img_hw)
-
+                        if method_flag == 0:
+                            t_featurepoint_b = time.perf_counter()
+                            pts1_, desc1_ = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
+                            pts2_, desc2_ = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
+                            t_featurepoint_a = time.perf_counter()
+                        if method_flag == 1:
+                            t_featurepoint_b = time.perf_counter()
+                            pts1_, desc1_ = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
+                            pts2_, desc2_ = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
                             pts12_, desc12_ = process_image_to_keypoints(path_o2, corners, scale_factor, base_order, sample_order, opt, mode)
                             pts22_, desc22_ = process_image_to_keypoints(path_r2, corners, scale_factor, base_order, sample_order, opt, mode)
                             pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
                             pts22_ = convert_coordinates_vectorized(pts22_, img_hw)
+                            pts1_, desc1_ = filter_middle_latitude(pts1_, desc1_, img_hw)
+                            pts2_, desc2_ = filter_middle_latitude(pts2_, desc2_, img_hw)
                             pts12_, desc12_ = filter_middle_latitude(pts12_, desc12_, img_hw, invert_mask=True)
                             pts22_, desc22_ = filter_middle_latitude(pts22_, desc22_, img_hw, invert_mask=True)
+                        elif method_flag == 2:
+                            t_featurepoint_b = time.perf_counter()
+                            pts1_, desc1_ = process_image_to_keypoints(path_op, corners, scale_factor, base_order, sample_order, opt, mode)
+                            pts2_, desc2_ = process_image_to_keypoints(path_rp, corners, scale_factor, base_order, sample_order, opt, mode)
+                            pts12_, desc12_ = process_image_to_keypoints(path_op2, corners, scale_factor, base_order, sample_order, opt, mode)
+                            pts22_, desc22_ = process_image_to_keypoints(path_rp2, corners, scale_factor, base_order, sample_order, opt, mode)
+                            pts1_ = add_offset_to_image(pts1_, crop_start_xy)
+                            pts2_ = add_offset_to_image(pts2_, crop_start_xy)
+                            pts12_ = add_offset_to_image(pts12_, crop_start_xy)
+                            pts22_ = add_offset_to_image(pts22_, crop_start_xy)
 
-
+                            pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
+                            pts22_ = convert_coordinates_vectorized(pts22_, img_hw)
+                            #pts1_, desc1_ = filter_keypoints(pts1_, desc1_, filter_map_hw)
+                            #pts2_, desc2_ = filter_keypoints(pts2_, desc2_, filter_map_hw)
+                            #pts12_, desc12_ = filter_keypoints(pts12_, desc12_, filter_map_hw, invert_mask=True)
+                            #pts22_, desc22_ = filter_keypoints(pts22_, desc22_, filter_map_hw, invert_mask=True)
+                            pts1_, desc1_ = filter_keypoints(pts1_, desc1_, img_hw)
+                            pts2_, desc2_ = filter_keypoints(pts2_, desc2_, img_hw)
+                            pts12_, desc12_ = filter_keypoints(pts12_, desc12_, img_hw, invert_mask=True)
+                            pts22_, desc22_ = filter_keypoints(pts22_, desc22_, img_hw, invert_mask=True)
+                        if method_flag:
                             pts1_ = torch.cat((pts1_, pts12_), dim=0)
                             desc1_ = torch.cat((desc1_, desc12_), dim=1)
                             pts2_ = torch.cat((pts2_, pts22_), dim=0)

@@ -318,7 +318,6 @@ def nn_match_two_way(desc1, desc2, nn_thresh = 0.7):
     return matches
 
 def process_image_to_keypoints(image_path, corners, scale_factor, base_order, sample_order, opt, mode):
-
     img = load_torch_img(image_path)[:3, ...].float() # inputs/I1.png
     img = F.interpolate(img.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
 

@@ -186,7 +186,7 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match="BF", constant
     elif match == 'FLANN_KNN':
         matches = flannknn_matcher(s_desc1, s_desc2, distance_eval_FLANN, constant)
     elif match == 'MNN':
-        if 'orb' in args_opt:
+        if args_opt in ["orb", "sphorb"]:
             matches = mnn_matcher_hamming(desc1, desc2, constant)
         else:
             matches = mnn_matcher_L2(s_desc1, s_desc2, constant)
