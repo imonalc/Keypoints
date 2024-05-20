@@ -83,6 +83,12 @@ def main():
     elif descriptor[-1] == 'p':
         method_flag = 2
         descriptor = descriptor[:-2]
+    elif descriptor[-1] == 'a':
+        method_flag = 3
+        descriptor = descriptor[:-2]
+    else:
+        method_flag = 0
+    if method_flag in [2, 3]:
         receptive_field_l = 38
         img_hw_crop = (img_hw[0]//2+receptive_field_l*2+4, img_hw[1]*3//4+receptive_field_l*2+4)
         crop_start_xy = ((img_hw[0]-img_hw_crop[0])//2, (img_hw[1]-img_hw_crop[1])//2)
@@ -98,8 +104,6 @@ def main():
         img_r2_cropped = img_r2[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
         cv2.imwrite(path_op2, img_o2_cropped)
         cv2.imwrite(path_rp2, img_r2_cropped)
-    else:
-        method_flag = 0  
     opt, mode, sphered = get_descriptor(descriptor)
 
     method_idx = 0.0
@@ -162,6 +166,22 @@ def main():
             pts2_, desc2_ = filter_keypoints(pts2_, desc2_, img_hw)
             pts12_, desc12_ = filter_keypoints(pts12_, desc12_, img_hw, invert_mask=True)
             pts22_, desc22_ = filter_keypoints(pts22_, desc22_, img_hw, invert_mask=True)
+        elif method_flag == 3:
+            t_featurepoint_b = time.perf_counter()
+            pts1_, desc1_ = process_image_to_keypoints(path_op, corners, scale_factor, base_order, sample_order, opt, mode)
+            pts2_, desc2_ = process_image_to_keypoints(path_rp, corners, scale_factor, base_order, sample_order, opt, mode)
+            pts12_, desc12_ = process_image_to_keypoints(path_op2, corners, scale_factor, base_order, sample_order, opt, mode)
+            pts22_, desc22_ = process_image_to_keypoints(path_rp2, corners, scale_factor, base_order, sample_order, opt, mode)
+            pts1_ = add_offset_to_image(pts1_, crop_start_xy)
+            pts2_ = add_offset_to_image(pts2_, crop_start_xy)
+            pts12_ = add_offset_to_image(pts12_, crop_start_xy)
+            pts22_ = add_offset_to_image(pts22_, crop_start_xy)
+            pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
+            pts22_ = convert_coordinates_vectorized(pts22_, img_hw)
+            pts1_, desc1_ = filter_keypoints_abridged(pts1_, desc1_, img_hw)
+            pts2_, desc2_ = filter_keypoints_abridged(pts2_, desc2_, img_hw)
+            pts12_, desc12_ = filter_keypoints_abridged(pts12_, desc12_, img_hw, invert_mask=True)
+            pts22_, desc22_ = filter_keypoints_abridged(pts22_, desc22_, img_hw, invert_mask=True)
         if method_flag:
             pts1_ = torch.cat((pts1_, pts12_), dim=0)
             desc1_ = torch.cat((desc1_, desc12_), dim=1)
