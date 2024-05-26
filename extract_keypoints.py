@@ -147,6 +147,7 @@ def main():
                             pts1_, desc1_ = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
                             pts2_, desc2_ = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
                             t_featurepoint_a = time.perf_counter()
+                            print(2222)
                         elif method_flag == 1:
                             t_featurepoint_b = time.perf_counter()
                             pts1_, desc1_ = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
