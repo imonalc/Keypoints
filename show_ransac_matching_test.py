@@ -208,8 +208,6 @@ def main():
         pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
         pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
         t_featurepoint_a = time.perf_counter()
-        #pts1[pts1[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
-        #pts2[pts2[:,0] > img_o.shape[1], 0] -= img_o.shape[1]
         os.chdir('../')
 
 
@@ -233,8 +231,6 @@ def main():
     print("FP:", "{:.4g}".format((t_featurepoint_a-t_featurepoint_b)/2))
     print("MC:", "{:.4g}".format((t_matching_a-t_matching_b)))
 
-    #print(R_)
-    #print(T_)
     
     vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1_[:, :2], x2_[:, :2], inlier_idx)
     vis_img = cv2.resize(vis_img,dsize=(512,512))

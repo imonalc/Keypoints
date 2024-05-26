@@ -59,7 +59,6 @@ def main():
 
     NUM = 0
     METRICS = np.zeros((len(DESCRIPTORS),2))
-    data_name = ""
     np.random.seed(0)
     data = get_data(DATAS)
     for data in DATAS:
@@ -147,7 +146,6 @@ def main():
                             pts1_, desc1_ = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
                             pts2_, desc2_ = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
                             t_featurepoint_a = time.perf_counter()
-                            print(2222)
                         elif method_flag == 1:
                             t_featurepoint_b = time.perf_counter()
                             pts1_, desc1_ = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
@@ -273,7 +271,7 @@ def main():
 
 
         for indicador, descriptor in enumerate(DESCRIPTORS):
-            base_path = f'results/data_100/FP_{args.points}{data_name}/values/'+data+'/'+descriptor+'/'+args.match+'_'+args.inliers+'_'+args.solver
+            base_path = f'results/data_100/FP_{args.points}/values/'+data+'/'+descriptor+'/'+args.match+'_'+args.inliers+'_'+args.solver
             os.system('mkdir -p '+base_path)
             np.savetxt(base_path+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
             np.savetxt(base_path+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")

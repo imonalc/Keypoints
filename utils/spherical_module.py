@@ -80,7 +80,7 @@ def filter_keypoints(pts_, desc_, img_hw, invert_mask=False):
     xx, yy, zz = rotate_pitch(xx, yy, zz, rad)
     xx, yy, zz = rotate_yaw(xx, yy, zz, rad)
     _, new_theta = cartesian_to_spherical(xx, yy, zz)
-    new_i = new_theta / torch.pi * img_height
+    new_i = (new_theta / torch.pi * img_height + img_height) % img_height
 
     mask_y = torch.abs(pts_[:, 1] - img_height // 2) < torch.abs(new_i - img_height // 2) 
     mask_x = torch.abs(pts_[:, 0] - img_width // 2) < img_width * 3 // 8

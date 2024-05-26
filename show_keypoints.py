@@ -117,9 +117,12 @@ def main():
             pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
             pts1_, desc1_ = filter_keypoints_abridged(pts1_, desc1_, img_hw)
             pts12_, desc12_ = filter_keypoints_abridged(pts12_, desc12_, img_hw, invert_mask=True)
-        if method_flag:
-            pts1_ = torch.cat((pts1_, pts12_), dim=0)
-            desc1_ = torch.cat((desc1_, desc12_), dim=1)
+        #if method_flag:
+        #    pts1_ = torch.cat((pts1_, pts12_), dim=0)
+        #    desc1_ = torch.cat((desc1_, desc12_), dim=1)
+        if True:
+            pts1_ = pts12_
+            desc1_ = desc12_
         pts1, desc1, score1 = sort_key_div(pts1_, desc1_, args.points)
         print(pts1.shape)
 
@@ -159,7 +162,7 @@ def main():
     ax.imshow(img)
     ax.get_xaxis().set_ticks([])
     ax.get_yaxis().set_ticks([])
-    ax.plot(pts1[:, 0], pts1[:, 1], 'b.', markersize=3.0)
+    ax.plot(pts1_[:, 0], pts1_[:, 1], 'b.', markersize=3.0)
     plt.axis('off')
 
     plt.show()
