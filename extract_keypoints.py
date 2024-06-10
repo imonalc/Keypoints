@@ -98,7 +98,7 @@ def main():
             remap_t2 = remap_image(path_r, path_r2, (Y_remap, X_remap))
             for indicador, descriptor in enumerate(DESCRIPTORS):
 
-                try:
+                #try:
                     if descriptor[-1] == 'P':
                         method_flag = 1
                         descriptor = descriptor[:-2]
@@ -127,8 +127,8 @@ def main():
                         t_featurepoint_b = time.perf_counter()
                         pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
                         pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
-                        pts1, desc1 = convert_sphorb(pts1, desc1)
-                        pts2, desc2 = convert_sphorb(pts2, desc2)
+                        pts1_, desc1_ = convert_sphorb(pts1, desc1)
+                        pts2_, desc2_ = convert_sphorb(pts2, desc2)
                         t_featurepoint_a = time.perf_counter()
                         os.chdir('../')
 
@@ -140,7 +140,7 @@ def main():
                             pts2_, desc2_ = process_image_to_keypoints(path_r, scale_factor, base_order, sample_order, opt, mode)
                             t_featurepoint_a = time.perf_counter()
                         elif method_flag == 1:
-                            pts1_, desc1_, pts2_, desc2_, pts12_, desc12_, pts22_, desc22_ = method_P(path_o, path_r, path_o2, path_r2, args, img_hw, crop_start_xy, scale_factor, base_order, sample_order, opt, mode)
+                            pts1_, desc1_, pts2_, desc2_, pts12_, desc12_, pts22_, desc22_ = method_P(path_o, path_r, path_o2, path_r2, args, img_hw, scale_factor, base_order, sample_order, opt, mode)
                         elif method_flag == 2:
                             pts1_, desc1_, pts2_, desc2_, pts12_, desc12_, pts22_, desc22_ = method_p(path_op, path_rp, path_op2, path_rp2, args, img_hw, crop_start_xy, scale_factor, base_order, sample_order, opt, mode)
                         elif method_flag == 3:
@@ -216,8 +216,8 @@ def main():
                         METRICS[indicador,:] = METRICS[indicador,:] + [x1.shape[0], (s_pts1.shape[0]+s_pts2.shape[1])/2]
 
                         std.append(x1.shape[0])
-                except:     
-                    print("Unexpected error:",indicador, opt, method_idx)
+                #except:     
+                #    print("Unexpected error:",indicador, opt, method_idx)
 
 
         for indicador, descriptor in enumerate(DESCRIPTORS):
@@ -259,7 +259,7 @@ def convert_sphorb(pts, desc):
     return pts_tensor, desc_tensor
 
 
-def method_P(path_o, path_r, path_o2, path_r2, args, img_hw, crop_start_xy, scale_factor, base_order, sample_order, opt, mode):
+def method_P(path_o, path_r, path_o2, path_r2, args, img_hw, scale_factor, base_order, sample_order, opt, mode):
     pts1_, desc1_ = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode)
     pts2_, desc2_ = process_image_to_keypoints(path_r, scale_factor, base_order, sample_order, opt, mode)
     pts12_, desc12_ = process_image_to_keypoints(path_o2, scale_factor, base_order, sample_order, opt, mode)
