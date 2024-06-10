@@ -25,7 +25,7 @@ def process_img(img):
     grayim = (grayim.astype('float32') / 255.)
     return grayim
 
-def computes_superpoint_keypoints(img, opt, nms_dist=4, conf_thresh = 0.015, nn_thresh =0.7, cuda = True):
+def computes_superpoint_keypoints(img, opt, nms_dist=3, conf_thresh = 0.005, nn_thresh =0.7, cuda = True):  # 4 0.015, 0.7
     fe = train_sp.SuperPointFrontend(weights_path = 'utils/models/superpoint-trained.pth.tar', 
                                      nms_dist= nms_dist, 
                                      conf_thresh = conf_thresh, 
@@ -317,7 +317,7 @@ def nn_match_two_way(desc1, desc2, nn_thresh = 0.7):
     #return np.sort(matches, axis=1)
     return matches
 
-def process_image_to_keypoints(image_path, corners, scale_factor, base_order, sample_order, opt, mode):
+def process_image_to_keypoints(image_path, scale_factor, base_order, sample_order, opt, mode):
     img = load_torch_img(image_path)[:3, ...].float() # inputs/I1.png
     img = F.interpolate(img.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
 

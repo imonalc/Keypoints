@@ -104,8 +104,8 @@ def main():
                 else:
                     corners = tangent_image_corners(base_order, sample_order)
                     t_featurepoint_b = time.perf_counter()
-                    pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
-                    pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
+                    pts1, desc1 = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode)
+                    pts2, desc2 = process_image_to_keypoints(path_r, scale_factor, base_order, sample_order, opt, mode)
                     t_featurepoint_a = time.perf_counter()
 
                 num_points = args.points

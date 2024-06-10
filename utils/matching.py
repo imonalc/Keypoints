@@ -89,13 +89,15 @@ def hamming_distance_optimized(desc1, desc2):
 def hamming_distance(x, y):
     return np.sum(x != y, axis=-1)
 
-def mnn_matcher_hamming(desc1, desc2, constant_cut):
+
+def mnn_matcher_hamming(desc1, desc2, constant_cut=0.0):
+    desc1 = desc1.astype(np.uint8)
+    desc2 = desc2.astype(np.uint8)
     desc1 = np.unpackbits(desc1, axis=1)
     desc2 = np.unpackbits(desc2, axis=1)
-    #distances = distance.cdist(desc1, desc2, metric=hamming_distance)
+    
+
     distances = hamming_distance_optimized(desc1, desc2)
-
-
     nn12 = np.argmin(distances, axis=1)
     nn21 = np.argmin(distances, axis=0)
     ids1 = np.arange(desc1.shape[0])
@@ -120,7 +122,7 @@ def mnn_matcher_hamming(desc1, desc2, constant_cut):
 
 
 
-def mnn_matcher_L2(desc1, desc2, constant_cut):
+def mnn_matcher_L2(desc1, desc2, constant_cut=0.0):
     d1_square = np.sum(np.square(desc1), axis=1, keepdims=True)
     d2_square = np.sum(np.square(desc2), axis=1, keepdims=True)
     distances = np.sqrt(d1_square - 2 * np.dot(desc1, desc2.T) + d2_square.T)
@@ -154,11 +156,12 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match="BF", constant
         n_key = int(porce/100 * pts1.shape[0])
     else:
         n_key = int(opt)
-
+    
     s_pts1  = pts1.copy()[:n_key,:]
     s_pts2  = pts2.copy()[:n_key,:]
     s_desc1 = desc1.copy().astype('float32')[:n_key,:]
     s_desc2 = desc2.copy().astype('float32')[:n_key,:]
+
 
     if 'orb' in args_opt:
         s_desc1 = s_desc1.astype(np.uint8)
@@ -187,18 +190,16 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match="BF", constant
         matches = flannknn_matcher(s_desc1, s_desc2, distance_eval_FLANN, constant)
     elif match == 'MNN':
         if args_opt in ["orb", "sphorb"]:
-            matches = mnn_matcher_hamming(desc1, desc2, constant)
+            matches = mnn_matcher_hamming(desc1, desc2)
         else:
-            matches = mnn_matcher_L2(s_desc1, s_desc2, constant)
+            matches = mnn_matcher_L2(s_desc1, s_desc2)
     else:
         raise ValueError("Invalid matching method specified.")
     
-
     M = np.zeros((2,len(matches)))
     for ind, match in zip(np.arange(len(matches)),matches):
         M[0,ind] = match.queryIdx
         M[1,ind] = match.trainIdx
-
 
     return s_pts1, s_pts2, s_pts1[M[0,:].astype(int),:3], s_pts2[M[1,:].astype(int),:3]
 

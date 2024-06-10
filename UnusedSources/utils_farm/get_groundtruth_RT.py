@@ -85,8 +85,8 @@ def main():
                 # ----------------------------------------------
                 # 80 baricenter points
                 corners = tangent_image_corners(base_order, sample_order)
-                pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
-                pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
+                pts1, desc1 = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode)
+                pts2, desc2 = process_image_to_keypoints(path_r, scale_factor, base_order, sample_order, opt, mode)
                 pts1, pts2, desc1, desc2, _, _ = sort_key(pts1, pts2, desc1, desc2, args.points)
 
             else:

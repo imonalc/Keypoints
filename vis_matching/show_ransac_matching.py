@@ -86,8 +86,8 @@ method_idx = 0
 
     if opt != 'sphorb':
         corners = tangent_image_corners(base_order, sample_order)
-        pts1, desc1 = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
-        pts2, desc2 = process_image_to_keypoints(path_r, corners, scale_factor, base_order, sample_order, opt, mode)
+        pts1, desc1 = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode)
+        pts2, desc2 = process_image_to_keypoints(path_r, scale_factor, base_order, sample_order, opt, mode)
         print(pts1.shape, desc1.shape)
         print(pts1[:5])
         pts1[pts1[:,0] > img_o.shape[1], 0] -= img_o.shape[1]

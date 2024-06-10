@@ -66,8 +66,8 @@ def main():
         method_flag = 3
         descriptor = descriptor[:-2]
     if method_flag in [2, 3]:
-        receptive_field_l = 38
-        img_hw_crop = (img_hw[0]//2+receptive_field_l*2+4, img_hw[1]*3//4+receptive_field_l*2+4)
+        padding_length = 38
+        img_hw_crop = (img_hw[0]//2+padding_length*2+4, img_hw[1]*3//4+padding_length*2+4)
         crop_start_xy = ((img_hw[0]-img_hw_crop[0])//2, (img_hw[1]-img_hw_crop[1])//2)
         img_o = cv2.imread(path_o)
         img_o_cropped = img_o[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
@@ -90,19 +90,19 @@ def main():
         corners = tangent_image_corners(base_order, sample_order)
         if method_flag == 0:
             t_featurepoint_b = time.perf_counter()
-            pts1_, desc1_ = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
+            pts1_, desc1_ = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode)
             t_featurepoint_a = time.perf_counter()
         elif method_flag == 1:
             t_featurepoint_b = time.perf_counter()
-            pts1_, desc1_ = process_image_to_keypoints(path_o, corners, scale_factor, base_order, sample_order, opt, mode)
-            pts12_, desc12_ = process_image_to_keypoints(path_o2, corners, scale_factor, base_order, sample_order, opt, mode)
+            pts1_, desc1_ = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode)
+            pts12_, desc12_ = process_image_to_keypoints(path_o2, scale_factor, base_order, sample_order, opt, mode)
             pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
             pts1_, desc1_ = filter_middle_latitude(pts1_, desc1_, img_hw)
             pts12_, desc12_ = filter_middle_latitude(pts12_, desc12_, img_hw, invert_mask=True)
         elif method_flag == 2:
             t_featurepoint_b = time.perf_counter()
-            pts1_, desc1_ = process_image_to_keypoints(path_op, corners, scale_factor, base_order, sample_order, opt, mode)
-            pts12_, desc12_ = process_image_to_keypoints(path_op2, corners, scale_factor, base_order, sample_order, opt, mode)
+            pts1_, desc1_ = process_image_to_keypoints(path_op, scale_factor, base_order, sample_order, opt, mode)
+            pts12_, desc12_ = process_image_to_keypoints(path_op2, scale_factor, base_order, sample_order, opt, mode)
             pts1_ = add_offset_to_image(pts1_, crop_start_xy)
             pts12_ = add_offset_to_image(pts12_, crop_start_xy)
             pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
@@ -110,8 +110,8 @@ def main():
             pts12_, desc12_ = filter_keypoints(pts12_, desc12_, img_hw, invert_mask=True)
         elif method_flag == 3:
             t_featurepoint_b = time.perf_counter()
-            pts1_, desc1_ = process_image_to_keypoints(path_op, corners, scale_factor, base_order, sample_order, opt, mode)
-            pts12_, desc12_ = process_image_to_keypoints(path_op2, corners, scale_factor, base_order, sample_order, opt, mode)
+            pts1_, desc1_ = process_image_to_keypoints(path_op, scale_factor, base_order, sample_order, opt, mode)
+            pts12_, desc12_ = process_image_to_keypoints(path_op2, scale_factor, base_order, sample_order, opt, mode)
             pts1_ = add_offset_to_image(pts1_, crop_start_xy)
             pts12_ = add_offset_to_image(pts12_, crop_start_xy)
             pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
