@@ -98,7 +98,7 @@ def main():
             remap_t2 = remap_image(path_r, path_r2, (Y_remap, X_remap))
             for indicador, descriptor in enumerate(DESCRIPTORS):
 
-                #try:
+                try:
                     if descriptor[-1] == 'P':
                         method_flag = 1
                         descriptor = descriptor[:-2]
@@ -112,7 +112,7 @@ def main():
                         method_flag = 0
                     
                     if method_flag in [2, 3]:
-                        padding_length = 40
+                        padding_length = 50
                         img_hw_crop = (img_hw[0]//2+padding_length*2+2, img_hw[1]*3//4+padding_length*2+2)
                         crop_start_xy = ((img_hw[0]-img_hw_crop[0])//2 - 1, (img_hw[1]-img_hw_crop[1])//2 - 1)
                         proposed_image_mapping(path_o, path_r, path_o2, path_r2, path_op, path_rp, path_op2, path_rp2, img_hw, crop_start_xy, img_hw_crop)
@@ -205,7 +205,7 @@ def main():
 
                         R_ERROR[indicador].append(R_error)
                         T_ERROR[indicador].append(T_error)
-                        TIMES_FP[indicador].append((t_featurepoint_a-t_featurepoint_b)/2+remap_t1+remap_t2)
+                        TIMES_FP[indicador].append((t_featurepoint_a-t_featurepoint_b)/2)
                         TIMES_MC[indicador].append(t_matching_a-t_matching_b)
                         TIMES_PE[indicador].append(t_poseestimate_a-t_poseestimate_b)
                         MATCHING_SCORE[indicador].append(count_inliers / len_pts)
@@ -216,8 +216,8 @@ def main():
                         METRICS[indicador,:] = METRICS[indicador,:] + [x1.shape[0], (s_pts1.shape[0]+s_pts2.shape[1])/2]
 
                         std.append(x1.shape[0])
-                #except:     
-                #    print("Unexpected error:",indicador, opt, method_idx)
+                except:     
+                    print("Unexpected error:",indicador, opt, method_idx)
 
 
         for indicador, descriptor in enumerate(DESCRIPTORS):
@@ -290,11 +290,11 @@ def method_p(path_op, path_rp, path_op2, path_rp2, args, img_hw, crop_start_xy, 
     pts2_, desc2_ = filter_keypoints(pts2_, desc2_, img_hw)
     pts12_, desc12_ = filter_keypoints(pts12_, desc12_, img_hw, invert_mask=True)
     pts22_, desc22_ = filter_keypoints(pts22_, desc22_, img_hw, invert_mask=True)
-    points_half = args.points // 2
-    pts1_, desc1_ = sort_key_div_torch(pts1_, desc1_, points_half)
-    pts2_, desc2_ = sort_key_div_torch(pts2_, desc2_, points_half)
-    pts12_, desc12_ = sort_key_div_torch(pts12_, desc12_, points_half)
-    pts22_, desc22_ = sort_key_div_torch(pts22_, desc22_, points_half)
+    #points_half = args.points // 2
+    #pts1_, desc1_ = sort_key_div_torch(pts1_, desc1_, points_half)
+    #pts2_, desc2_ = sort_key_div_torch(pts2_, desc2_, points_half)
+    #pts12_, desc12_ = sort_key_div_torch(pts12_, desc12_, points_half)
+    #pts22_, desc22_ = sort_key_div_torch(pts22_, desc22_, points_half)
 
     return pts1_, desc1_, pts2_, desc2_, pts12_, desc12_, pts22_, desc22_
 
@@ -315,12 +315,6 @@ def method_a(path_op, path_rp, path_op2, path_rp2, args, img_hw, crop_start_xy, 
     pts2_, desc2_ = filter_keypoints_abridged(pts2_, desc2_, img_hw)
     pts12_, desc12_ = filter_keypoints_abridged(pts12_, desc12_, img_hw, invert_mask=True)
     pts22_, desc22_ = filter_keypoints_abridged(pts22_, desc22_, img_hw, invert_mask=True)
-
-    points_half = args.points // 2
-    pts1_, desc1_ = sort_key_div_torch(pts1_, desc1_, points_half)
-    pts2_, desc2_ = sort_key_div_torch(pts2_, desc2_, points_half)
-    pts12_, desc12_ = sort_key_div_torch(pts12_, desc12_, points_half)
-    pts22_, desc22_ = sort_key_div_torch(pts22_, desc22_, points_half)
 
     return pts1_, desc1_, pts2_, desc2_, pts12_, desc12_, pts22_, desc22_
 
