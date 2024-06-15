@@ -25,7 +25,7 @@ def process_img(img):
     grayim = (grayim.astype('float32') / 255.)
     return grayim
 
-def computes_superpoint_keypoints(img, opt, nms_dist=3, conf_thresh = 0.005, nn_thresh =0.7, cuda = True):  # 4 0.015 or 3 0.005
+def computes_superpoint_keypoints(img, opt, nms_dist=4, conf_thresh = 0.015, nn_thresh =0.7, cuda = True):  # 4 0.015 or 3 0.005
     fe = train_sp.SuperPointFrontend(weights_path = 'utils/models/superpoint-trained.pth.tar', 
                                      nms_dist= nms_dist, 
                                      conf_thresh = conf_thresh, 

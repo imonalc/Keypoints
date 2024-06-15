@@ -234,6 +234,10 @@ def get_descriptor(descriptor):
     if descriptor[0] == 't':
         descriptor_main = descriptor_main[1:]
         image_mode = 'tangent'
+    elif descriptor[0] == 'c':
+        descriptor_main = descriptor_main[1:]
+        image_mode = 'cube'
+    
     descriptor_configs = {
         'Proposed': ('superpoint', image_mode, 512),
         'sphorb': ('sphorb', image_mode, 640),

@@ -290,11 +290,6 @@ def method_p(path_op, path_rp, path_op2, path_rp2, args, img_hw, crop_start_xy, 
     pts2_, desc2_ = filter_keypoints(pts2_, desc2_, img_hw)
     pts12_, desc12_ = filter_keypoints(pts12_, desc12_, img_hw, invert_mask=True)
     pts22_, desc22_ = filter_keypoints(pts22_, desc22_, img_hw, invert_mask=True)
-    #points_half = args.points // 2
-    #pts1_, desc1_ = sort_key_div_torch(pts1_, desc1_, points_half)
-    #pts2_, desc2_ = sort_key_div_torch(pts2_, desc2_, points_half)
-    #pts12_, desc12_ = sort_key_div_torch(pts12_, desc12_, points_half)
-    #pts22_, desc22_ = sort_key_div_torch(pts22_, desc22_, points_half)
 
     return pts1_, desc1_, pts2_, desc2_, pts12_, desc12_, pts22_, desc22_
 

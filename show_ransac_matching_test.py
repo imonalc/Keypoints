@@ -183,10 +183,10 @@ def main():
             pts12_, desc12_ = filter_keypoints_abridged(pts12_, desc12_, img_hw, invert_mask=True)
             pts22_, desc22_ = filter_keypoints_abridged(pts22_, desc22_, img_hw, invert_mask=True)
         if method_flag:
-            pts1_ = torch.cat((pts1_, pts12_), dim=0)
-            desc1_ = torch.cat((desc1_, desc12_), dim=1)
-            pts2_ = torch.cat((pts2_, pts22_), dim=0)
-            desc2_ = torch.cat((desc2_, desc22_), dim=1)
+            #pts1_ = torch.cat((pts1_, pts12_), dim=0)
+            #desc1_ = torch.cat((desc1_, desc12_), dim=1)
+            #pts2_ = torch.cat((pts2_, pts22_), dim=0)
+            #desc2_ = torch.cat((desc2_, desc22_), dim=1)
             t_featurepoint_a = time.perf_counter()+remap_t1+remap_t2
             
 

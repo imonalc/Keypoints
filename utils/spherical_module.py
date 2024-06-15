@@ -52,7 +52,7 @@ def filter_middle_latitude(pts_, desc_, img_hw, invert_mask=False):
     img_width = img_hw[1]
 
     theta_values = (pts_[:, 1] / img_height) * torch.pi
-    phi_values = (pts_[:, 0] / img_width) * 2 * torch.pi  # x座標を使用して経度を計算
+    phi_values = (pts_[:, 0] / img_width) * 2 * torch.pi
     theta_std = 6
     phi_std = 8
     mask_theta = (torch.pi/theta_std <= theta_values) & (theta_values < (theta_std-1)*torch.pi/theta_std)

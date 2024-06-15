@@ -120,9 +120,9 @@ def main():
         #if method_flag:
         #    pts1_ = torch.cat((pts1_, pts12_), dim=0)
         #    desc1_ = torch.cat((desc1_, desc12_), dim=1)
-        if True:
-            pts1_ = pts12_
-            desc1_ = desc12_
+        #if True:
+        #    pts1_ = pts12_
+        #    desc1_ = desc12_
         pts1, desc1, score1 = sort_key_div(pts1_, desc1_, args.points)
         print(pts1.shape)
 
