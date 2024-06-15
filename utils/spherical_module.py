@@ -116,6 +116,7 @@ def filter_keypoints_abridged(pts_, desc_, img_hw, invert_mask=False):
     return pts, desc
 
 
+
 def add_offset_to_image(pts_, crop_start_xy):
     pts_[:, 0] += crop_start_xy[1]
     pts_[:, 1] += crop_start_xy[0]

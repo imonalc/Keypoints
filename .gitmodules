@@ -7,3 +7,6 @@
 [submodule "LightGlue"]
 	path = LightGlue
 	url = git@github.com:cvg/LightGlue.git
+[submodule "utils/ALIKED"]
+	path = utils/ALIKED
+	url = git@github.com:Shiaoming/ALIKED.git

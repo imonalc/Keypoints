@@ -82,6 +82,22 @@ def flannknn_matcher(s_desc1, s_desc2, distance_eval, constant):
     return matches
 
 
+
+def mnn_matcher_aliked(desc1, desc2):
+    sim = desc1 @ desc2.transpose()
+    sim[sim < 0.75] = 0
+    nn12 = np.argmax(sim, axis=1)
+    nn21 = np.argmax(sim, axis=0)
+    ids1 = np.arange(0, sim.shape[0])
+    mask = (ids1 == nn21[nn12])
+    matches = np.stack([ids1[mask], nn12[mask]])
+    matches_idx = matches.transpose()
+    matchesD = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
+    
+    return matchesD
+
+
+
 def hamming_distance_optimized(desc1, desc2):
     return np.bitwise_xor(desc1[:, None, :], desc2).sum(axis=-1)
 
@@ -172,8 +188,9 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match="BF", constant
         distance_eval = cv2.NORM_L2
         distance_eval_FLANN = 1
     
-
-    if match == 'BF':
+    if "aliked" in args_opt:
+        matches = mnn_matcher_aliked(s_desc1, s_desc2)
+    elif match == 'BF':
         bf = cv2.BFMatcher(distance_eval, True)
         matches = bf.match(s_desc1, s_desc2)
     elif match == 'BF_KNN':
@@ -183,8 +200,8 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match="BF", constant
             constant = 0.9
         elif args_opt == "sift":
             constant = 0.75
-        elif args_opt == "alike":
-            constant = 0.95
+        #elif args_opt == "alike":
+        #    constant = 0.98
         matches = bfknn_matcher(s_desc1, s_desc2, distance_eval, constant)
     elif match == 'FLANN_KNN':
         matches = flannknn_matcher(s_desc1, s_desc2, distance_eval_FLANN, constant)
@@ -246,6 +263,7 @@ def get_descriptor(descriptor):
         'spoint': ('superpoint', image_mode, 512),
         'akaze': ('akaze', image_mode, 512),
         'alike': ('alike', image_mode, 512),
+        'aliked': ('aliked', image_mode, 512),
     }
 
     return descriptor_configs.get(descriptor_main, ('unknown', 'unknown', 0,))

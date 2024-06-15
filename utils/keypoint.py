@@ -9,6 +9,22 @@ import numpy as np
 import utils.superpoint.magic_sp.superpoint as magic_sp
 import utils.superpoint.train_sp.superpoint as train_sp
 from utils.ALIKE.alike import ALike, configs
+from utils.ALIKED.nets.aliked import ALIKED
+
+## call instance
+orb_model = cv2.ORB_create(scoreType=cv2.ORB_HARRIS_SCORE, nfeatures=10000)
+sift_model = cv2.SIFT_create(nfeatures=10000)
+akaze_model = cv2.AKAZE_create()
+sp_model = train_sp.SuperPointFrontend(weights_path = 'utils/models/superpoint-trained.pth.tar', 
+                                 nms_dist= 4, #nms_dist, 
+                                 conf_thresh = 0.015, #conf_thresh, 
+                                 nn_thresh= 0.7, #nn_thresh, 
+                                 cuda = True )
+aliked_model = ALIKED(model_name="aliked-n16",
+    device="cuda",
+    top_k=-1,
+    scores_th=0.2,
+    n_limit=10000)
 
 
 def process_img(img):
@@ -25,16 +41,10 @@ def process_img(img):
     grayim = (grayim.astype('float32') / 255.)
     return grayim
 
+
+
 def computes_superpoint_keypoints(img, opt, nms_dist=4, conf_thresh = 0.015, nn_thresh =0.7, cuda = True):  # 4 0.015 or 3 0.005
-    fe = train_sp.SuperPointFrontend(weights_path = 'utils/models/superpoint-trained.pth.tar', 
-                                     nms_dist= nms_dist, 
-                                     conf_thresh = conf_thresh, 
-                                     nn_thresh= nn_thresh, 
-                                     cuda = cuda )
-
-
-    pts, desc, heatmap = fe.run(img)
-    #print(pts.shape)
+    pts, desc, _ = sp_model.run(img)
     kpt_details = np.zeros((pts.shape[1],4))
     kpt_details[:,0] = pts[0,:]
     kpt_details[:,1] = pts[1,:]
@@ -44,6 +54,7 @@ def computes_superpoint_keypoints(img, opt, nms_dist=4, conf_thresh = 0.015, nn_
         desc = np.transpose(desc, [1,0])
         return torch.from_numpy(kpt_details), torch.from_numpy(desc)
     return None
+
 
 
 def computes_alike_keypoints(img, model_nm="alike-n", device="cuda", top_k=-1, scores_th=0.2, n_limit=10000):
@@ -73,6 +84,28 @@ def computes_alike_keypoints(img, model_nm="alike-n", device="cuda", top_k=-1, s
     return None
 
 
+
+def computes_aliked_keypoints(img, model_nm="aliked-n32", device="cuda", top_k=-1, scores_th=0.2, n_limit=10000):
+    img_rgb = cv2.cvtColor(img.permute(1, 2, 0).numpy(), cv2.COLOR_BGR2RGB)
+    pred = aliked_model.run(img_rgb)
+    kpts = pred["keypoints"]
+    desc = pred["descriptors"]
+    scores = pred["scores"]
+    #print(kpts.shape, desc.shape, scores.shape, score_map.shape)
+
+    kpt_details = np.zeros((kpts.shape[0],4))
+
+    kpt_details[:,0] = kpts[:,0]
+    kpt_details[:,1] = kpts[:,1]
+    kpt_details[:,2] = scores.squeeze()
+    kpt_details[:,3] = scores.squeeze()
+
+    if len(kpts)>0:
+        #desc = np.transpose(desc, [1,0])
+        return torch.from_numpy(kpt_details), torch.from_numpy(desc)
+    return None
+
+
 def format_keypoints(keypoints, desc):
     """
     Formatear puntos de interes y descriptores de opencv para su posterior tratamiento
@@ -84,14 +117,10 @@ def format_keypoints(keypoints, desc):
     desc = torch.from_numpy(desc)
     return torch.cat((coords, responsex.unsqueeze(1), responsey.unsqueeze(1)), -1), desc
 
+
 def computes_orb_keypoints(img):
-
     img = torch2numpy(img.byte())
-
-    # Initialize OpenCV ORB detector
-    orb = cv2.ORB_create(scoreType=cv2.ORB_HARRIS_SCORE, nfeatures=10000)
-
-    keypoints, desc = orb.detectAndCompute(img, None)
+    keypoints, desc = orb_model.detectAndCompute(img, None)
 
     # Keypoints is a list of lenght N, desc is N x 128
     if len(keypoints) > 0:
@@ -101,10 +130,7 @@ def computes_orb_keypoints(img):
 
 def computes_akaze_keypoints(img):
     img = torch2numpy(img.byte())
-
-    akaze = cv2.AKAZE_create()
-
-    keypoints, descriptors = akaze.detectAndCompute(img, None)
+    keypoints, descriptors = akaze_model.detectAndCompute(img, None)
 
     if len(keypoints) > 0:
         return format_keypoints(keypoints, descriptors)
@@ -127,13 +153,8 @@ def computes_surf_keypoints(img):
 
 
 def computes_sift_keypoints(img):
-
     img = torch2numpy(img.byte())
-
-    # Initialize OpenCV ORB detector
-    sift = cv2.SIFT_create(nfeatures=10000)
-
-    keypoints, desc = sift.detectAndCompute(img, None)
+    keypoints, desc = sift_model.detectAndCompute(img, None)
 
     # Keypoints is a list of lenght N, desc is N x 128
     if len(keypoints) > 0:
@@ -179,6 +200,9 @@ def keypoint_tangent_images(tex_image, base_order, sample_order, image_shape, op
         
         if opt == 'alike':
             kp_details = computes_alike_keypoints(img)
+        
+        if opt == 'aliked':
+            kp_details = computes_aliked_keypoints(img)
         
         if opt == 'akaze':
             kp_details = computes_akaze_keypoints(img)
@@ -244,6 +268,9 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
 
     if opt == 'alike':
         erp_kp_details = computes_alike_keypoints(img)
+    
+    if opt == 'aliked':
+        erp_kp_details = computes_aliked_keypoints(img)
 
     if opt == 'akaze':
         erp_kp_details = computes_akaze_keypoints(img)
@@ -329,6 +356,9 @@ def process_image_to_keypoints(image_path, scale_factor, base_order, sample_orde
         image_kp, image_desc = keypoint_tangent_images(tex_image, base_order, sample_order, img.shape[-2:], opt , 0)
 
     if mode == 'erp':
+        image_kp, image_desc = keypoint_equirectangular(img, opt)
+    
+    if mode == 'cube':
         image_kp, image_desc = keypoint_equirectangular(img, opt)
 
     #print(tangent_image_desc.shape)

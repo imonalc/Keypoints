@@ -17,7 +17,6 @@ def create_equirectangler_to_bottom_and_top_map(input_w, input_h, output_sqr, z)
                           torch.linspace(-output_sqr/2.0, output_sqr/2.0-1, output_sqr),indexing='ij')
     x, y = x.to(device), y.to(device)
     z = torch.tensor(z).to(device)
-    #print(x.shape, z)
     
     rho = torch.sqrt(x**2 + y**2 + z**2)
     norm_theta = get_theta_torch(x, y) / (2 * math.pi)
@@ -86,13 +85,11 @@ def create_cube_imgs(img):
     z = (output_sqr / (2.0 * normalized_f))
     bottom_map_x, bottom_map_y = create_equirectangler_to_bottom_and_top_map(input_w, input_h, output_sqr, z)
     bottom_img = cv2.remap(img, bottom_map_x.astype("float32"), bottom_map_y.astype("float32"), cv2.INTER_CUBIC)
-    #bottom_img = cv2.rotate(bottom_img, cv2.ROTATE_90_CLOCKWISE)
 
     z = (-1) * (output_sqr / (2.0 * normalized_f))
     top_map_x, top_map_y = create_equirectangler_to_bottom_and_top_map(input_w, input_h, output_sqr, z)
     top_img = cv2.remap(img, top_map_x.astype("float32"), top_map_y.astype("float32"), cv2.INTER_CUBIC)
     top_img = cv2.flip(top_img, 0)
-    #top_img = cv2.rotate(top_img, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
     x = (-1) * (output_sqr / (2.0 * normalized_f))
     front_map_x, front_map_y = create_equirectangler_to_front_and_back_map(input_w, input_h, output_sqr, x)
