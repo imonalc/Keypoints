@@ -1,58 +1,36 @@
 import sys
 import os
-sys.path.append('.'+'/fivepoint')
-import build.fivep as f
-import time
-import torch
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
-from spherical_distortion.functional import create_tangent_images, unresample
-from spherical_distortion.util import *
-import matplotlib.pyplot as plt
-from skimage import io
-import os
-import cv2
+sys.path.append(os.getcwd()+'/fivepoint')
+import fivepoint.build.fivep as f
 
-import sys
+import time
+from spherical_distortion.util import *
+
+import torch
 import pandas as pd
 import numpy as np
-import _spherical_distortion_ext._mesh as _mesh
 import argparse
-from PIL import Image
-import random
 
-from random import sample
-import imageio
-from scipy.spatial.transform import Rotation as Rot
 
 from utils.coord    import coord_3d
 from utils.ransac   import *
 from utils.keypoint import *
 from utils.metrics  import *
+from utils.method  import *
 from utils.camera_recovering import *
 from utils.matching import *
 from utils.spherical_module import *
 
-from os import listdir
-from os.path import isfile, join, isdir
-from tqdm import tqdm
-from torchvision import transforms
-
-
-sys.path.append('.'+'/SPHORB-master')
+sys.path.append(os.getcwd()+'/SPHORB-master')
 
 import build1.sphorb_cpp as sphorb
-
-#sys.path.append('..')
-#from SuperGluePretrainedNetwork.models.matching import Matching
-
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
-    parser.add_argument('--points', type=int, default = 10000)
+    parser.add_argument('--points', type=int, default = 1000)
     parser.add_argument('--match', default="BF_KNN")
     parser.add_argument('--g_metrics',default="False")
     parser.add_argument('--solver', default="GSM_wRT")
@@ -88,22 +66,12 @@ def main():
         descriptor = descriptor[:-2]
     else:
         method_flag = 0
+    
     if method_flag in [2, 3]:
         padding_length = 38
-        img_hw_crop = (img_hw[0]//2+padding_length*2+4, img_hw[1]*3//4+padding_length*2+4)
-        crop_start_xy = ((img_hw[0]-img_hw_crop[0])//2, (img_hw[1]-img_hw_crop[1])//2)
-        img_o = cv2.imread(path_o)
-        img_r = cv2.imread(path_r)
-        img_o_cropped = img_o[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
-        img_r_cropped = img_r[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
-        cv2.imwrite(path_op, img_o_cropped)
-        cv2.imwrite(path_rp, img_r_cropped)
-        img_o2 = cv2.imread(path_o2)
-        img_r2 = cv2.imread(path_r2)
-        img_o2_cropped = img_o2[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
-        img_r2_cropped = img_r2[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
-        cv2.imwrite(path_op2, img_o2_cropped)
-        cv2.imwrite(path_rp2, img_r2_cropped)
+        img_hw_crop = (img_hw[0]//2+padding_length*2+2, img_hw[1]*3//4+padding_length*2+2)
+        crop_start_xy = ((img_hw[0]-img_hw_crop[0])//2 - 1, (img_hw[1]-img_hw_crop[1])//2 - 1)
+        proposed_image_mapping(path_o, path_r, path_o2, path_r2, path_op, path_rp, path_op2, path_rp2, img_hw, crop_start_xy, img_hw_crop)
     opt, mode, sphered = get_descriptor(descriptor)
 
     method_idx = 0.0
@@ -132,72 +100,24 @@ def main():
     
 
     if opt != 'sphorb':
-        corners = tangent_image_corners(base_order, sample_order)
+        #corners = tangent_image_corners(base_order, sample_order)
+        t_featurepoint_b = time.perf_counter()
         if method_flag == 0:
-            t_featurepoint_b = time.perf_counter()
             pts1_, desc1_ = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode)
             pts2_, desc2_ = process_image_to_keypoints(path_r, scale_factor, base_order, sample_order, opt, mode)
             t_featurepoint_a = time.perf_counter()
-        if method_flag == 1:
-            t_featurepoint_b = time.perf_counter()
-            pts1_, desc1_ = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode)
-            pts2_, desc2_ = process_image_to_keypoints(path_r, scale_factor, base_order, sample_order, opt, mode)
-            pts12_, desc12_ = process_image_to_keypoints(path_o2, scale_factor, base_order, sample_order, opt, mode)
-            pts22_, desc22_ = process_image_to_keypoints(path_r2, scale_factor, base_order, sample_order, opt, mode)
-            pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
-            pts22_ = convert_coordinates_vectorized(pts22_, img_hw)
-            pts1_, desc1_ = filter_middle_latitude(pts1_, desc1_, img_hw)
-            pts2_, desc2_ = filter_middle_latitude(pts2_, desc2_, img_hw)
-            pts12_, desc12_ = filter_middle_latitude(pts12_, desc12_, img_hw, invert_mask=True)
-            pts22_, desc22_ = filter_middle_latitude(pts22_, desc22_, img_hw, invert_mask=True)
+        elif method_flag == 1:
+            pts1_, desc1_, pts2_, desc2_, pts12_, desc12_, pts22_, desc22_ = method_P(path_o, path_r, path_o2, path_r2, args, img_hw, scale_factor, base_order, sample_order, opt, mode)
         elif method_flag == 2:
-            t_featurepoint_b = time.perf_counter()
-            pts1_, desc1_ = process_image_to_keypoints(path_op, scale_factor, base_order, sample_order, opt, mode)
-            pts2_, desc2_ = process_image_to_keypoints(path_rp, scale_factor, base_order, sample_order, opt, mode)
-            pts12_, desc12_ = process_image_to_keypoints(path_op2, scale_factor, base_order, sample_order, opt, mode)
-            pts22_, desc22_ = process_image_to_keypoints(path_rp2, scale_factor, base_order, sample_order, opt, mode)
-            pts1_ = add_offset_to_image(pts1_, crop_start_xy)
-            pts2_ = add_offset_to_image(pts2_, crop_start_xy)
-            pts12_ = add_offset_to_image(pts12_, crop_start_xy)
-            pts22_ = add_offset_to_image(pts22_, crop_start_xy)
-            pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
-            pts22_ = convert_coordinates_vectorized(pts22_, img_hw)
-            pts1_, desc1_ = filter_keypoints(pts1_, desc1_, img_hw)
-            pts2_, desc2_ = filter_keypoints(pts2_, desc2_, img_hw)
-            pts12_, desc12_ = filter_keypoints(pts12_, desc12_, img_hw, invert_mask=True)
-            pts22_, desc22_ = filter_keypoints(pts22_, desc22_, img_hw, invert_mask=True)
+            pts1_, desc1_, pts2_, desc2_, pts12_, desc12_, pts22_, desc22_ = method_p(path_op, path_rp, path_op2, path_rp2, args, img_hw, crop_start_xy, scale_factor, base_order, sample_order, opt, mode)
         elif method_flag == 3:
-            t_featurepoint_b = time.perf_counter()
-            pts1_, desc1_ = process_image_to_keypoints(path_op, scale_factor, base_order, sample_order, opt, mode)
-            pts2_, desc2_ = process_image_to_keypoints(path_rp, scale_factor, base_order, sample_order, opt, mode)
-            pts12_, desc12_ = process_image_to_keypoints(path_op2, scale_factor, base_order, sample_order, opt, mode)
-            pts22_, desc22_ = process_image_to_keypoints(path_rp2, scale_factor, base_order, sample_order, opt, mode)
-            pts1_ = add_offset_to_image(pts1_, crop_start_xy)
-            pts2_ = add_offset_to_image(pts2_, crop_start_xy)
-            pts12_ = add_offset_to_image(pts12_, crop_start_xy)
-            pts22_ = add_offset_to_image(pts22_, crop_start_xy)
-            pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
-            pts22_ = convert_coordinates_vectorized(pts22_, img_hw)
-            pts1_, desc1_ = filter_keypoints_abridged(pts1_, desc1_, img_hw)
-            pts2_, desc2_ = filter_keypoints_abridged(pts2_, desc2_, img_hw)
-            pts12_, desc12_ = filter_keypoints_abridged(pts12_, desc12_, img_hw, invert_mask=True)
-            pts22_, desc22_ = filter_keypoints_abridged(pts22_, desc22_, img_hw, invert_mask=True)
+            pts1_, desc1_, pts2_, desc2_, pts12_, desc12_, pts22_, desc22_ = method_a(path_op, path_rp, path_op2, path_rp2, args, img_hw, crop_start_xy, scale_factor, base_order, sample_order, opt, mode)
         if method_flag:
-            #pts1_ = torch.cat((pts1_, pts12_), dim=0)
-            #desc1_ = torch.cat((desc1_, desc12_), dim=1)
-            #pts2_ = torch.cat((pts2_, pts22_), dim=0)
-            #desc2_ = torch.cat((desc2_, desc22_), dim=1)
+            pts1_ = torch.cat((pts1_, pts12_), dim=0)
+            desc1_ = torch.cat((desc1_, desc12_), dim=1)
+            pts2_ = torch.cat((pts2_, pts22_), dim=0)
+            desc2_ = torch.cat((desc2_, desc22_), dim=1)
             t_featurepoint_a = time.perf_counter()+remap_t1+remap_t2
-            
-
-        num_points = args.points
-        num_points_1 = num_points
-        num_points_2 = num_points
-        if args.match == 'MNN':
-            num_points_1 = min(num_points_1, 3000)
-            num_points_2 = min(num_points_2, 3000)
-        pts1, desc1, score1 = sort_key_div(pts1_, desc1_, num_points_1)   
-        pts2, desc2, score2 = sort_key_div(pts2_, desc2_, num_points_2)  
         
 
     else:           
@@ -212,6 +132,14 @@ def main():
         t_featurepoint_a = time.perf_counter()
         os.chdir('../')
 
+    num_points = args.points
+    num_points_1 = num_points
+    num_points_2 = num_points
+    if args.match == 'MNN':
+        num_points_1 = min(num_points_1, 3000)
+        num_points_2 = min(num_points_2, 3000)
+    pts1, desc1, score1 = sort_key_div(pts1_, desc1_, num_points_1)   
+    pts2, desc2, score2 = sort_key_div(pts2_, desc2_, num_points_2)  
 
 
     if len(pts1.shape) == 1:

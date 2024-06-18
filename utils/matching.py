@@ -179,7 +179,7 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match="BF", constant
     s_desc2 = desc2.copy().astype('float32')[:n_key,:]
 
 
-    if 'orb' in args_opt:
+    if 'args_opt' in ['orb', 'sphorb', 'akaze']:
         s_desc1 = s_desc1.astype(np.uint8)
         s_desc2 = s_desc2.astype(np.uint8)
         distance_eval = cv2.NORM_HAMMING
@@ -196,17 +196,15 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match="BF", constant
     elif match == 'BF_KNN':
         if args_opt == "superpoint":
             constant = 0.95
-        elif args_opt in ["orb", "sphorb"]:
+        elif args_opt in ["orb", "sphorb", 'akaze']:
             constant = 0.9
         elif args_opt == "sift":
             constant = 0.75
-        #elif args_opt == "alike":
-        #    constant = 0.98
         matches = bfknn_matcher(s_desc1, s_desc2, distance_eval, constant)
     elif match == 'FLANN_KNN':
         matches = flannknn_matcher(s_desc1, s_desc2, distance_eval_FLANN, constant)
     elif match == 'MNN':
-        if args_opt in ["orb", "sphorb"]:
+        if 'args_opt' in ['orb', 'sphorb', 'akaze']:
             matches = mnn_matcher_hamming(desc1, desc2)
         else:
             matches = mnn_matcher_L2(s_desc1, s_desc2)
