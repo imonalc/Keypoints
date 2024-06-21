@@ -3,9 +3,11 @@ import torch.nn.functional as F
 from spherical_distortion.functional import create_tangent_images, unresample
 from spherical_distortion.util import *
 import time
-
+import cv2
 import numpy as np
 
+
+from utils.spherical_module import *
 import utils.superpoint.magic_sp.superpoint as magic_sp
 import utils.superpoint.train_sp.superpoint as train_sp
 from utils.ALIKE.alike import ALike, configs
@@ -241,6 +243,86 @@ def keypoint_tangent_images(tex_image, base_order, sample_order, image_shape, op
     return all_visible_kp, all_visible_desc
 
 
+def keypoint_cube_images(img, opt):
+    """
+    Extracts only the visible Superpoint features from a collection tangent image. That is, only returns the keypoints visible to a spherical camera at the center of the icosahedron.
+
+    tex_image: 3 x N x H x W
+    corners: N x 4 x 3 coordinates of tangent image corners in 3D
+    image_shape: (H, W) of equirectangular image that we render back to
+    crop_degree: [optional] scalar value in degrees dictating how much of input equirectangular image is 0-padding
+
+    returns [visible_kp, visible_desc] (M x 4, M x length_descriptors)
+    """
+
+    # ----------------------------------------------
+    # Compute descriptors for each patch
+    # ----------------------------------------------
+    kp_list = []  # Stores keypoint coords
+    desc_list = []  # Stores keypoint descriptors
+    [back_img, bottom_img, front_img, left_img, right_img, top_img] = convert_img_eq_to_cube(img.permute(1, 2, 0).cpu().numpy(), output_sqr=256, margin=0)
+    face_h = back_img.shape[0]
+
+    face_dict = {"top": top_img,
+                 "left": left_img,
+                 "front": front_img,
+                 "right": right_img,
+                 "bottom": bottom_img, 
+                 "back": back_img
+    }
+
+    for idx, (face, img) in enumerate(face_dict.items()):
+        img = torch.from_numpy(img.astype(np.float32)).clone().permute(2, 1, 0)
+        #if idx != 2: continue
+        if opt == 'superpoint':
+            img = process_img(img)
+            kp_details = computes_superpoint_keypoints(img, opt)
+
+        if opt == 'sift':
+            kp_details = computes_sift_keypoints(img)
+
+        if opt == 'orb':
+            kp_details = computes_orb_keypoints(img)
+
+        if opt == 'surf':
+            kp_details = computes_surf_keypoints(img)
+
+        if opt == 'aliked':
+            kp_details = computes_aliked_keypoints(img)
+        
+        if opt == 'akaze':
+            kp_details = computes_akaze_keypoints(img)
+   
+        if kp_details is not None:
+            kp = kp_details[0]
+            desc = kp_details[1]
+            new_coords = []
+            new_kps = []
+            new_desc = []
+            for jdx, row in enumerate(kp):
+                x, y = row[:2].tolist()
+                new_x, new_y = cube_to_equirectangular_coord(face, (x, y), face_h//2)
+                new_coords.append([new_x, new_y])
+                new_kps.append(row[2:])
+                new_desc.append(desc[jdx])
+            if len(new_coords) < 1:
+                continue
+            new_coords_tensor = torch.tensor(new_coords)
+            new_kps_tensor = torch.stack(new_kps)
+            new_desc_tensor = torch.stack(new_desc)
+            
+            kp_converted = torch.cat((new_coords_tensor, new_kps_tensor), dim=1)
+            
+            kp_list.append(kp_converted)
+            desc_list.append(new_desc_tensor)
+    
+    kp_list = torch.cat(kp_list, dim=0)
+    desc_list = torch.cat(desc_list, dim=0)
+
+    return kp_list, desc_list
+
+
+
 def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
     """
     img: torch style (C x H x W) torch tensor
@@ -359,7 +441,7 @@ def process_image_to_keypoints(image_path, scale_factor, base_order, sample_orde
         image_kp, image_desc = keypoint_equirectangular(img, opt)
     
     if mode == 'cube':
-        image_kp, image_desc = keypoint_equirectangular(img, opt)
+        image_kp, image_desc = keypoint_cube_images(img, opt)
 
     #print(tangent_image_desc.shape)
     #print(np.transpose(tangent_image_desc,[1,0]).shape)

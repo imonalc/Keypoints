@@ -72,6 +72,7 @@ def main():
         img_hw_crop = (img_hw[0]//2+padding_length*2+2, img_hw[1]*3//4+padding_length*2+2)
         crop_start_xy = ((img_hw[0]-img_hw_crop[0])//2 - 1, (img_hw[1]-img_hw_crop[1])//2 - 1)
         proposed_image_mapping(path_o, path_r, path_o2, path_r2, path_op, path_rp, path_op2, path_rp2, img_hw, crop_start_xy, img_hw_crop)
+    
     opt, mode, sphered = get_descriptor(descriptor)
 
     method_idx = 0.0

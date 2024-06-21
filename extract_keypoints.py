@@ -55,7 +55,9 @@ def main():
 
     img_sample = cv2.imread('./data/data_100/Room/0/O.png')
     img_hw = img_sample.shape[:2]
+    t_making_map_b = time.perf_counter()
     Y_remap, X_remap = make_image_map(img_hw)
+    t_making_map_a = time.perf_counter()
 
 
     NUM = 0
@@ -152,17 +154,14 @@ def main():
                             desc1_ = torch.cat((desc1_, desc12_), dim=1)
                             pts2_ = torch.cat((pts2_, pts22_), dim=0)
                             desc2_ = torch.cat((desc2_, desc22_), dim=1)
-                            t_featurepoint_a = time.perf_counter()+remap_t1+remap_t2
+                            t_featurepoint_a = time.perf_counter()+remap_t1+remap_t2 + (t_making_map_a-t_making_map_b)*2
 
 
                     num_points = args.points
-                    num_points_1 = num_points
-                    num_points_2 = num_points
                     if args.match == 'MNN':
-                        num_points_1 = min(num_points_1, 3000)
-                        num_points_2 = min(num_points_2, 3000)
-                    pts1, desc1, score1 = sort_key_div(pts1_, desc1_, num_points_1)   
-                    pts2, desc2, score2 = sort_key_div(pts2_, desc2_, num_points_2)
+                        num_points = min(num_points, 3000)
+                    pts1, desc1, score1 = sort_key_div(pts1_, desc1_, num_points)   
+                    pts2, desc2, score2 = sort_key_div(pts2_, desc2_, num_points)
 
                     if len(pts1.shape) == 1:
                         pts1 = pts1.reshape(1,-1)

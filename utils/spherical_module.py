@@ -7,6 +7,10 @@ from utils.keypoint import *
 from utils.metrics  import *
 from utils.camera_recovering import *
 from scipy.spatial import distance
+import math
+import torch
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 
@@ -188,3 +192,137 @@ def rotate_pitch(x, y, z, rot):
     zz = -x * np.sin(rot) + z * np.cos(rot)
 
     return xx, yy, zz
+
+
+
+#### cube map ####
+def create_equirectangular_map(input_w, input_h, output_sqr, displacement, direction='z'):
+    row_indices, col_indices = np.meshgrid(np.arange(output_sqr), np.arange(output_sqr))
+    x = y = z = np.zeros_like(row_indices, dtype=float)
+    
+    if direction == 'z':
+        x = row_indices - output_sqr / 2.0
+        y = col_indices - output_sqr / 2.0
+        z += displacement
+    elif direction == 'x':
+        y = row_indices - output_sqr / 2.0
+        z = col_indices - output_sqr / 2.0
+        x += displacement
+    elif direction == 'y':
+        z = row_indices - output_sqr / 2.0
+        x = col_indices - output_sqr / 2.0
+        y += displacement
+
+    rho = np.sqrt(x**2 + y**2 + z**2)
+    norm_theta = np.arctan2(y, x) / (2 * np.pi)
+    norm_phi = (np.pi - np.arccos(z / rho)) / np.pi
+    ix = norm_theta * input_w
+    iy = norm_phi * input_h
+
+    ix = ix % input_w
+    iy = iy % input_h
+
+    return ix, iy
+
+
+def convert_img_eq_to_cube(img, output_sqr=256, margin=50):
+    normalized_f = 2.0
+    displacement = output_sqr / normalized_f
+    expanded_output_sqr = output_sqr + margin * 2
+    input_h, input_w = img.shape[0], img.shape[1]
+    
+    bottom_map_x, bottom_map_y = create_equirectangular_map(
+        input_w, input_h, expanded_output_sqr, displacement, 'z'
+    )
+    top_map_x, top_map_y = create_equirectangular_map(
+        input_w, input_h, expanded_output_sqr, -displacement, 'z'
+    )
+    front_map_x, front_map_y = create_equirectangular_map(
+        input_w, input_h, expanded_output_sqr, -displacement, 'x'
+    )
+    back_map_x, back_map_y = create_equirectangular_map(
+        input_w, input_h, expanded_output_sqr, displacement, 'x'
+    )
+    left_map_x, left_map_y = create_equirectangular_map(
+        input_w, input_h, expanded_output_sqr, -displacement, 'y'
+    )
+    right_map_x, right_map_y = create_equirectangular_map(
+        input_w, input_h, expanded_output_sqr, displacement, 'y'
+    )
+    bottom_img = cv2.remap(
+        img,
+        bottom_map_x.astype("float32"),
+        bottom_map_y.astype("float32"),
+        cv2.INTER_CUBIC,
+    )
+    bottom_img = cv2.rotate(bottom_img, cv2.ROTATE_90_CLOCKWISE)
+    
+    top_img = cv2.remap(
+        img, top_map_x.astype("float32"), top_map_y.astype("float32"), cv2.INTER_CUBIC
+    )
+    top_img = cv2.flip(top_img, 1)
+    top_img = cv2.rotate(top_img, cv2.ROTATE_90_CLOCKWISE)
+
+    front_img = cv2.remap(
+        img,
+        front_map_x.astype("float32"),
+        front_map_y.astype("float32"),
+        cv2.INTER_CUBIC,
+    )
+    front_img = cv2.flip(front_img, 1)
+
+
+    back_img = cv2.remap(
+        img, back_map_x.astype("float32"), back_map_y.astype("float32"), cv2.INTER_CUBIC
+    )
+    
+    left_img = cv2.remap(
+        img, left_map_x.astype("float32"), left_map_y.astype("float32"), cv2.INTER_CUBIC
+    )
+    left_img = cv2.flip(left_img, 1)
+    left_img = cv2.rotate(left_img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+    right_img = cv2.remap(
+        img,
+        right_map_x.astype("float32"),
+        right_map_y.astype("float32"),
+        cv2.INTER_CUBIC,
+    )
+    right_img = cv2.rotate(right_img, cv2.ROTATE_90_CLOCKWISE)
+
+    return [back_img, bottom_img, front_img, left_img, right_img, top_img]
+
+
+def cube_coord_to_3d_vector(face, cor_xy, width):
+    x, y = cor_xy
+    x -= width
+    y -= width
+
+    if face == "front":
+        return torch.tensor([width, y, -x])
+    elif face == "back":
+        return torch.tensor([-width, -y, -x])
+    elif face == "left":
+        return torch.tensor([-y, width, -x])
+    elif face == "right":
+        return torch.tensor([y, -width, -x])
+    elif face == "top":
+        return torch.tensor([x, y, width])
+    elif face == "bottom":
+        return torch.tensor([-x, y, -width])
+    else:
+        raise ValueError(f"Invalid face name: {face}")
+    
+def vector_to_equirectangular_coord(vec, width):
+    r = torch.sqrt(torch.sum(vec**2))
+    theta = torch.acos(vec[2] / r)  # polar angle (0 <= theta <= pi)
+    phi = torch.atan2(vec[1], vec[0])  # azimuthal angle (-pi <= phi <= pi)
+    
+    x = width * 8 * (phi + torch.pi) / (2 * torch.pi)
+    y = width * 4 * theta / torch.pi
+    
+    return x.item(), y.item()
+
+def cube_to_equirectangular_coord(face, cor_xy, width):
+    vec = cube_coord_to_3d_vector(face, cor_xy, width)
+    return vector_to_equirectangular_coord(vec, width)
