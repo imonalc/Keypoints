@@ -39,8 +39,8 @@ python3 extract_keypoints.py --datas Urban1 Urban2 Urban3 Urban4 --descriptors c
 #python3 extract_keypoints.py --datas Urban1 Urban2 Urban3 Urban4 --descriptors orb_p sift_p spoint_p akaze_p aliked_p --match MNN  --points 1000
 #python3 extract_keypoints.py --datas Room Classroom Realistic Interior1 Interior2 --descriptors sphorb --match MNN  --points 1000
 #python3 extract_keypoints.py --datas Urban1 Urban2 Urban3 Urban4 --descriptors sphorb --match MNN  --points 1000
-#python3 extract_keypoints.py --datas Room Classroom Realistic Interior1 Interior2 --descriptors tspoint --match BF_KNN  --points 1000
-#python3 extract_keypoints.py --datas Urban1 Urban2 Urban3 Urban4 --descriptors tspoint --match BF_KNN  --points 1000
+python3 extract_keypoints.py --datas Room Classroom Realistic Interior1 Interior2 --descriptors tspoint --match MNN  --points 1000
+python3 extract_keypoints.py --datas Urban1 Urban2 Urban3 Urban4 --descriptors tspoint --match MNN  --points 1000
 
 #python3 extract_keypoints.py --datas Room Classroom Realistic Interior1 Interior2 --descriptors orb_a sift_a spoint_a --match MNN  --points 1000
 #python3 extract_keypoints.py --datas Urban1 Urban2 Urban3 Urban4 --descriptors orb_a sift_a spoint_a --match MNN  --points 1000

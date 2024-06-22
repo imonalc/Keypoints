@@ -253,12 +253,12 @@ def convert_img_eq_to_cube(img, output_sqr=256, margin=50):
         img,
         bottom_map_x.astype("float32"),
         bottom_map_y.astype("float32"),
-        cv2.INTER_CUBIC,
+        cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP,
     )
     bottom_img = cv2.rotate(bottom_img, cv2.ROTATE_90_CLOCKWISE)
     
     top_img = cv2.remap(
-        img, top_map_x.astype("float32"), top_map_y.astype("float32"), cv2.INTER_CUBIC
+        img, top_map_x.astype("float32"), top_map_y.astype("float32"), cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP
     )
     top_img = cv2.flip(top_img, 1)
     top_img = cv2.rotate(top_img, cv2.ROTATE_90_CLOCKWISE)
@@ -267,17 +267,17 @@ def convert_img_eq_to_cube(img, output_sqr=256, margin=50):
         img,
         front_map_x.astype("float32"),
         front_map_y.astype("float32"),
-        cv2.INTER_CUBIC,
+        cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP,
     )
     front_img = cv2.flip(front_img, 1)
 
 
     back_img = cv2.remap(
-        img, back_map_x.astype("float32"), back_map_y.astype("float32"), cv2.INTER_CUBIC
+        img, back_map_x.astype("float32"), back_map_y.astype("float32"), cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP
     )
     
     left_img = cv2.remap(
-        img, left_map_x.astype("float32"), left_map_y.astype("float32"), cv2.INTER_CUBIC
+        img, left_map_x.astype("float32"), left_map_y.astype("float32"), cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP
     )
     left_img = cv2.flip(left_img, 1)
     left_img = cv2.rotate(left_img, cv2.ROTATE_90_COUNTERCLOCKWISE)
@@ -286,7 +286,7 @@ def convert_img_eq_to_cube(img, output_sqr=256, margin=50):
         img,
         right_map_x.astype("float32"),
         right_map_y.astype("float32"),
-        cv2.INTER_CUBIC,
+        cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP,
     )
     right_img = cv2.rotate(right_img, cv2.ROTATE_90_CLOCKWISE)
 
@@ -315,8 +315,8 @@ def cube_coord_to_3d_vector(face, cor_xy, width):
     
 def vector_to_equirectangular_coord(vec, width):
     r = torch.sqrt(torch.sum(vec**2))
-    theta = torch.acos(vec[2] / r)  # polar angle (0 <= theta <= pi)
-    phi = torch.atan2(vec[1], vec[0])  # azimuthal angle (-pi <= phi <= pi)
+    theta = torch.acos(vec[2] / r) # polar angle (0 <= theta <= pi)
+    phi = torch.atan2(vec[1], vec[0]) # azimuthal angle (-pi <= phi <= pi)
     
     x = width * 8 * (phi + torch.pi) / (2 * torch.pi)
     y = width * 4 * theta / torch.pi
