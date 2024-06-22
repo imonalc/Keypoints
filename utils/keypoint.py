@@ -260,8 +260,11 @@ def keypoint_cube_images(img, opt):
     # ----------------------------------------------
     kp_list = []  # Stores keypoint coords
     desc_list = []  # Stores keypoint descriptors
-    [back_img, bottom_img, front_img, left_img, right_img, top_img] = convert_img_eq_to_cube(img.permute(1, 2, 0).cpu().numpy(), output_sqr=256, margin=0)
-    face_h = back_img.shape[0]
+    output_sqr=256
+    margin=50
+    [back_img, bottom_img, front_img, left_img, right_img, top_img] = convert_img_eq_to_cube(img.permute(1, 2, 0).cpu().numpy(), output_sqr, margin)
+    #face_h = back_img.shape[0]
+
 
     face_dict = {"top": top_img,
                  "left": left_img,
@@ -270,10 +273,9 @@ def keypoint_cube_images(img, opt):
                  "bottom": bottom_img, 
                  "back": back_img
     }
-
     for idx, (face, img) in enumerate(face_dict.items()):
         img = torch.from_numpy(img.astype(np.float32)).clone().permute(2, 1, 0)
-        #if idx != 2: continue
+        #if idx != 1: continue
         if opt == 'superpoint':
             img = process_img(img)
             kp_details = computes_superpoint_keypoints(img, opt)
@@ -292,16 +294,20 @@ def keypoint_cube_images(img, opt):
         
         if opt == 'akaze':
             kp_details = computes_akaze_keypoints(img)
-   
+        
         if kp_details is not None:
             kp = kp_details[0]
             desc = kp_details[1]
             new_coords = []
             new_kps = []
             new_desc = []
+            #new_coords_tensor, new_kps_tensor = cube_to_equirectangular(kp, face, margin, output_sqr)
             for jdx, row in enumerate(kp):
                 x, y = row[:2].tolist()
-                new_x, new_y = cube_to_equirectangular_coord(face, (x, y), face_h//2)
+                x -= margin
+                y -= margin
+                if not (0 <= x < output_sqr and 0 <= y < output_sqr): continue
+                new_x, new_y = cube_to_equirectangular_coord(face, (x, y), output_sqr//2)
                 new_coords.append([new_x, new_y])
                 new_kps.append(row[2:])
                 new_desc.append(desc[jdx])
