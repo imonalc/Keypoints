@@ -13,6 +13,8 @@ import utils.superpoint.train_sp.superpoint as train_sp
 from utils.ALIKE.alike import ALike, configs
 from utils.ALIKED.nets.aliked import ALIKED
 
+padding_length = 50
+
 ## call instance
 orb_model = cv2.ORB_create(scoreType=cv2.ORB_HARRIS_SCORE, nfeatures=10000)
 sift_model = cv2.SIFT_create(nfeatures=10000)
@@ -27,6 +29,9 @@ aliked_model = ALIKED(model_name="aliked-n16",
     top_k=-1,
     scores_th=0.2,
     n_limit=10000)
+
+
+
 
 
 def process_img(img):
@@ -182,7 +187,6 @@ def keypoint_tangent_images(tex_image, base_order, sample_order, image_shape, op
     # ----------------------------------------------
     kp_list = []  # Stores keypoint coords
     desc_list = []  # Stores keypoint descriptors
-    quad_idx_list = []  # Stores quad index for each keypoint
     for i in range(tex_image.shape[1]):
         #print(i)
         img = tex_image[:, i, ...]
@@ -240,31 +244,13 @@ def keypoint_tangent_images(tex_image, base_order, sample_order, image_shape, op
                                               image_shape[0] - crop_h)
     all_visible_kp = all_visible_kp[mask]  # M x 4
     all_visible_desc = all_visible_desc[mask]  # M x 128
-    return all_visible_kp, all_visible_desc
+
+    return all_visible_kp, np.transpose(all_visible_desc,[1,0])
 
 
-def keypoint_cube_images(img, opt):
-    """
-    Extracts only the visible Superpoint features from a collection tangent image. That is, only returns the keypoints visible to a spherical camera at the center of the icosahedron.
-
-    tex_image: 3 x N x H x W
-    corners: N x 4 x 3 coordinates of tangent image corners in 3D
-    image_shape: (H, W) of equirectangular image that we render back to
-    crop_degree: [optional] scalar value in degrees dictating how much of input equirectangular image is 0-padding
-
-    returns [visible_kp, visible_desc] (M x 4, M x length_descriptors)
-    """
-
-    # ----------------------------------------------
-    # Compute descriptors for each patch
-    # ----------------------------------------------
-    kp_list = []  # Stores keypoint coords
-    desc_list = []  # Stores keypoint descriptors
-    output_sqr=256
-    margin=50
-    [back_img, bottom_img, front_img, left_img, right_img, top_img] = convert_img_eq_to_cube(img.permute(1, 2, 0).cpu().numpy(), output_sqr, margin)
-    #face_h = back_img.shape[0]
-
+def keypoint_cube_images(img, opt, output_sqr=256, margin=50):
+    kp_list, desc_list = [], []
+    [back_img, bottom_img, front_img, left_img, right_img, top_img], make_map_time, remap_time = convert_img_eq_to_cube(img.permute(1, 2, 0).cpu().numpy(), output_sqr, margin)
 
     face_dict = {"top": top_img,
                  "left": left_img,
@@ -273,9 +259,9 @@ def keypoint_cube_images(img, opt):
                  "bottom": bottom_img, 
                  "back": back_img
     }
+    feature_time1 = time.perf_counter()
     for idx, (face, img) in enumerate(face_dict.items()):
         img = torch.from_numpy(img.astype(np.float32)).clone().permute(2, 1, 0)
-        #if idx != 1: continue
         if opt == 'superpoint':
             img = process_img(img)
             kp_details = computes_superpoint_keypoints(img, opt)
@@ -296,36 +282,51 @@ def keypoint_cube_images(img, opt):
             kp_details = computes_akaze_keypoints(img)
         
         if kp_details is not None:
-            kp = kp_details[0]
-            desc = kp_details[1]
-            new_coords = []
-            new_kps = []
-            new_desc = []
-            #new_coords_tensor, new_kps_tensor = cube_to_equirectangular(kp, face, margin, output_sqr)
-            for jdx, row in enumerate(kp):
-                x, y = row[:2].tolist()
-                x -= margin
-                y -= margin
-                if not (0 <= x < output_sqr and 0 <= y < output_sqr): continue
-                new_x, new_y = cube_to_equirectangular_coord(face, (x, y), output_sqr//2)
-                new_coords.append([new_x, new_y])
-                new_kps.append(row[2:])
-                new_desc.append(desc[jdx])
-            if len(new_coords) < 1:
-                continue
-            new_coords_tensor = torch.tensor(new_coords)
-            new_kps_tensor = torch.stack(new_kps)
-            new_desc_tensor = torch.stack(new_desc)
+            kp, desc = kp_details
+            coords = kp[:, :2].clone()
+            coords -= margin
+            valid_mask = (coords >= 0) & (coords < output_sqr)
+            valid_indices = valid_mask.all(dim=1)
+            coords = coords[valid_indices]
             
-            kp_converted = torch.cat((new_coords_tensor, new_kps_tensor), dim=1)
-            
+            new_coords = batch_cube_to_equirectangular(face, coords, output_sqr // 2)
+            new_kps = kp[valid_indices, 2:]
+            new_desc = desc[valid_indices]
+            kp_converted = torch.cat([new_coords, new_kps], dim=1)
             kp_list.append(kp_converted)
-            desc_list.append(new_desc_tensor)
+            desc_list.append(new_desc)
     
     kp_list = torch.cat(kp_list, dim=0)
     desc_list = torch.cat(desc_list, dim=0)
 
-    return kp_list, desc_list
+    feature_time2 = time.perf_counter()
+    feature_time = feature_time2 - feature_time1
+
+    return kp_list, np.transpose(desc_list,[1,0]), make_map_time, remap_time, feature_time
+
+
+
+def keypoint_proposed(img, opt, scale_factor, img_hw):
+    Y_remap, X_remap, make_map_time = make_image_map(img_hw)
+    img_hw_crop = (img_hw[0]//2+padding_length*2, img_hw[1]*3//4+padding_length*2)
+    crop_start_xy = ((img_hw[0]-img_hw_crop[0])//2 - 1, (img_hw[1]-img_hw_crop[1])//2 - 1)
+
+    img1, img2, remap_time = remap_crop_image(img, (Y_remap, X_remap), img_hw_crop, crop_start_xy)
+    img1 = torch.from_numpy(img1).permute(2, 0, 1).float().unsqueeze(0)
+    img1 = F.interpolate(img1, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+    img2 = torch.from_numpy(img2).permute(2, 0, 1).float().unsqueeze(0)
+    img2 = F.interpolate(img2, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+    pts1_, desc1_, feature_time1 = keypoint_equirectangular(img1, opt)
+    pts2_, desc2_, feature_time2 = keypoint_equirectangular(img2, opt)
+    pts1_ = add_offset_to_image(pts1_, crop_start_xy)
+    pts2_ = add_offset_to_image(pts2_, crop_start_xy)
+    pts2_ = convert_coordinates_vectorized(pts2_, img_hw)
+    pts1_, desc1_ = filter_keypoints(pts1_, desc1_, img_hw)
+    pts2_, desc2_ = filter_keypoints(pts2_, desc2_, img_hw, invert_mask=True)
+    image_kp = torch.cat((pts1_, pts2_), dim=0)
+    image_desc = torch.cat((desc1_, desc2_), dim=1)
+
+    return image_kp, image_desc, make_map_time, remap_time, feature_time1 + feature_time2
 
 
 
@@ -340,7 +341,7 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
     # ----------------------------------------------
     # Compute descriptors on equirect image
     # ----------------------------------------------
-
+    feature_time1 = time.perf_counter()
     if opt == 'superpoint':
         img = process_img(img)
         erp_kp_details = computes_superpoint_keypoints(img, opt)
@@ -377,7 +378,10 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
     erp_kp = erp_kp[mask]
     erp_desc = erp_desc[mask]
 
-    return erp_kp, erp_desc
+    feature_time2 = time.perf_counter()
+    feature_time = feature_time2 - feature_time1
+
+    return erp_kp, np.transpose(erp_desc,[1,0]), feature_time
 
 
 
@@ -432,25 +436,22 @@ def nn_match_two_way(desc1, desc2, nn_thresh = 0.7):
     #return np.sort(matches, axis=1)
     return matches
 
-def process_image_to_keypoints(image_path, scale_factor, base_order, sample_order, opt, mode):
-    img = load_torch_img(image_path)[:3, ...].float() # inputs/I1.png
+def process_image_to_keypoints(image_path, scale_factor, base_order, sample_order, opt, mode, img_hw):
+    img = load_torch_img(image_path)[:3, ...].float()
     img = F.interpolate(img.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+    make_map_time, remap_time, feature_time = 0, 0, 0
 
-    # Resample the image to N tangent images (out: 3 x N x H x W)
-    # N = 80, H, W depend of the sample_order( 2^(sample_order-1) = 512 )
-    
     if mode == 'tangent':
         tex_image = create_tangent_images(img, base_order, sample_order).byte()
         image_kp, image_desc = keypoint_tangent_images(tex_image, base_order, sample_order, img.shape[-2:], opt , 0)
+    elif mode == 'cube':
+        image_kp, image_desc, make_map_time, remap_time, feature_time = keypoint_cube_images(img, opt)
+    elif mode == 'proposed':
+        img = cv2.imread(image_path)
+        image_kp, image_desc, make_map_time, remap_time, feature_time = keypoint_proposed(img, opt, scale_factor, img_hw)
+    elif mode == 'erp':
+        image_kp, image_desc, feature_time = keypoint_equirectangular(img, opt)
 
-    if mode == 'erp':
-        image_kp, image_desc = keypoint_equirectangular(img, opt)
-    
-    if mode == 'cube':
-        image_kp, image_desc = keypoint_cube_images(img, opt)
-
-    #print(tangent_image_desc.shape)
-    #print(np.transpose(tangent_image_desc,[1,0]).shape)
-    return image_kp, np.transpose(image_desc,[1,0])
+    return image_kp, image_desc, make_map_time, remap_time, feature_time
 
 

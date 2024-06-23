@@ -252,6 +252,9 @@ def get_descriptor(descriptor):
     elif descriptor[0] == 'c':
         descriptor_main = descriptor_main[1:]
         image_mode = 'cube'
+    elif descriptor[0] == 'p':
+        descriptor_main = descriptor_main[1:]
+        image_mode = 'proposed'
     
     descriptor_configs = {
         'Proposed': ('superpoint', image_mode, 512),

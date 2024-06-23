@@ -11,7 +11,9 @@ from utils.spherical_module import *
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
-def proposed_image_mapping(path_o, path_r, path_o2, path_r2, path_op, path_rp, path_op2, path_rp2, img_hw, crop_start_xy, img_hw_crop):
+def proposed_image_mapping(path_o, path_r, path_o2, path_r2, path_op, path_rp, path_op2, path_rp2, img_hw, padding_length):
+    img_hw_crop = (img_hw[0]//2+padding_length*2+2, img_hw[1]*3//4+padding_length*2+2)
+    crop_start_xy = ((img_hw[0]-img_hw_crop[0])//2 - 1, (img_hw[1]-img_hw_crop[1])//2 - 1)
     img_o = cv2.imread(path_o)
     img_r = cv2.imread(path_r)
     img_o_cropped = img_o[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
@@ -24,6 +26,8 @@ def proposed_image_mapping(path_o, path_r, path_o2, path_r2, path_op, path_rp, p
     img_r2_cropped = img_r2[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
     cv2.imwrite(path_op2, img_o2_cropped)
     cv2.imwrite(path_rp2, img_r2_cropped)
+
+    return img_hw_crop, crop_start_xy
 
 
 def convert_sphorb(pts, desc):

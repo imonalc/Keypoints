@@ -15,6 +15,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def make_image_map(img_hw, rad=torch.pi/2):
+    make_map_time1 = time.perf_counter()
     (h, w) = img_hw
     w_half = int(w / 2)
     h_half = int(h / 2)
@@ -33,7 +34,10 @@ def make_image_map(img_hw, rad=torch.pi/2):
     Y_remap = 2 * new_theta / torch.pi * h_half + h_half
     X_remap = new_phi / torch.pi * w_half + w_half
 
-    return Y_remap, X_remap
+    make_map_time2 = time.perf_counter()
+    make_map_time = make_map_time2 - make_map_time1
+
+    return Y_remap, X_remap, make_map_time
 
 
 
@@ -48,6 +52,19 @@ def remap_image(image_path, output_path, YX_remap):
     cv2.imwrite(output_path, out)
 
     return ret
+
+
+def remap_crop_image(img, YX_remap, img_hw_crop, crop_start_xy):
+    (Y_remap, X_remap) = YX_remap
+
+    remap_time1 = time.perf_counter()
+    img2 = cv2.remap(img, X_remap.astype(np.float32), Y_remap.astype(np.float32), 
+                    cv2.INTER_LINEAR, borderMode=cv2.BORDER_WRAP)
+    remap_time2 = time.perf_counter()
+    remap_time = remap_time2 - remap_time1
+
+
+    return img, img2, remap_time
 
 
 
@@ -230,7 +247,8 @@ def convert_img_eq_to_cube(img, output_sqr=256, margin=50):
     displacement = output_sqr / normalized_f
     expanded_output_sqr = output_sqr + margin * 2
     input_h, input_w = img.shape[0], img.shape[1]
-    
+
+    make_map_time1 = time.perf_counter()
     bottom_map_x, bottom_map_y = create_equirectangular_map(
         input_w, input_h, expanded_output_sqr, displacement, 'z'
     )
@@ -249,6 +267,9 @@ def convert_img_eq_to_cube(img, output_sqr=256, margin=50):
     right_map_x, right_map_y = create_equirectangular_map(
         input_w, input_h, expanded_output_sqr, displacement, 'y'
     )
+    make_map_time2 = time.perf_counter()
+
+    remap_time1 = time.perf_counter()
     bottom_img = cv2.remap(
         img,
         bottom_map_x.astype("float32"),
@@ -289,8 +310,12 @@ def convert_img_eq_to_cube(img, output_sqr=256, margin=50):
         cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP,
     )
     right_img = cv2.rotate(right_img, cv2.ROTATE_90_CLOCKWISE)
+    remap_time2 = time.perf_counter()
 
-    return [back_img, bottom_img, front_img, left_img, right_img, top_img]
+    make_map_time = make_map_time2 - make_map_time1
+    remap_time = remap_time2 - remap_time1
+
+    return [back_img, bottom_img, front_img, left_img, right_img, top_img], make_map_time, remap_time
 
 
 def cube_coord_to_3d_vector(face, cor_xy, width):
@@ -326,3 +351,35 @@ def vector_to_equirectangular_coord(vec, width):
 def cube_to_equirectangular_coord(face, cor_xy, width):
     vec = cube_coord_to_3d_vector(face, cor_xy, width)
     return vector_to_equirectangular_coord(vec, width)
+
+
+def cube_coords_to_3d_vectors(face, coords, width):
+    x, y = coords[:, 0], coords[:, 1]
+    x -= width
+    y -= width
+
+    face_dict = {
+        "front": torch.stack([width * torch.ones_like(x), y, -x], dim=-1),
+        "back": torch.stack([-width * torch.ones_like(x), -y, x], dim=-1),
+        "left": torch.stack([-y, width * torch.ones_like(x), -x], dim=-1),
+        "right": torch.stack([y, -width * torch.ones_like(x), -x], dim=-1),
+        "top": torch.stack([x, y, width * torch.ones_like(x)], dim=-1),
+        "bottom": torch.stack([-x, y, -width * torch.ones_like(x)], dim=-1)
+    }
+    return face_dict[face]
+
+
+def vectors_to_equirectangular_coords(vectors, width):
+    r = torch.sqrt(torch.sum(vectors**2, dim=1))
+    theta = torch.acos(vectors[:, 2] / r) # polar angle
+    phi = torch.atan2(vectors[:, 1], vectors[:, 0]) # azimuthal angle
+    
+    x = width * 8 * (phi + torch.pi) / (2 * torch.pi)
+    y = width * 4 * theta / torch.pi
+    
+    return torch.stack([x, y], dim=-1)
+
+
+def batch_cube_to_equirectangular(face, coords, width):
+    vecs = cube_coords_to_3d_vectors(face, coords, width // 2)
+    return vectors_to_equirectangular_coords(vecs, width // 2)
