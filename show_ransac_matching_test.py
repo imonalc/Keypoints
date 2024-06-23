@@ -47,32 +47,7 @@ def main():
     img_hw = (512, 1024)
     path_o = path + f'/O.png'
     path_r = path + f'/R.png'
-    path_o2 = path + f'/O2.png'
-    path_r2 = path + f'/R2.png'
-    path_op = path + f'/Op.png'
-    path_rp = path + f'/Rp.png'
-    path_op2 = path + f'/Op2.png'
-    path_rp2 = path + f'/Rp2.png'
 
-
-    if descriptor[-1] == 'P':
-        method_flag = 1
-        descriptor = descriptor[:-2]
-    elif descriptor[-1] == 'p':
-        method_flag = 2
-        descriptor = descriptor[:-2]
-    elif descriptor[-1] == 'a':
-        method_flag = 3
-        descriptor = descriptor[:-2]
-    else:
-        method_flag = 0
-    
-    if method_flag in [2, 3]:
-        padding_length = 38
-        img_hw_crop = (img_hw[0]//2+padding_length*2+2, img_hw[1]*3//4+padding_length*2+2)
-        crop_start_xy = ((img_hw[0]-img_hw_crop[0])//2 - 1, (img_hw[1]-img_hw_crop[1])//2 - 1)
-        proposed_image_mapping(path_o, path_r, path_o2, path_r2, path_op, path_rp, path_op2, path_rp2, img_hw, crop_start_xy, img_hw_crop)
-    
     opt, mode, sphered = get_descriptor(descriptor)
 
     method_idx = 0.0
@@ -81,10 +56,6 @@ def main():
     scale_factor = 1.0  # How much to scale input equirectangular image by
     save_ply = False  # Whether to save the PLY visualizations too
     dim = np.array([2*sphered, sphered])
-
-    Y_remap, X_remap = make_image_map(img_hw)
-    remap_t1 = remap_image(path_o, path_o2, (Y_remap, X_remap))
-    remap_t2 = remap_image(path_r, path_r2, (Y_remap, X_remap))
     
     print(path_o)
     img_o = load_torch_img(path_o)[:3, ...].float()
@@ -103,22 +74,9 @@ def main():
     if opt != 'sphorb':
         #corners = tangent_image_corners(base_order, sample_order)
         t_featurepoint_b = time.perf_counter()
-        if method_flag == 0:
-            pts1_, desc1_ = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode)
-            pts2_, desc2_ = process_image_to_keypoints(path_r, scale_factor, base_order, sample_order, opt, mode)
-            t_featurepoint_a = time.perf_counter()
-        elif method_flag == 1:
-            pts1_, desc1_, pts2_, desc2_, pts12_, desc12_, pts22_, desc22_ = method_P(path_o, path_r, path_o2, path_r2, args, img_hw, scale_factor, base_order, sample_order, opt, mode)
-        elif method_flag == 2:
-            pts1_, desc1_, pts2_, desc2_, pts12_, desc12_, pts22_, desc22_ = method_p(path_op, path_rp, path_op2, path_rp2, args, img_hw, crop_start_xy, scale_factor, base_order, sample_order, opt, mode)
-        elif method_flag == 3:
-            pts1_, desc1_, pts2_, desc2_, pts12_, desc12_, pts22_, desc22_ = method_a(path_op, path_rp, path_op2, path_rp2, args, img_hw, crop_start_xy, scale_factor, base_order, sample_order, opt, mode)
-        if method_flag:
-            pts1_ = torch.cat((pts1_, pts12_), dim=0)
-            desc1_ = torch.cat((desc1_, desc12_), dim=1)
-            pts2_ = torch.cat((pts2_, pts22_), dim=0)
-            desc2_ = torch.cat((desc2_, desc22_), dim=1)
-            t_featurepoint_a = time.perf_counter()+remap_t1+remap_t2
+        pts1_, desc1_, make_map_time, remap_time, feature_time = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode, img_hw)
+        pts2_, desc2_, make_map_time, remap_time, feature_time = process_image_to_keypoints(path_r, scale_factor, base_order, sample_order, opt, mode, img_hw)
+        t_featurepoint_a = time.perf_counter()
         
 
     else:           

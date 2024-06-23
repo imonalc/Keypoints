@@ -363,7 +363,7 @@ def cube_coords_to_3d_vectors(face, coords, width):
 
     face_dict = {
         "front": torch.stack([width * torch.ones_like(x), y, -x], dim=-1),
-        "back": torch.stack([-width * torch.ones_like(x), -y, x], dim=-1),
+        "back": torch.stack([-width * torch.ones_like(x), -y, -x], dim=-1),
         "left": torch.stack([-y, width * torch.ones_like(x), -x], dim=-1),
         "right": torch.stack([y, -width * torch.ones_like(x), -x], dim=-1),
         "top": torch.stack([x, y, width * torch.ones_like(x)], dim=-1),

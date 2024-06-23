@@ -258,6 +258,7 @@ def keypoint_cube_images(img, opt, output_sqr=256, margin=50):
     }
     feature_time1 = time.perf_counter()
     for idx, (face, img) in enumerate(face_dict.items()):
+        #if idx != 5: continue
         img = torch.from_numpy(img.astype(np.float32)).clone().permute(2, 1, 0)
         kp_details = compute_keypoints(img, opt)
         
