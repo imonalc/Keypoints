@@ -23,7 +23,7 @@ sp_model = train_sp.SuperPointFrontend(weights_path = 'utils/models/superpoint-t
                                  nms_dist= 4, #nms_dist, 
                                  conf_thresh = 0.015, #conf_thresh, 
                                  nn_thresh= 0.7, #nn_thresh, 
-                                 cuda = True )
+                                 cuda = True ) # 4 0.015 or 3 0.005
 aliked_model = ALIKED(model_name="aliked-n16",
     device="cuda",
     top_k=-1,
@@ -50,7 +50,7 @@ def process_img(img):
 
 
 
-def computes_superpoint_keypoints(img, opt, nms_dist=4, conf_thresh = 0.015, nn_thresh =0.7, cuda = True):  # 4 0.015 or 3 0.005
+def computes_superpoint_keypoints(img):
     pts, desc, _ = sp_model.run(img)
     kpt_details = np.zeros((pts.shape[1],4))
     kpt_details[:,0] = pts[0,:]
@@ -92,7 +92,7 @@ def computes_alike_keypoints(img, model_nm="alike-n", device="cuda", top_k=-1, s
 
 
 
-def computes_aliked_keypoints(img, model_nm="aliked-n32", device="cuda", top_k=-1, scores_th=0.2, n_limit=10000):
+def computes_aliked_keypoints(img):
     img_rgb = cv2.cvtColor(img.permute(1, 2, 0).numpy(), cv2.COLOR_BGR2RGB)
     pred = aliked_model.run(img_rgb)
     kpts = pred["keypoints"]
@@ -169,6 +169,24 @@ def computes_sift_keypoints(img):
     return None
 
 
+def compute_keypoints(img, opt):
+    if opt == 'superpoint':
+        img = process_img(img)
+        return computes_superpoint_keypoints(img)
+    if opt == 'sift':
+        return computes_sift_keypoints(img)
+    if opt == 'orb':
+        return computes_orb_keypoints(img)
+    if opt == 'surf':
+        return computes_surf_keypoints(img)
+    if opt == 'alike':
+        return computes_alike_keypoints(img)
+    if opt == 'aliked':
+        return computes_aliked_keypoints(img)
+    if opt == 'akaze':
+        return computes_akaze_keypoints(img)
+
+
 
 def keypoint_tangent_images(tex_image, base_order, sample_order, image_shape, opt = 'superpoint', crop_degree=0):
     """
@@ -188,30 +206,8 @@ def keypoint_tangent_images(tex_image, base_order, sample_order, image_shape, op
     kp_list = []  # Stores keypoint coords
     desc_list = []  # Stores keypoint descriptors
     for i in range(tex_image.shape[1]):
-        #print(i)
         img = tex_image[:, i, ...]
-
-        if opt == 'superpoint':
-            img = process_img(img)
-            kp_details = computes_superpoint_keypoints(img, opt)
-
-        if opt == 'sift':
-            kp_details = computes_sift_keypoints(img)
-
-        if opt == 'orb':
-            kp_details = computes_orb_keypoints(img)
-
-        if opt == 'surf':
-            kp_details = computes_surf_keypoints(img)
-        
-        if opt == 'alike':
-            kp_details = computes_alike_keypoints(img)
-        
-        if opt == 'aliked':
-            kp_details = computes_aliked_keypoints(img)
-        
-        if opt == 'akaze':
-            kp_details = computes_akaze_keypoints(img)
+        kp_details = compute_keypoints(img, opt)
 
         if kp_details is not None:
             valid_mask = get_valid_coordinates(base_order,
@@ -248,6 +244,7 @@ def keypoint_tangent_images(tex_image, base_order, sample_order, image_shape, op
     return all_visible_kp, np.transpose(all_visible_desc,[1,0])
 
 
+
 def keypoint_cube_images(img, opt, output_sqr=256, margin=50):
     kp_list, desc_list = [], []
     [back_img, bottom_img, front_img, left_img, right_img, top_img], make_map_time, remap_time = convert_img_eq_to_cube(img.permute(1, 2, 0).cpu().numpy(), output_sqr, margin)
@@ -262,24 +259,7 @@ def keypoint_cube_images(img, opt, output_sqr=256, margin=50):
     feature_time1 = time.perf_counter()
     for idx, (face, img) in enumerate(face_dict.items()):
         img = torch.from_numpy(img.astype(np.float32)).clone().permute(2, 1, 0)
-        if opt == 'superpoint':
-            img = process_img(img)
-            kp_details = computes_superpoint_keypoints(img, opt)
-
-        if opt == 'sift':
-            kp_details = computes_sift_keypoints(img)
-
-        if opt == 'orb':
-            kp_details = computes_orb_keypoints(img)
-
-        if opt == 'surf':
-            kp_details = computes_surf_keypoints(img)
-
-        if opt == 'aliked':
-            kp_details = computes_aliked_keypoints(img)
-        
-        if opt == 'akaze':
-            kp_details = computes_akaze_keypoints(img)
+        kp_details = compute_keypoints(img, opt)
         
         if kp_details is not None:
             kp, desc = kp_details
@@ -289,7 +269,7 @@ def keypoint_cube_images(img, opt, output_sqr=256, margin=50):
             valid_indices = valid_mask.all(dim=1)
             coords = coords[valid_indices]
             
-            new_coords = batch_cube_to_equirectangular(face, coords, output_sqr // 2)
+            new_coords = batch_cube_to_equirectangular(face, coords, output_sqr)
             new_kps = kp[valid_indices, 2:]
             new_desc = desc[valid_indices]
             kp_converted = torch.cat([new_coords, new_kps], dim=1)
@@ -313,11 +293,15 @@ def keypoint_proposed(img, opt, scale_factor, img_hw):
 
     img1, img2, remap_time = remap_crop_image(img, (Y_remap, X_remap), img_hw_crop, crop_start_xy)
     img1 = torch.from_numpy(img1).permute(2, 0, 1).float().unsqueeze(0)
+
     img1 = F.interpolate(img1, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
     img2 = torch.from_numpy(img2).permute(2, 0, 1).float().unsqueeze(0)
     img2 = F.interpolate(img2, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+
     pts1_, desc1_, feature_time1 = keypoint_equirectangular(img1, opt)
     pts2_, desc2_, feature_time2 = keypoint_equirectangular(img2, opt)
+    feature_time = feature_time1 + feature_time2
+
     pts1_ = add_offset_to_image(pts1_, crop_start_xy)
     pts2_ = add_offset_to_image(pts2_, crop_start_xy)
     pts2_ = convert_coordinates_vectorized(pts2_, img_hw)
@@ -326,7 +310,7 @@ def keypoint_proposed(img, opt, scale_factor, img_hw):
     image_kp = torch.cat((pts1_, pts2_), dim=0)
     image_desc = torch.cat((desc1_, desc2_), dim=1)
 
-    return image_kp, image_desc, make_map_time, remap_time, feature_time1 + feature_time2
+    return image_kp, image_desc, make_map_time, remap_time, feature_time
 
 
 
@@ -342,33 +326,9 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
     # Compute descriptors on equirect image
     # ----------------------------------------------
     feature_time1 = time.perf_counter()
-    if opt == 'superpoint':
-        img = process_img(img)
-        erp_kp_details = computes_superpoint_keypoints(img, opt)
-
-    if opt == 'sift':
-        erp_kp_details = computes_sift_keypoints(img)
-
-    if opt == 'orb':
-        erp_kp_details = computes_orb_keypoints(img)
-
-    if opt == 'surf':
-        erp_kp_details = computes_surf_keypoints(img)
-
-    if opt == 'alike':
-        erp_kp_details = computes_alike_keypoints(img)
-    
-    if opt == 'aliked':
-        erp_kp_details = computes_aliked_keypoints(img)
-
-    if opt == 'akaze':
-        erp_kp_details = computes_akaze_keypoints(img)
-
-    erp_kp = erp_kp_details[0]
-    erp_desc = erp_kp_details[1]
-    #print(type(erp_kp), type(erp_desc))
-    #print(erp_kp.shape, erp_desc.shape)
-    #print(erp_kp.shape, erp_desc.shape)
+    kp_details = compute_keypoints(img, opt)
+    erp_kp = kp_details[0]
+    erp_desc = kp_details[1]
 
     # If top top and bottom of image is padding
     crop_h = compute_crop(img.shape[-2:], crop_degree)
@@ -385,56 +345,6 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
 
 
 
-def nn_match_two_way(desc1, desc2, nn_thresh = 0.7):
-    """
-    Performs two-way nearest neighbor matching of two sets of descriptors, such
-    that the NN match from descriptor A->B must equal the NN match from B->A.
-
-    Inputs:
-      desc1 - NxM numpy matrix of N corresponding M-dimensional descriptors.
-      desc2 - NxM numpy matrix of N corresponding M-dimensional descriptors.
-      nn_thresh - Optional descriptor distance below which is a good match.
-
-    Returns:
-      matches - 3xL numpy array, of L matches, where L <= N and each column i is
-                a match of two descriptors, d_i in image 1 and d_j' in image 2:
-                [d_i index, d_j' index, match_score]^T
-    """
-    assert desc1.shape[0] == desc2.shape[0]
-    if desc1.shape[1] == 0 or desc2.shape[1] == 0:
-      return np.zeros((3, 0))
-    if nn_thresh < 0.0:
-      raise ValueError('\'nn_thresh\' should be non-negative')
-    # Compute L2 distance. Easy since vectors are unit normalized.
-    desc1 /= np.linalg.norm(desc1, axis=0)[np.newaxis, :]
-    desc2 /= np.linalg.norm(desc2, axis=0)[np.newaxis, :]
-
-    dmat = np.dot(desc1.T, desc2)
-    dmat = np.sqrt(2-2*np.clip(dmat, -1, 1))
-    #print(dmat)
-    #print(np.max(dmat))
-    # Get NN indices and scores.
-    idx = np.argmin(dmat, axis=1)
-    scores = dmat[np.arange(dmat.shape[0]), idx]
-    # Threshold the NN matches.
-    #print(scores)
-    keep = scores < nn_thresh
-    # Check if nearest neighbor goes both directions and keep those.
-    idx2 = np.argmin(dmat, axis=0)
-    keep_bi = np.arange(len(idx)) == idx2[idx]
-    keep = np.logical_and(keep, keep_bi)
-    idx = idx[keep]
-    scores = scores[keep]
-    # Get the surviving point indices.
-    m_idx1 = np.arange(desc1.shape[1])[keep]
-    m_idx2 = idx
-    # Populate the final 3xN match data structure.
-    matches = np.zeros((3, int(keep.sum())))
-    matches[0, :] = m_idx1
-    matches[1, :] = m_idx2
-    matches[2, :] = scores
-    #return np.sort(matches, axis=1)
-    return matches
 
 def process_image_to_keypoints(image_path, scale_factor, base_order, sample_order, opt, mode, img_hw):
     img = load_torch_img(image_path)[:3, ...].float()

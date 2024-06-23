@@ -49,32 +49,7 @@ def main():
     path = args.path
     img_sample = cv2.imread('./data/data_100/Room/0/O.png')
     img_hw = img_sample.shape[:2]
-    Y_remap, X_remap = make_image_map(img_hw)
     path_o = path + f'/O.png'
-    path_o2 = path + f'/O2.png'
-    path_op = path + f'/Op.png'
-    path_op2 = path + f'/Op2.png'
-    remap_t1 = remap_image(path_o, path_o2, (Y_remap, X_remap))
-    method_flag = 0
-    if descriptor[-1] == 'P':
-        method_flag = 1
-        descriptor = descriptor[:-2]
-    elif descriptor[-1] == 'p':
-        method_flag = 2
-        descriptor = descriptor[:-2]
-    elif descriptor[-1] == 'a':
-        method_flag = 3
-        descriptor = descriptor[:-2]
-    if method_flag in [2, 3]:
-        padding_length = 38
-        img_hw_crop = (img_hw[0]//2+padding_length*2+4, img_hw[1]*3//4+padding_length*2+4)
-        crop_start_xy = ((img_hw[0]-img_hw_crop[0])//2, (img_hw[1]-img_hw_crop[1])//2)
-        img_o = cv2.imread(path_o)
-        img_o_cropped = img_o[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
-        cv2.imwrite(path_op, img_o_cropped)
-        img_o2 = cv2.imread(path_o2)
-        img_o2_cropped = img_o2[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
-        cv2.imwrite(path_op2, img_o2_cropped)
 
     opt, mode, sphered = get_descriptor(descriptor)
 
@@ -88,41 +63,8 @@ def main():
     print(path_o)
     if opt != 'sphorb':
         corners = tangent_image_corners(base_order, sample_order)
-        if method_flag == 0:
-            t_featurepoint_b = time.perf_counter()
-            pts1_, desc1_ = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode)
-            t_featurepoint_a = time.perf_counter()
-        elif method_flag == 1:
-            t_featurepoint_b = time.perf_counter()
-            pts1_, desc1_ = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode)
-            pts12_, desc12_ = process_image_to_keypoints(path_o2, scale_factor, base_order, sample_order, opt, mode)
-            pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
-            pts1_, desc1_ = filter_middle_latitude(pts1_, desc1_, img_hw)
-            pts12_, desc12_ = filter_middle_latitude(pts12_, desc12_, img_hw, invert_mask=True)
-        elif method_flag == 2:
-            t_featurepoint_b = time.perf_counter()
-            pts1_, desc1_ = process_image_to_keypoints(path_op, scale_factor, base_order, sample_order, opt, mode)
-            pts12_, desc12_ = process_image_to_keypoints(path_op2, scale_factor, base_order, sample_order, opt, mode)
-            pts1_ = add_offset_to_image(pts1_, crop_start_xy)
-            pts12_ = add_offset_to_image(pts12_, crop_start_xy)
-            pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
-            pts1_, desc1_ = filter_keypoints(pts1_, desc1_, img_hw)
-            pts12_, desc12_ = filter_keypoints(pts12_, desc12_, img_hw, invert_mask=True)
-        elif method_flag == 3:
-            t_featurepoint_b = time.perf_counter()
-            pts1_, desc1_ = process_image_to_keypoints(path_op, scale_factor, base_order, sample_order, opt, mode)
-            pts12_, desc12_ = process_image_to_keypoints(path_op2, scale_factor, base_order, sample_order, opt, mode)
-            pts1_ = add_offset_to_image(pts1_, crop_start_xy)
-            pts12_ = add_offset_to_image(pts12_, crop_start_xy)
-            pts12_ = convert_coordinates_vectorized(pts12_, img_hw)
-            pts1_, desc1_ = filter_keypoints_abridged(pts1_, desc1_, img_hw)
-            pts12_, desc12_ = filter_keypoints_abridged(pts12_, desc12_, img_hw, invert_mask=True)
-        #if method_flag:
-        #    pts1_ = torch.cat((pts1_, pts12_), dim=0)
-        #    desc1_ = torch.cat((desc1_, desc12_), dim=1)
-        #if True:
-        #    pts1_ = pts12_
-        #    desc1_ = desc12_
+        pts1_, desc1_, make_map_time, remap_time, feature_time = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode, img_hw)
+        
         pts1, desc1, score1 = sort_key_div(pts1_, desc1_, args.points)
         print(pts1.shape)
 

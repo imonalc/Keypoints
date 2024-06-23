@@ -32,7 +32,9 @@ sys.path.append(os.getcwd()+'/SPHORB-master')
 
 import build1.sphorb_cpp as sphorb
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
+base_order = 0  # Base sphere resolution
+sample_order = 8  # Determines sample resolution (10 = 2048 x 4096) (0, 8): 20*256*256
+scale_factor = 1.0  # How much to scale input equirectangular image by
 
 
 def main():
@@ -82,26 +84,16 @@ def main():
         std = []
 
         for path in tqdm(paths):
-            method_idx = 0
-            base_order = 0  # Base sphere resolution
-            sample_order = 8  # Determines sample resolution (10 = 2048 x 4096) (0, 8): 20*256*256
-            scale_factor = 1.0  # How much to scale input equirectangular image by
+            path_o = path + '/O.png'
+            path_r = path + '/R.png'
+            Rx = np.load(path+"/R.npy")
+            Tx = np.load(path+"/T.npy")
 
-            img_hw = (512, 1024)
-            path_o = path + f'/O.png'
-            path_r = path + f'/R.png'
-            path_o2 = path + f'/O2.png'
-            path_r2 = path + f'/R2.png'
-            path_op = path + f'/Op.png'
-            path_rp = path + f'/Rp.png'
-            path_op2 = path + f'/Op2.png'
-            path_rp2 = path + f'/Rp2.png'
             for indicador, descriptor in enumerate(DESCRIPTORS):
 
                 try:
                     opt, mode, sphered = get_descriptor(descriptor)
                     dim = np.array([2*sphered, sphered])
-
 
                     if opt == 'sphorb':
                         os.chdir('SPHORB-master/')
@@ -111,46 +103,27 @@ def main():
                         pts1_, desc1_ = convert_sphorb(pts1, desc1)
                         pts2_, desc2_ = convert_sphorb(pts2, desc2)
                         t_featurepoint_a = time.perf_counter()
+                        feature_time = t_featurepoint_a - t_featurepoint_b
                         os.chdir('../')
-
                     else:
-                        #if mode != "proposed":
-                            pts1_, desc1_, make_map_time, remap_time, feature_time = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode, img_hw)
-                            pts2_, desc2_, make_map_time, remap_time, feature_time = process_image_to_keypoints(path_r, scale_factor, base_order, sample_order, opt, mode, img_hw)
-                        #else:
-                        #    Y_remap, X_remap, t = make_image_map(img_hw)
-                        #    remap_t1 = remap_image(path_o, path_o2, (Y_remap, X_remap))
-                        #    remap_t2 = remap_image(path_r, path_r2, (Y_remap, X_remap))
-                        #    _, crop_start_xy = proposed_image_mapping(path_o, path_r, path_o2, path_r2, path_op, path_rp, path_op2, path_rp2, img_hw, padding_length)
-#
-                        #    pts1_, desc1_, pts2_, desc2_, pts12_, desc12_, pts22_, desc22_ = method_p(path_op, path_rp, path_op2, path_rp2, args, img_hw, crop_start_xy, scale_factor, base_order, sample_order, opt, mode)
-                        #    pts1_ = torch.cat((pts1_, pts12_), dim=0)
-                        #    desc1_ = torch.cat((desc1_, desc12_), dim=1)
-                        #    pts2_ = torch.cat((pts2_, pts22_), dim=0)
-                        #    desc2_ = torch.cat((desc2_, desc22_), dim=1)
+                        pts1_, desc1_, make_map_time, remap_time, feature_time = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode, img_hw)
+                        pts2_, desc2_, make_map_time, remap_time, feature_time = process_image_to_keypoints(path_r, scale_factor, base_order, sample_order, opt, mode, img_hw)
 
 
                     num_points = args.points
-                    if args.match == 'MNN':
-                        num_points = min(num_points, 3000)
-                    pts1, desc1, score1 = sort_key_div(pts1_, desc1_, num_points)   
-                    pts2, desc2, score2 = sort_key_div(pts2_, desc2_, num_points)
+                    pts1, desc1, _ = sort_key_div(pts1_, desc1_, num_points)   
+                    pts2, desc2, _ = sort_key_div(pts2_, desc2_, num_points)
+                    len_pts = (len(pts1) + len(pts2)) / 2
 
                     if len(pts1.shape) == 1:
                         pts1 = pts1.reshape(1,-1)
                     if len(pts2.shape) == 1:
                         pts2 = pts2.reshape(1,-1)
-                        
-                    Rx = np.load(path+"/R.npy")
-                    Tx = np.load(path+"/T.npy")
 
-
-                    len_pts = (len(pts1) + len(pts2)) / 2
 
                     if pts1.shape[0] > 0 or pts2.shape[0] >0:
-                        s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match, method_idx)
+                        s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match)
                         x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
-
                         s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
                         
                         if x1.shape[0] < 8:
@@ -185,7 +158,7 @@ def main():
 
                         std.append(x1.shape[0])
                 except:     
-                    print("Unexpected error:",indicador, opt, method_idx)
+                    print("Unexpected error:",indicador, opt)
 
 
         for indicador, descriptor in enumerate(DESCRIPTORS):

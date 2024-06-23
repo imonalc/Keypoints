@@ -63,8 +63,11 @@ def remap_crop_image(img, YX_remap, img_hw_crop, crop_start_xy):
     remap_time2 = time.perf_counter()
     remap_time = remap_time2 - remap_time1
 
+    img1_cropped = img[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
+    img2_cropped = img2[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
 
-    return img, img2, remap_time
+
+    return img1_cropped, img2_cropped, remap_time
 
 
 
@@ -381,5 +384,5 @@ def vectors_to_equirectangular_coords(vectors, width):
 
 
 def batch_cube_to_equirectangular(face, coords, width):
-    vecs = cube_coords_to_3d_vectors(face, coords, width // 2)
-    return vectors_to_equirectangular_coords(vecs, width // 2)
+    vecs = cube_coords_to_3d_vectors(face, coords, width //2)
+    return vectors_to_equirectangular_coords(vecs, width //2)

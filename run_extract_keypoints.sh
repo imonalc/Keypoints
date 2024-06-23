@@ -1,5 +1,5 @@
 # test
-python3 extract_keypoints.py --datas Room --descriptors orb corb torb porb --match BF_KNN --points 1000
+python3 extract_keypoints.py --datas Room --descriptors spoint pspoint tspoint cspoint --match BF_KNN --points 1000
 #python3 extract_keypoints.py --datas Room --descriptors spoint --match BF_KNN
 #python3 extract_keypoints.py --datas Room --descriptors sift_P sift_p --match BF_KNN
 
