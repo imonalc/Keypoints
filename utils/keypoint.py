@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from spherical_distortion.functional import create_tangent_images, unresample
+from spherical_distortion.functional import create_tangent_images, create_sample_map, create_tangent_images_from_map
 from spherical_distortion.util import *
 import time
 import cv2
@@ -16,8 +16,9 @@ from utils.ALIKED.nets.aliked import ALIKED
 padding_length = 50
 
 ## call instance
-orb_model = cv2.ORB_create(scoreType=cv2.ORB_HARRIS_SCORE, nfeatures=10000)
+orb_model = cv2.ORB_create(scoreType=cv2.ORB_HARRIS_SCORE, nfeatures=1000)
 sift_model = cv2.SIFT_create(nfeatures=10000)
+#sift_model = cv2.features2d.SIFT_create(nfeatures=10000)
 akaze_model = cv2.AKAZE_create()
 sp_model = train_sp.SuperPointFrontend(weights_path = 'utils/models/superpoint-trained.pth.tar', 
                                  nms_dist= 4, #nms_dist, 
@@ -353,8 +354,18 @@ def process_image_to_keypoints(image_path, scale_factor, base_order, sample_orde
     make_map_time, remap_time, feature_time = 0, 0, 0
 
     if mode == 'tangent':
-        tex_image = create_tangent_images(img, base_order, sample_order).byte()
+        time1 = time.perf_counter()
+        sample_map = create_sample_map(img, base_order,sample_order)
+        time2 = time.perf_counter()
+        tex_image = create_tangent_images_from_map(img, sample_map, base_order, sample_order).byte()
+        time3 = time.perf_counter()
+        #tex_image = create_tangent_images(img, base_order, sample_order).byte()
         image_kp, image_desc = keypoint_tangent_images(tex_image, base_order, sample_order, img.shape[-2:], opt , 0)
+        time4 = time.perf_counter()
+        
+        make_map_time = time2 - time1
+        remap_time = time3 - time2
+        feature_time = time4 - time3
     elif mode == 'cube':
         image_kp, image_desc, make_map_time, remap_time, feature_time = keypoint_cube_images(img, opt)
     elif mode == 'proposed':

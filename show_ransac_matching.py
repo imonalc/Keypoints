@@ -31,7 +31,7 @@ def main():
 
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
     parser.add_argument('--points', type=int, default = 1000)
-    parser.add_argument('--match', default="BF_KNN")
+    parser.add_argument('--match', default="MNN")
     parser.add_argument('--g_metrics',default="False")
     parser.add_argument('--solver', default="GSM_wRT")
     parser.add_argument('--inliers', default="8PA")
@@ -47,6 +47,8 @@ def main():
     img_hw = (512, 1024)
     path_o = path + f'/O.png'
     path_r = path + f'/R.png'
+    Rx = np.load(path+"/R.npy")
+    Tx = np.load(path+"/T.npy")
 
     opt, mode, sphered = get_descriptor(descriptor)
 
@@ -73,22 +75,18 @@ def main():
 
     if opt != 'sphorb':
         #corners = tangent_image_corners(base_order, sample_order)
-        t_featurepoint_b = time.perf_counter()
         pts1_, desc1_, make_map_time, remap_time, feature_time = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode, img_hw)
         pts2_, desc2_, make_map_time, remap_time, feature_time = process_image_to_keypoints(path_r, scale_factor, base_order, sample_order, opt, mode, img_hw)
-        t_featurepoint_a = time.perf_counter()
         
 
     else:           
         os.chdir('SPHORB-master/')
         path_o = "."+path_o
         path_r = "."+path_r
-        t_featurepoint_b = time.perf_counter()
         pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
         pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
         pts1, desc1 = convert_sphorb(pts1, desc1)
         pts2, desc2 = convert_sphorb(pts2, desc2)
-        t_featurepoint_a = time.perf_counter()
         os.chdir('../')
 
     num_points = args.points
@@ -103,13 +101,9 @@ def main():
 
     if len(pts1.shape) == 1:
         pts1 = pts1.reshape(1,-1)
-
-    t_matching_b = time.perf_counter()
     s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, match=args.match, constant=method_idx)
-    t_matching_a = time.perf_counter()
-    
-    #print(x1_.shape, s_pts1.shape)
-    #print(x1_)
+    print(s_pts1.shape, x1_.shape)
+
     x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
     s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
 
@@ -117,8 +111,13 @@ def main():
     R1_,R2_,T1_,T2_ = decomposeE(E.T)
     R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
     print("True:", sum(inlier_idx), len(inlier_idx), ", ratio:", sum(inlier_idx) / len(inlier_idx))
-    print("FP:", "{:.4g}".format((t_featurepoint_a-t_featurepoint_b)/2))
-    print("MC:", "{:.4g}".format((t_matching_a-t_matching_b)))
+
+    print(Rx, Tx)
+    threshold = 0.2
+    mse, count_under_threshold, ratio_under_threshold = transform_and_evaluate(x1, x2, Rx, Tx, threshold)
+    print(f"MSE: {mse}")
+    print(f"Threshold under {threshold} pixels: {count_under_threshold} points")
+    print(f"Ratio of points under threshold: {ratio_under_threshold * 100:.2f}%")
 
     
     vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1_[:, :2], x2_[:, :2], inlier_idx)
@@ -134,6 +133,37 @@ def convert_sphorb(pts, desc):
     desc_tensor = torch.tensor(desc.T)
     
     return pts_tensor, desc_tensor
+
+
+def transform_and_evaluate(x1, x2, R, t, threshold):
+    # x1, x2の座標部分のみを抽出
+    points1 = x1[:, :3]
+    points2 = x2[:, :3]
+
+    # 座標をホモジニアス座標に変換
+    points1_hom = np.hstack([points1, np.ones((points1.shape[0], 1))])
+
+    # 変換行列を作成（回転と並進を合わせた行列）
+    transform_matrix = np.hstack([R, t.reshape(-1, 1)])
+
+    # 点群x1を変換
+    transformed_points1_hom = points1_hom @ transform_matrix.T
+
+    # 3D座標から2Dプロジェクション（ここでは単純化のためにz座標を無視）
+    transformed_points1 = transformed_points1_hom[:, :2]
+    points2_2d = points2[:, :2]
+
+    # 各点の誤差を計算
+    errors = np.sqrt(np.sum((transformed_points1 - points2_2d) ** 2, axis=1))
+    mse = np.mean(errors ** 2)
+
+    # 閾値以下の誤差を持つ点の数と割合
+    under_threshold = errors < threshold
+    count_under_threshold = np.sum(under_threshold)
+    ratio_under_threshold = count_under_threshold / len(errors)
+
+    return mse, count_under_threshold, ratio_under_threshold
+
 
 
 

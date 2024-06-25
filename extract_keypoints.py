@@ -66,10 +66,11 @@ def main():
     np.random.seed(0)
     data = get_data(DATAS)
     for data in DATAS:
-        R_ERROR, T_ERROR, TIMES_MAKEMAP, TIMES_REMAP, TIMES_FEATURE, MATCHING_SCORE, MEAN_MATCHING_ACCURCY, MATCHING_NUM, FP_NUM = [], [], [], [], [], [], [], [], []
+        R_ERROR, T_ERROR, T_LENGTH_ERROR, TIMES_MAKEMAP, TIMES_REMAP, TIMES_FEATURE, MATCHING_SCORE, MEAN_MATCHING_ACCURCY, MATCHING_NUM, FP_NUM = [], [], [], [], [], [], [], [], [], []
         for i in range(len(DESCRIPTORS)):
             R_ERROR.append([])
             T_ERROR.append([])
+            T_LENGTH_ERROR.append([])
             TIMES_MAKEMAP.append([])
             TIMES_REMAP.append([])
             TIMES_FEATURE.append([])
@@ -88,6 +89,7 @@ def main():
             path_r = path + '/R.png'
             Rx = np.load(path+"/R.npy")
             Tx = np.load(path+"/T.npy")
+            Tx_norm = Tx / np.linalg.norm(Tx)
 
             for indicador, descriptor in enumerate(DESCRIPTORS):
 
@@ -97,6 +99,7 @@ def main():
 
                     if opt == 'sphorb':
                         os.chdir('SPHORB-master/')
+                        make_map_time, remap_time = 0, 0
                         t_featurepoint_b = time.perf_counter()
                         pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
                         pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
@@ -141,11 +144,13 @@ def main():
                                 E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
                             R1_,R2_,T1_,T2_ = decomposeE(E.T)
                             R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
+                            t_length_error = np.linalg.norm(Tx_norm - T_)
                             R_error, T_error = r_error(Rx,R_), t_error(Tx,T_)
                             count_inliers = np.sum(inlier_idx == 1)
 
                         R_ERROR[indicador].append(R_error)
                         T_ERROR[indicador].append(T_error)
+                        T_LENGTH_ERROR[indicador].append(t_length_error)
                         TIMES_MAKEMAP[indicador].append(make_map_time)
                         TIMES_REMAP[indicador].append(remap_time)
                         TIMES_FEATURE[indicador].append(feature_time)
@@ -153,8 +158,6 @@ def main():
                         MEAN_MATCHING_ACCURCY[indicador].append(count_inliers/len(inlier_idx))
                         MATCHING_NUM[indicador].append(count_inliers)
                         FP_NUM[indicador].append(len_pts)
-
-                        METRICS[indicador,:] = METRICS[indicador,:] + [x1.shape[0], (s_pts1.shape[0]+s_pts2.shape[1])/2]
 
                         std.append(x1.shape[0])
                 except:     
@@ -166,6 +169,7 @@ def main():
             os.system('mkdir -p '+base_path)
             np.savetxt(base_path+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
             np.savetxt(base_path+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
+            np.savetxt(base_path+'/T_LENGTH_ERRORS.csv',np.array(T_LENGTH_ERROR[indicador]),delimiter=",")
             np.savetxt(base_path+'/TIMES_MAKEMAP.csv',np.array(TIMES_MAKEMAP[indicador]),delimiter=",")
             np.savetxt(base_path+'/TIMES_REMAP.csv',np.array(TIMES_REMAP[indicador]),delimiter=",")
             np.savetxt(base_path+'/TIMES_FEATURE.csv',np.array(TIMES_FEATURE[indicador]),delimiter=",")
