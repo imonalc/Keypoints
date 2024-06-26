@@ -107,11 +107,7 @@ def main():
     R1_,R2_,T1_,T2_ = decomposeE(E.T)
     R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
     E_true = compute_essential_matrix(Rx, Tx_norm)
-    #print(Rx, Tx_norm, E_true)
     results = evaluate_matches(x1, x2, E_true)
-
-    #print(x1[0:10])
-    #print(x2[0:10])
 
     print("Evaluation Results:")
     print(f"Valid Matches: {results['valid_matches']} / {results['total_matches']}")
@@ -124,7 +120,6 @@ def main():
     cv2.imshow("aaa", vis_img)
     c = cv2.waitKey()
     for i in range(len(x1)):
-        #print(x1_[i, :2].copy(), x2_[i, :2].copy(), results['epipolar_results'][i])
         vis_img = plot_match(img_o, img_r, s_pts1[i, :2], s_pts2[i, :2], x1_[i, :2].copy(), x2_[i, :2].copy(), results['threshold_results'][i])
         vis_img = cv2.resize(vis_img,dsize=(512,512))
         cv2.imshow("aaa", vis_img)
@@ -133,8 +128,12 @@ def main():
             break
 
 
-def evaluate_matches(x1, x2, E, threshold=0.02):
+def evaluate_matches(x1, x2, E, threshold=np.deg2rad(1)):
     epipolar_results = np.einsum('ij,jk,ik->i', x2, E, x1)
+    #angles = np.arccos(np.clip(epipolar_results, -1, 1))
+    #max_epipolar_result = np.max(angles)
+    #min_epipolar_result = np.min(angles)
+    #print(max_epipolar_result, min_epipolar_result)
     valid_matches = np.sum(abs(epipolar_results) < threshold)
     total_matches = len(epipolar_results)
     valid_ratio = valid_matches / total_matches
@@ -163,10 +162,7 @@ def plot_epipolar_results(epipolar_results):
     plt.savefig("temp_histogram.png")
     plt.close()
     
-    # OpenCVで画像を読み込む
     vis_img = cv2.imread("temp_histogram.png")
-    
-    # 画像を表示
     cv2.imshow("Epipolar Results Histogram", vis_img)
     c = cv2.waitKey()
     if c == 27:  # Escキーで閉じる
