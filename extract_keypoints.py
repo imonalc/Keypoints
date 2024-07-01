@@ -35,10 +35,10 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 base_order = 0  # Base sphere resolution
 sample_order = 8  # Determines sample resolution (10 = 2048 x 4096) (0, 8): 20*256*256
 scale_factor = 1.0  # How much to scale input equirectangular image by
-
+np.random.seed(1)
+random.seed(1)
 
 def main():
-
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
     parser.add_argument('--points', type=int, default = 10000)
     parser.add_argument('--match', default="BF")
@@ -129,7 +129,7 @@ def main():
                         s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match)
                         x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
                         s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
-                        results1 = evaluate_matches(x1, x2, E_true, threshold=np.deg2rad(1))
+                        results1 = evaluate_matches_angle(x1, x2, E_true, threshold=np.deg2rad(1))
                         
                         if x1.shape[0] < 8:
                             R_error, T_error = 3.14, 3.14
@@ -178,7 +178,7 @@ def main():
             np.savetxt(base_path+'/TIMES_REMAP.csv',np.array(TIMES_REMAP[indicador]),delimiter=",")
             np.savetxt(base_path+'/TIMES_FEATURE.csv',np.array(TIMES_FEATURE[indicador]),delimiter=",")
             np.savetxt(base_path+'/MATCHING_SCORE.csv',np.array(MATCHING_SCORE[indicador]),delimiter=",")
-            np.savetxt(base_path+'/MEAN_MATCHING_ACCURCY.csv',np.array(MEAN_MATCHING_ACCURCY[indicador]),delimiter=",")
+            np.savetxt(base_path+'/MEAN_MATCHING_ACCURACY.csv',np.array(MEAN_MATCHING_ACCURCY[indicador]),delimiter=",")
             np.savetxt(base_path+'/MATCHING_NUM.csv',np.array(MATCHING_NUM[indicador]),delimiter=",")
             np.savetxt(base_path+'/VALID_MATCHING_NUM.csv',np.array(VALID_MATCHING_NUM[indicador]),delimiter=",")
             np.savetxt(base_path+'/FP_NUM.csv',np.array(FP_NUM[indicador]),delimiter=",")
@@ -199,7 +199,7 @@ def compute_essential_matrix(R, t):
     E = t_cross.dot(R)
     return E
 
-def evaluate_matches(x1, x2, E, threshold=np.deg2rad(1)):
+def evaluate_matches_angle(x1, x2, E, threshold=np.deg2rad(1)):
     epipolar_results = np.einsum('ij,jk,ik->i', x2, E, x1)
     valid_matches = np.sum(abs(epipolar_results) < threshold)
     total_matches = len(epipolar_results)
