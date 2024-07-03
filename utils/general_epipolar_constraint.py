@@ -226,7 +226,7 @@ class EightPointAlgorithmGeneralGeometry:
     def projected_error2(**kwargs):
         Ex1 = kwargs["x1"].T.dot(kwargs["e"])
         A = np.abs(np.einsum('ij,ij->i',kwargs["x2"].T,Ex1))/(np.linalg.norm(Ex1, axis=1)+1e-5)
-
+        
         Ex2 = kwargs["x2"].T.dot(kwargs["e"].T)
         B = np.abs(np.einsum('ij,ij->i',kwargs["x1"].T,Ex2))/(np.linalg.norm(Ex2, axis=1)+1e-5)
 

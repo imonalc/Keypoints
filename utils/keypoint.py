@@ -18,7 +18,6 @@ padding_length = 50
 ## call instance
 orb_model = cv2.ORB_create(scoreType=cv2.ORB_HARRIS_SCORE, nfeatures=1000)
 sift_model = cv2.SIFT_create(nfeatures=10000)
-#sift_model = cv2.features2d.SIFT_create(nfeatures=10000)
 akaze_model = cv2.AKAZE_create()
 sp_model = train_sp.SuperPointFrontend(weights_path = 'utils/models/superpoint-trained.pth.tar', 
                                  nms_dist= 4, #nms_dist, 

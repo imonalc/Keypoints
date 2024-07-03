@@ -198,9 +198,19 @@ def get_cam_pose_by_GSM_const_wRT(x1, x2):
     return cam_final
 
 
-def get_cam_pose_by_ransac(x1, x2, get_E = False, I = "8PA"):
+def get_cam_pose_by_ransac(x1, x2, get_E = False, I = "8PA", solver=None):
     ransac = RANSAC_POSE_ESTIMATOR()
-    ransac.post_function_evaluation = get_cam_pose_by_8pa
+    if solver is None:
+        ransac.post_function_evaluation = get_cam_pose_by_8pa
+    elif solver == "SK":
+        ransac.post_function_evaluation = get_cam_pose_by_opt_SK
+    elif solver == "GSM":
+        ransac.post_function_evaluation = get_cam_pose_by_GSM
+    elif solver == "GSM_const_wRT":
+        ransac.post_function_evaluation = get_cam_pose_by_GSM_const_wRT
+    elif solver == "GSM_const_wSK":
+        ransac.post_function_evaluation = get_cam_pose_by_GSM_const_wSK
+        
     ransac.I = I
     if I == "8PA":
         ransac.min_super_set = 8
@@ -218,97 +228,11 @@ def get_cam_pose_by_ransac(x1, x2, get_E = False, I = "8PA"):
         return E, cam_final, inlier_idx
 
 
-
-def get_cam_pose_by_ransac_opt_SK(x1, x2, get_E=False, I = "8PA"):
-    ransac = RANSAC_POSE_ESTIMATOR()
-    ransac.post_function_evaluation = get_cam_pose_by_opt_SK
-    ransac.I = I
-    if I == "8PA":
-        ransac.min_super_set = 8
-    elif I == "5PA":
-        ransac.min_super_set = 5
-    if get_E == False:
-        cam_final, inlier_idx = ransac.get_cam_pose(
-            bearings_1=x1,
-            bearings_2=x2
-        )
-        return cam_final, inlier_idx
-    else:
-        E, cam_final, inlier_idx = ransac.get_cam_pose(
-            bearings_1=x1,
-            bearings_2=x2, get_E = True)
-        return E, cam_final, inlier_idx
-
-
-
-def get_cam_pose_by_ransac_GSM(x1, x2, get_E = False, I = "8PA"):
-    ransac = RANSAC_POSE_ESTIMATOR()
-    ransac.post_function_evaluation = get_cam_pose_by_GSM
-    ransac.I = I
-    if I == "8PA":
-        ransac.min_super_set = 8
-    elif I == "5PA":
-        ransac.min_super_set = 5
-    if get_E == False:
-        cam_final, inlier_idx = ransac.get_cam_pose(
-            bearings_1=x1,
-            bearings_2=x2
-        )
-        return cam_final, inlier_idx
-    else:
-        E, cam_final, inlier_idx = ransac.get_cam_pose(
-            bearings_1=x1,
-            bearings_2=x2, get_E = True)
-        return E, cam_final, inlier_idx
-
-
-
-def get_cam_pose_by_ransac_GSM_const_wRT(x1, x2, get_E = False, I="8PA"):
-    ransac = RANSAC_POSE_ESTIMATOR()
-    ransac.post_function_evaluation = get_cam_pose_by_GSM_const_wRT
-    ransac.I = I
-    if I == "8PA":
-        ransac.min_super_set = 8
-    elif I == "5PA":
-        ransac.min_super_set = 5
-    if get_E == False:
-        cam_final, inlier_idx = ransac.get_cam_pose(
-            bearings_1=x1,
-            bearings_2=x2
-        )
-        return cam_final, inlier_idx
-    else:
-        E, cam_final, inlier_idx = ransac.get_cam_pose(
-            bearings_1=x1,
-            bearings_2=x2, get_E = True)
-        return E, cam_final, inlier_idx
-
-
-def get_cam_pose_by_ransac_GSM_const_wSK(x1, x2, get_E = False, I="8PA"):
-    ransac = RANSAC_POSE_ESTIMATOR()
-    ransac.post_function_evaluation = get_cam_pose_by_GSM_const_wSK
-    ransac.I = I
-    if I == "8PA":
-        ransac.min_super_set = 8
-    elif I == "5PA":
-        ransac.min_super_set = 5
-    if get_E == False:
-        cam_final, inlier_idx = ransac.get_cam_pose(
-            bearings_1=x1,
-            bearings_2=x2
-        )
-        return cam_final, inlier_idx
-    else:
-        E, cam_final, inlier_idx = ransac.get_cam_pose(
-            bearings_1=x1,
-            bearings_2=x2, get_E = True)
-        return E, cam_final, inlier_idx
-
 def main():
     x1 = np.ones((3,10))
     x2 = np.ones((3,10))
 
-    print(get_cam_pose_by_ransac_opt_SK(x1,x2))
+    print(get_cam_pose_by_ransac(x1,x2))
 
 if __name__ == '__main__':
     main()

@@ -47,9 +47,9 @@ def main():
     img_hw = (512, 1024)
     path_o = path + f'/O.png'
     path_r = path + f'/R.png'
-    Rx = np.load(path+"/R.npy")
-    Tx = np.load(path+"/T.npy")
-    Tx_norm = Tx / np.linalg.norm(Tx)
+    R_true = np.load(path+"/R.npy")
+    T_true = np.load(path+"/T.npy")
+    T_true_norm = T_true / np.linalg.norm(T_true)
 
     opt, mode, sphered = get_descriptor(descriptor)
 
@@ -102,44 +102,30 @@ def main():
     s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, match=args.match, constant=method_idx)
     x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
     s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
-    E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-    print(inlier_idx)
+    E, cam, inlier_idx = get_cam_pose_by_ransac(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers, solver="SK")
     R1_,R2_,T1_,T2_ = decomposeE(E.T)
-    R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
-    E_true = compute_essential_matrix(Rx, Tx_norm)
+    R_estimated, T_estimated = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
+    E_true = compute_essential_matrix(R_true, T_true_norm)
     results = evaluate_matches(x1, x2, E_true)
-
-    print(Tx)
-    print(x1.shape, x2.shape)
-    #print(E_true)
-    #print(Rx)
-    #print(Tx_norm)
-    #x1_world = np.dot(Rx, (x2-Tx).T).T
-    #x1_world_norm = x1_world / np.linalg.norm(x1_world, axis=1).reshape(-1, 1)
-    #print(x1_world[0:3])
-    #x_a = np.dot(Rx, x1.T).T+Tx.T
-    #x_a = x_a / np.linalg.norm(x_a, axis=1).reshape(-1, 1)
-    #x_b = np.dot(Rx, x1.T).T-Tx.T
-    #x_b = x_b / np.linalg.norm(x_b, axis=1).reshape(-1, 1)
-    #x_c = np.dot(Rx, x2.T).T+Tx.T
-    #x_c = x_c / np.linalg.norm(x_c, axis=1).reshape(-1, 1)
-    #x_d = np.dot(Rx, x2.T).T-Tx.T
-    #x_d = x_d / np.linalg.norm(x_d, axis=1).reshape(-1, 1)
-    #print(x2_world[0:3])
-    #print(x1[0])
-    #print(x2[0:2])
-    #print()
-    #print(x_a[0:2])
-    #print(x_b[0])
-    #print(x_c[0])
-    #print(x_d[0])
 
     print("Evaluation Results:")
     print(f"Valid Matches: {results['valid_matches']} / {results['total_matches']}")
     print(f"Valid Ratio: {results['valid_ratio']*100:.2f}%")
+    print(f"MAE: {results['mae']}")
     print(f"MSE: {results['mse']}")
-
     plot_epipolar_results(results['epipolar_results'])
+
+    print(E.shape, x1.shape)
+    Ex1 = x1.dot(E_true.T)
+    print(Ex1[0:10])
+    print(x2[0:10])
+    #A = np.abs(np.einsum('ij,ij->i',x2,Ex1))/(np.linalg.norm(Ex1, axis=1)+1e-5)
+    #print(A)
+
+
+
+
+
     vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1_[:, :2].copy(), x2_[:, :2].copy(), results['threshold_results'])
     vis_img = cv2.resize(vis_img,dsize=(512,512))
     cv2.imshow("aaa", vis_img)
@@ -147,40 +133,38 @@ def main():
     for i in range(len(x1)):
         vis_img = plot_match(img_o, img_r, s_pts1[i, :2], s_pts2[i, :2], x1_[i, :2].copy(), x2_[i, :2].copy(), results['threshold_results'][i])
         vis_img = cv2.resize(vis_img,dsize=(512,512))
-        print(x1[i], x2[i])
         cv2.imshow("aaa", vis_img)
         c = cv2.waitKey()
         if c == 27: # esc
             break
 
 
-def evaluate_matches(x1, x2, E, threshold=1):
-    epipolar_results = np.einsum('ij,jk,ik->i', x2, E, x1)*180/np.pi
-    #print(epipolar_results)
-    #angles = np.arccos(np.clip(epipolar_results, -1, 1))
-    #max_epipolar_result = np.max(angles)
-    #min_epipolar_result = np.min(angles)
-    #print(max_epipolar_result, min_epipolar_result)
+def evaluate_matches(x1, x2, E, threshold=0.01):
+    epipolar_results = np.einsum('ij,jk,ik->i', x2, E, x1)
     valid_matches = np.sum(abs(epipolar_results) < threshold)
     total_matches = len(epipolar_results)
     valid_ratio = valid_matches / total_matches
-    mse = np.mean(epipolar_results**2)
-
     threshold_results = np.where(abs(epipolar_results) < threshold, 1, 0)
+    epipolar_result_under_threshold = epipolar_results[threshold_results == 1]
+    mae = np.mean(abs(epipolar_result_under_threshold))
+    mse = np.mean(epipolar_result_under_threshold**2)
     
     return {
         "valid_matches": valid_matches,
         "total_matches": total_matches,
         "valid_ratio": valid_ratio,
+        "mae": mae,
         "mse": mse,
         "threshold_results": threshold_results,
         "epipolar_results": epipolar_results
     }
 
 
+
+
 def plot_epipolar_results(epipolar_results):
     plt.figure()
-    range = (-0.05*180/np.pi, 0.05*180/np.pi)
+    range = (-0.05, 0.05)
     plt.hist(epipolar_results, bins=50, color='blue', alpha=0.7, range=range)
     plt.title("Epipolar Results Distribution")
     plt.xlabel("Value")

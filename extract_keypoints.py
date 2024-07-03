@@ -73,10 +73,11 @@ def main():
         TIMES_REMAP = [[] for _ in range(len(DESCRIPTORS))]
         TIMES_FEATURE = [[] for _ in range(len(DESCRIPTORS))]
         MATCHING_SCORE = [[] for _ in range(len(DESCRIPTORS))]
-        MEAN_MATCHING_ACCURCY = [[] for _ in range(len(DESCRIPTORS))]
+        MEAN_MATCHING_ACCURACY = [[] for _ in range(len(DESCRIPTORS))]
         MATCHING_NUM = [[] for _ in range(len(DESCRIPTORS))]
         VALID_MATCHING_NUM = [[] for _ in range(len(DESCRIPTORS))]
         FP_NUM = [[] for _ in range(len(DESCRIPTORS))]
+        MAE = [[] for _ in range(len(DESCRIPTORS))]
         MSE = [[] for _ in range(len(DESCRIPTORS))]
 
         mypath = os.path.join('data/data_100',data)
@@ -87,10 +88,10 @@ def main():
         for path in tqdm(paths):
             path_o = path + '/O.png'
             path_r = path + '/R.png'
-            Rx = np.load(path+"/R.npy")
-            Tx = np.load(path+"/T.npy")
-            Tx_norm = Tx / np.linalg.norm(Tx)
-            E_true = compute_essential_matrix(Rx, Tx_norm)
+            R_true = np.load(path+"/R.npy")
+            T_true = np.load(path+"/T.npy")
+            T_true_norm = T_true / np.linalg.norm(T_true)
+            E_true = compute_essential_matrix(R_true, T_true_norm)
 
             for indicador, descriptor in enumerate(DESCRIPTORS):
 
@@ -129,25 +130,16 @@ def main():
                         s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match)
                         x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
                         s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
-                        results1 = evaluate_matches_angle(x1, x2, E_true, threshold=np.deg2rad(1))
+                        results = evaluate_matches(x1, x2, E_true)
                         
                         if x1.shape[0] < 8:
                             R_error, T_error = 3.14, 3.14
                         else:
-                            if args.solver   == 'None':
-                                E, cam, inlier_idx = get_cam_pose_by_ransac(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-                            elif args.solver == 'SK':
-                                E, can, inlier_idx = get_cam_pose_by_ransac_opt_SK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-                            elif args.solver == 'GSM':
-                                E, can, inlier_idx = get_cam_pose_by_ransac_GSM(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-                            elif args.solver == 'GSM_wRT':
-                                E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
-                            elif args.solver == 'GSM_SK':
-                                E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wSK(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+                            E, cam, inlier_idx = get_cam_pose_by_ransac(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers, solver=args.solver)
                             R1_,R2_,T1_,T2_ = decomposeE(E.T)
-                            R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
-                            t_length_error = np.linalg.norm(Tx_norm - T_)
-                            R_error, T_error = r_error(Rx,R_), t_error(Tx,T_)
+                            R_estimated, T_estimated = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
+                            t_length_error = np.linalg.norm(T_true_norm - T_estimated)
+                            R_error, T_error = r_error(R_true, R_estimated), t_error(T_true,T_estimated)
 
                         R_ERROR[indicador].append(R_error)
                         T_ERROR[indicador].append(T_error)
@@ -156,11 +148,12 @@ def main():
                         TIMES_REMAP[indicador].append(remap_time)
                         TIMES_FEATURE[indicador].append(feature_time)
                         FP_NUM[indicador].append(len_pts)
-                        MATCHING_NUM[indicador].append(results1["total_matches"])
-                        VALID_MATCHING_NUM[indicador].append(results1["valid_matches"])
-                        MEAN_MATCHING_ACCURCY[indicador].append(results1["valid_ratio"])
-                        MATCHING_SCORE[indicador].append(results1["valid_matches"]/len_pts)
-                        MSE[indicador].append(results1["mse"])
+                        MATCHING_NUM[indicador].append(results["total_matches"])
+                        VALID_MATCHING_NUM[indicador].append(results["valid_matches"])
+                        MEAN_MATCHING_ACCURACY[indicador].append(results["valid_ratio"])
+                        MATCHING_SCORE[indicador].append(results["valid_matches"]/len_pts)
+                        MAE[indicador].append(results["mae"])
+                        MSE[indicador].append(results["mse"])
                         
 
                         std.append(x1.shape[0])
@@ -178,10 +171,11 @@ def main():
             np.savetxt(base_path+'/TIMES_REMAP.csv',np.array(TIMES_REMAP[indicador]),delimiter=",")
             np.savetxt(base_path+'/TIMES_FEATURE.csv',np.array(TIMES_FEATURE[indicador]),delimiter=",")
             np.savetxt(base_path+'/MATCHING_SCORE.csv',np.array(MATCHING_SCORE[indicador]),delimiter=",")
-            np.savetxt(base_path+'/MEAN_MATCHING_ACCURACY.csv',np.array(MEAN_MATCHING_ACCURCY[indicador]),delimiter=",")
+            np.savetxt(base_path+'/MEAN_MATCHING_ACCURACY.csv',np.array(MEAN_MATCHING_ACCURACY[indicador]),delimiter=",")
             np.savetxt(base_path+'/MATCHING_NUM.csv',np.array(MATCHING_NUM[indicador]),delimiter=",")
             np.savetxt(base_path+'/VALID_MATCHING_NUM.csv',np.array(VALID_MATCHING_NUM[indicador]),delimiter=",")
             np.savetxt(base_path+'/FP_NUM.csv',np.array(FP_NUM[indicador]),delimiter=",")
+            np.savetxt(base_path+'/MAE.csv',np.array(MAE[indicador]),delimiter=",")
             np.savetxt(base_path+'/MSE.csv',np.array(MSE[indicador]),delimiter=",")
 
     print('finish')
@@ -199,19 +193,21 @@ def compute_essential_matrix(R, t):
     E = t_cross.dot(R)
     return E
 
-def evaluate_matches_angle(x1, x2, E, threshold=np.deg2rad(1)):
+def evaluate_matches(x1, x2, E, threshold=0.01):
     epipolar_results = np.einsum('ij,jk,ik->i', x2, E, x1)
     valid_matches = np.sum(abs(epipolar_results) < threshold)
     total_matches = len(epipolar_results)
     valid_ratio = valid_matches / total_matches
-    mse = np.mean(epipolar_results**2)
-
     threshold_results = np.where(abs(epipolar_results) < threshold, 1, 0)
+    epipolar_result_under_threshold = epipolar_results[threshold_results == 1]
+    mae = np.mean(abs(epipolar_result_under_threshold))
+    mse = np.mean(epipolar_result_under_threshold**2)
     
     return {
         "valid_matches": valid_matches,
         "total_matches": total_matches,
         "valid_ratio": valid_ratio,
+        "mae": mae,
         "mse": mse,
         "threshold_results": threshold_results,
         "epipolar_results": epipolar_results
