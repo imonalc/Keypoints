@@ -52,7 +52,6 @@ def main(args):
     for img in progress_bar:
         if img is None:
             break
-        
         if descriptor == 'alike':
             img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             pred = alike_model(img_rgb, sub_pixel=not args.no_sub_pixel)
