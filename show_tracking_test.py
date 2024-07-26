@@ -10,64 +10,70 @@ import torch
 import utils.superpoint.train_sp.superpoint as train_sp
 from utils.ALIKE.alike import ALike, configs
 from utils.ALIKED.nets.aliked import ALIKED
+from utils.coord    import coord_3d
+from utils.ransac   import *
+from utils.keypoint import *
+from utils.metrics  import *
+from utils.method  import *
+from utils.camera_recovering import *
+from utils.matching import *
+from utils.spherical_module import *
 import time
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-orb_model = cv2.ORB_create(scoreType=cv2.ORB_HARRIS_SCORE, nfeatures=1000)
-sift_model = cv2.SIFT_create(nfeatures=1000)
-akaze_model = cv2.AKAZE_create()
-sp_model = train_sp.SuperPointFrontend(weights_path = 'utils/models/superpoint-trained.pth.tar', 
-                                 nms_dist= 4,
-                                 conf_thresh = 0.015,
-                                 nn_thresh= 0.7,
-                                 cuda = True)
-alike_model = ALike(**configs["alike-n"],
-                    device=device,
-                    top_k=-1,
-                    scores_th=0.2,
-                    n_limit=1000
-                    )
-aliked_model = ALIKED(model_name="aliked-n16", # aliked-t16, aliked-n32,
-                      device="cuda",
-                      top_k=-1,
-                      scores_th=0.2,
-                      n_limit=1000
-                      )
+dim = [1024, 512]
+Y_remap, X_remap, make_map_time = make_image_map([512, 1024])
 
 
 def main(args):
     descriptor = args.descriptor
+    proposed_method_flag = False
+    if descriptor[0] == 'p':
+        descriptor = descriptor[1:]
+        proposed_method_flag = True
+    model = get_model(descriptor)
     logging.basicConfig(level=logging.INFO) 
     logging.info("Press 'q' to stop!")
-    cv2.namedWindow("descriptor")   
-
+    cv2.namedWindow(descriptor)   
 
     image_loader = ImageLoader(args.input)
     tracker = SimpleTracker()
     runtime_list = []
     Trueratio_list = []
     Nmatches_list = []
+    Matchingscore_list = []
     progress_bar = tqdm(image_loader)
     for img in progress_bar:
         if img is None:
             break
-        kpts, desc, time_fp = get_kptsdesc(img, descriptor)
-        runtime_list.append(time_fp)
-        out, Nmatches = tracker.update(img, kpts, desc, descriptor)
-        Nmatches_list.append(Nmatches)
-        Trueratio_list.append(Nmatches / len(kpts))
+        if proposed_method_flag:
+            kpts, desc, time_fp = keypoint_proposed(img, descriptor, model)
+        else:
+            kpts, desc, time_fp = get_kptsdesc(img, descriptor, model)
+            kpts, desc, _ = sort_key_div_np(kpts, desc.T, 1000)
         
-        ave_fps = (1. / np.stack(runtime_list)).mean()
-        status = f"Fps:{ave_fps:.1f}, Keypoints/Matches: {len(kpts)}/{Nmatches}"
-        progress_bar.set_description(status)
+        out, x_eq1, x_eq2 = tracker.update(img, kpts, desc, descriptor)
+        Nmatches = len(x_eq1)
+        inlier_idx = []
+        status = ""
+        if Nmatches > 8:
+            runtime_list.append(time_fp)
+            x_3d1,x_3d2 = coord_3d(x_eq1, dim), coord_3d(x_eq2, dim)
+            E, cam, inlier_idx = get_cam_pose_by_ransac(x_3d1.copy().T,x_3d2.copy().T, get_E = True, solver="SK")
+            Nmatches_list.append(Nmatches)
+            Trueratio_list.append(sum(inlier_idx) / len(kpts))
+            Matchingscore_list.append(sum(inlier_idx) / Nmatches)
+            ave_fps = (1. / np.stack(runtime_list)).mean()
+            status = f"Fps:{ave_fps:.1f}, Keypoints/Matches/Truematches: {len(kpts)}/{Nmatches}/{sum(inlier_idx)}"
 
-        cv2.setWindowTitle(descriptor, descriptor + ': ' + status)
-        cv2.imshow(descriptor, out)
-        if cv2.waitKey(1) == ord('q'):
-            break
+            progress_bar.set_description(status)
+            cv2.setWindowTitle(descriptor, descriptor + ': ' + status)
+            cv2.imshow(descriptor, out)
+            if cv2.waitKey(1) == ord('q'):
+                break
     
     print(f"Average; FPS: {ave_fps:.1f}, Matches: {np.mean(Nmatches_list):.1f}", 
-          f"True Ratio: {np.mean(Trueratio_list):.3f}")
+          f"True Ratio: {np.mean(Trueratio_list):.3f}, Matching Score: {np.mean(Matchingscore_list):.3f}")
     logging.info('Finished!')
     logging.info('Press any key to exit!')
     cv2.waitKey()
@@ -131,7 +137,7 @@ class SimpleTracker(object):
         self.desc_prev = None
 
     def update(self, img, pts, desc, descriptor):
-        N_matches = 0
+        mpts1, mpts2 = [], []
         if self.pts_prev is None:
             self.pts_prev = pts
             self.desc_prev = desc
@@ -143,7 +149,6 @@ class SimpleTracker(object):
         else:
             matches = self.matcher_parser(self.desc_prev, desc, descriptor)
             mpts1, mpts2 = self.pts_prev[matches[:, 0]], pts[matches[:, 1]]
-            N_matches = len(matches)
 
             out = copy.deepcopy(img)
             for pt1, pt2 in zip(mpts1, mpts2):
@@ -155,7 +160,7 @@ class SimpleTracker(object):
             self.pts_prev = pts
             self.desc_prev = desc
 
-        return out, N_matches
+        return out, mpts1, mpts2
 
 
     def matcher_parser(self, desc1, desc2, descriptor):
@@ -217,58 +222,73 @@ class SimpleTracker(object):
         return matches.transpose()
 
 
-def get_kptsdesc(img, descriptor):
+def get_kptsdesc(img, descriptor, model):
     if descriptor == 'alike':
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         time_feature1 = time.perf_counter()
-        pred = alike_model(img_rgb)
+        pred = model(img_rgb)
         time_feature2 = time.perf_counter()
         kpts = pred['keypoints']
         desc = pred['descriptors']
+        scores = pred['scores']
+        kpts = np.column_stack((kpts, scores))
     elif descriptor == 'aliked':
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         time_feature1 = time.perf_counter()
-        pred = aliked_model.run(img_rgb)
+        pred = model.run(img_rgb)
         time_feature2 = time.perf_counter()
         kpts = pred['keypoints']
         desc = pred['descriptors']
+        scores = pred['scores']
+        kpts = np.column_stack((kpts, scores))
     elif descriptor == 'orb':
         time_feature1 = time.perf_counter()
-        kpts, desc = orb_model.detectAndCompute(img, None)
+        kpts, desc = model.detectAndCompute(img, None)
         time_feature2 = time.perf_counter()
-        kpts = np.array([kp.pt for kp in kpts])
+        kpts = np.array([(kp.pt[0], kp.pt[1], kp.response) for kp in kpts])
         desc = np.array(desc)
     elif descriptor == 'sift':
         time_feature1 = time.perf_counter()
-        kpts, desc = sift_model.detectAndCompute(img, None)
+        kpts, desc = model.detectAndCompute(img, None)
         time_feature2 = time.perf_counter()
-        kpts = np.array([kp.pt for kp in kpts])
+        kpts = np.array([(kp.pt[0], kp.pt[1], kp.response) for kp in kpts])
         desc = np.array(desc)
     elif descriptor == 'akaze':
         time_feature1 = time.perf_counter()
-        kpts, desc = akaze_model.detectAndCompute(img, None)
+        kpts, desc = model.detectAndCompute(img, None)
         time_feature2 = time.perf_counter()
-        kpts = np.array([kp.pt for kp in kpts])
+        kpts = np.array([(kp.pt[0], kp.pt[1], kp.response) for kp in kpts])
         desc = np.array(desc)
+    elif descriptor == 'spoint':
+        img = process_img(img)
+        time_feature1 = time.perf_counter()
+        pts, desc, _ = sp_model.run(img)
+        time_feature2 = time.perf_counter()
+        kpts = np.zeros((pts.shape[1],4))
+        kpts[:,0] = pts[0,:]
+        kpts[:,1] = pts[1,:]
+        kpts[:,2] = pts[2,:]
+        kpts[:,3] = pts[2,:]
+        desc = np.array(desc.T)
 
     return kpts, desc, time_feature2 - time_feature1
 
 
-def keypoint_proposed(img, opt, scale_factor, img_hw, padding_length=50):
-    Y_remap, X_remap, make_map_time = make_image_map(img_hw)
+def keypoint_proposed(img, descriptor, model, padding_length=34):
+    img_hw = img.shape[:2]
     img_hw_crop = (img_hw[0]//2+padding_length*2, img_hw[1]*3//4+padding_length*2)
     crop_start_xy = ((img_hw[0]-img_hw_crop[0])//2 - 1, (img_hw[1]-img_hw_crop[1])//2 - 1)
-
     img1, img2, remap_time = remap_crop_image(img, (Y_remap, X_remap), img_hw_crop, crop_start_xy)
-    img1 = torch.from_numpy(img1).permute(2, 0, 1).float().unsqueeze(0)
 
-    img1 = F.interpolate(img1, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
-    img2 = torch.from_numpy(img2).permute(2, 0, 1).float().unsqueeze(0)
-    img2 = F.interpolate(img2, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+    pts1_, desc1_, feature_time1 = get_kptsdesc(img1, descriptor, model)
+    pts2_, desc2_, feature_time2 = get_kptsdesc(img2, descriptor, model)
+    feature_time = feature_time1 + feature_time2 + remap_time
 
-    pts1_, desc1_, feature_time1 = keypoint_equirectangular(img1, opt)
-    pts2_, desc2_, feature_time2 = keypoint_equirectangular(img2, opt)
-    feature_time = feature_time1 + feature_time2
+    pts1_ = torch.tensor(pts1_).float()
+    pts2_ = torch.tensor(pts2_).float()
+    desc1_ = torch.tensor(desc1_.T).float()
+    desc2_ = torch.tensor(desc2_.T).float()
+
 
     pts1_ = add_offset_to_image(pts1_, crop_start_xy)
     pts2_ = add_offset_to_image(pts2_, crop_start_xy)
@@ -277,95 +297,67 @@ def keypoint_proposed(img, opt, scale_factor, img_hw, padding_length=50):
     pts2_, desc2_ = filter_keypoints(pts2_, desc2_, img_hw, invert_mask=True)
     image_kp = torch.cat((pts1_, pts2_), dim=0)
     image_desc = torch.cat((desc1_, desc2_), dim=1)
+    image_kp, image_desc, _ = sort_key_div_np(image_kp.numpy(), image_desc.numpy(), 1000)
 
-    return image_kp, image_desc, make_map_time, remap_time, feature_time
-
-
-def make_image_map(img_hw, rad=torch.pi/2):
-    make_map_time1 = time.perf_counter()
-    (h, w) = img_hw
-    w_half = int(w / 2)
-    h_half = int(h / 2)
-
-    phi, theta = np.meshgrid(np.linspace(-torch.pi, torch.pi, w_half*2),
-                             np.linspace(-torch.pi/2, torch.pi/2, h_half*2))
-
-    x, y, z = spherical_to_cartesian(phi, theta)
-
-    xx, yy, zz = rotate_yaw(x, y, z, rad)
-    xx, yy, zz = rotate_pitch(xx, yy, zz, rad)
-    xx, yy, zz = rotate_yaw(xx, yy, zz, rad)
-
-    new_phi, new_theta = cartesian_to_spherical(xx, yy, zz)
-
-    Y_remap = 2 * new_theta / torch.pi * h_half + h_half
-    X_remap = new_phi / torch.pi * w_half + w_half
-
-    make_map_time2 = time.perf_counter()
-    make_map_time = make_map_time2 - make_map_time1
-
-    return Y_remap, X_remap, make_map_time
+    return image_kp, image_desc, feature_time
 
 
-def rotate_yaw(x, y, z, rot):
-    xx = x * np.cos(rot) - y * np.sin(rot)
-    yy = x * np.sin(rot) + y * np.cos(rot)
-    zz = z
-
-    return xx, yy, zz
-
-def rotate_roll(x, y, z, rot):
-    xx = x
-    yy = y * np.cos(rot) - z * np.sin(rot)
-    zz = y * np.sin(rot) + z * np.cos(rot)
-
-    return xx, yy, zz
-
-def rotate_pitch(x, y, z, rot):
-    xx = x * np.cos(rot) + z * np.sin(rot)
-    yy = y
-    zz = -x * np.sin(rot) + z * np.cos(rot)
-
-    return xx, yy, zz
-
-
-def spherical_to_cartesian(phi, theta):
-    x = np.cos(theta) * np.cos(phi)
-    y = np.cos(theta) * np.sin(phi)
-    z = np.sin(theta)
-    return x, y, z
-
-
-def cartesian_to_spherical(x, y, z):
-    theta = np.arcsin(z)
-    phi = np.arctan2(y, x)
-    return phi, theta
+def get_model(descriptor):
+    feature_limit = 1000
+    if descriptor == 'orb':
+        model = cv2.ORB_create(scoreType=cv2.ORB_HARRIS_SCORE, nfeatures=feature_limit)
+    elif descriptor == 'sift':
+        model = cv2.SIFT_create(nfeatures=feature_limit)
+    elif descriptor == 'akaze':
+        model = cv2.AKAZE_create()
+    elif descriptor == 'spoint':
+        model = train_sp.SuperPointFrontend(weights_path = 'utils/models/superpoint-trained.pth.tar', 
+                                     nms_dist= 4,
+                                     conf_thresh = 0.015,
+                                     nn_thresh= 0.7,
+                                     cuda = True)
+    elif descriptor == 'alike':
+        model = ALike(**configs["alike-n"],
+                        device=device,
+                        top_k=-1,
+                        scores_th=0.2,
+                        n_limit=feature_limit
+                        )
+    elif descriptor == 'aliked':
+        model = ALIKED(model_name="aliked-n16", # aliked-t16, aliked-n32,
+                          device="cuda",
+                          top_k=-1,
+                          scores_th=0.2,
+                          n_limit=feature_limit
+                          )
+    return model
 
 
-def remap_crop_image(img, YX_remap, img_hw_crop, crop_start_xy):
-    (Y_remap, X_remap) = YX_remap
-
-    remap_time1 = time.perf_counter()
-    img2 = cv2.remap(img, X_remap.astype(np.float32), Y_remap.astype(np.float32), 
-                    cv2.INTER_LINEAR, borderMode=cv2.BORDER_WRAP)
-    remap_time2 = time.perf_counter()
-    remap_time = remap_time2 - remap_time1
-
-    img1_cropped = img[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
-    img2_cropped = img2[crop_start_xy[0]:crop_start_xy[0]+img_hw_crop[0], crop_start_xy[1]:crop_start_xy[1]+img_hw_crop[1]]
+def process_img(img):
+    H, W = img.shape[0], img.shape[1]
+    grayim = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    grayim = (grayim.astype('float32') / 255.)
+    return grayim
 
 
-    return img1_cropped, img2_cropped, remap_time
+def sort_key_div_np(pts1, desc1, points):
+    ind1 = np.argsort(pts1[:,2])[::-1]
+    max1 = min(points, len(ind1))
+    ind1 = ind1[:max1]
+    pts1 = pts1[ind1]
+    scores1 = pts1[:, 2:3].copy()
+    desc1 = desc1[:, ind1]
+    pts1 = np.concatenate((pts1[:,:2], np.ones((len(pts1), 1))), axis=1)
+    desc1 = desc1.T
+
+    return pts1, desc1, scores1
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='ALike Demo.')
     parser.add_argument('input', type=str, default='',
                         help='Image directory or movie file or "camera0" (for webcam0).')
-    parser.add_argument('--model', choices=['alike-t', 'alike-s', 'alike-n', 'alike-l', "test"], default="alike-n",
-                        help="The model configuration")
-    parser.add_argument('--descriptor', choices=['alike', 'orb', 'sift', 'aliked', 'akaze'], default='alike')
-    parser.add_argument('--n_limit', type=int, default=1000,
-                        help='Maximum number of keypoints to be detected (default: 5000).')
+    parser.add_argument('--descriptor',  default='orb')
     args = parser.parse_args()
 
     main(args)
