@@ -345,6 +345,46 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
     return erp_kp, np.transpose(erp_desc,[1,0]), feature_time
 
 
+def keypoint_rotated(img, opt, scale_factor, img_hw):
+    Y_remap1, X_remap1, Y_remap2, X_remap2, make_map_time = make_image_map_r(img_hw)
+    #img_hw_crop = (img_hw[0]//3+padding_length*2, img_hw[1])
+    img_hw_crop = (img_hw[0]//3, img_hw[1])
+    crop_start_xy = (img_hw[0]//3 - 1, 0)
+
+    img1, img2, remap_time1 = remap_crop_image(img, (Y_remap1, X_remap1), img_hw_crop, crop_start_xy)
+    _, img3, remap_time2 = remap_crop_image(img, (Y_remap2, X_remap2), img_hw_crop, crop_start_xy)
+    cv2.imwrite('img1.jpg', img1)
+    cv2.imwrite('img2.jpg', img2)
+    cv2.imwrite('img3.jpg', img3)
+    remap_time = remap_time1 + remap_time2
+    img1 = torch.from_numpy(img1).permute(2, 0, 1).float().unsqueeze(0)
+    img1 = F.interpolate(img1, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+    img2 = torch.from_numpy(img2).permute(2, 0, 1).float().unsqueeze(0)
+    img2 = F.interpolate(img2, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+    img3 = torch.from_numpy(img3).permute(2, 0, 1).float().unsqueeze(0)
+    img3 = F.interpolate(img3, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+    
+    pts1_, desc1_, feature_time1 = keypoint_equirectangular(img1, opt)
+    pts2_, desc2_, feature_time2 = keypoint_equirectangular(img2, opt)
+    pts3_, desc3_, feature_time3 = keypoint_equirectangular(img3, opt)
+    feature_time = feature_time1 + feature_time2 + feature_time3
+
+    pts1_ = add_offset_to_image(pts1_, crop_start_xy)
+    pts2_ = add_offset_to_image(pts2_, crop_start_xy)
+    pts3_ = add_offset_to_image(pts3_, crop_start_xy)
+
+    pts1_, desc1_ = filter_keypoints_r(pts1_, desc1_, img_hw)
+    pts2_, desc2_ = filter_keypoints_r(pts2_, desc2_, img_hw)
+    pts3_, desc3_ = filter_keypoints_r(pts3_, desc3_, img_hw)
+
+    pts2_ = convert_coordinates_vectorized_r(pts2_, img_hw, rad=torch.pi*2/3)
+    pts3_ = convert_coordinates_vectorized_r(pts3_, img_hw, rad=-torch.pi*2/3)
+    image_kp = torch.cat([pts1_, pts2_, pts3_], dim=0)
+    image_desc = torch.cat([desc1_, desc2_, desc3_], dim=1)
+    image_kp = pts3_
+    image_desc = desc3_
+
+    return image_kp, image_desc, make_map_time, remap_time, feature_time
 
 
 def process_image_to_keypoints(image_path, scale_factor, base_order, sample_order, opt, mode, img_hw):
@@ -372,6 +412,9 @@ def process_image_to_keypoints(image_path, scale_factor, base_order, sample_orde
         image_kp, image_desc, make_map_time, remap_time, feature_time = keypoint_proposed(img, opt, scale_factor, img_hw)
     elif mode == 'erp':
         image_kp, image_desc, feature_time = keypoint_equirectangular(img, opt)
+    elif mode == 'rotated':
+        img = cv2.imread(image_path)
+        image_kp, image_desc, make_map_time, remap_time, feature_time = keypoint_rotated(img, opt, scale_factor, img_hw)
 
     return image_kp, image_desc, make_map_time, remap_time, feature_time
 

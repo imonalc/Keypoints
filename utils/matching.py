@@ -40,6 +40,7 @@ def sort_key(pts1, pts2, desc1, desc2, points):
 
     return pts1, pts2, desc1, desc2, scores1, scores2
 
+
 def sort_key_div(pts1, desc1, points):
     ind1 = np.argsort(pts1[:,2].numpy(),axis = 0)[::-1]
     max1 = np.min([points,ind1.shape[0]])
@@ -255,9 +256,11 @@ def get_descriptor(descriptor):
     elif descriptor[0] == 'p':
         descriptor_main = descriptor_main[1:]
         image_mode = 'proposed'
+    elif descriptor[0] == 'r':
+        descriptor_main = descriptor_main[1:]
+        image_mode = 'rotated'
     
     descriptor_configs = {
-        'Proposed': ('superpoint', image_mode, 512),
         'sphorb': ('sphorb', image_mode, 640),
         'sift': ('sift', image_mode, 512),
         'orb': ('orb', image_mode, 512),

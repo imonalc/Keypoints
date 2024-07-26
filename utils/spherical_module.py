@@ -40,6 +40,33 @@ def make_image_map(img_hw, rad=torch.pi/2):
     return Y_remap, X_remap, make_map_time
 
 
+def make_image_map_r(img_hw, rad=torch.pi*2/3):
+    make_map_time1 = time.perf_counter()
+    (h, w) = img_hw
+    w_half = int(w / 2)
+    h_half = int(h / 2)
+
+    phi, theta = np.meshgrid(np.linspace(-torch.pi, torch.pi, w_half*2),
+                             np.linspace(-torch.pi/2, torch.pi/2, h_half*2))
+
+    x, y, z = spherical_to_cartesian(phi, theta)
+    xx, yy, zz = rotate_pitch(x, y, z, rad)
+    new_phi, new_theta = cartesian_to_spherical(xx, yy, zz)
+
+    Y_remap1 = 2 * new_theta / torch.pi * h_half + h_half
+    X_remap1 = new_phi / torch.pi * w_half + w_half
+
+    xx, yy, zz = rotate_pitch(xx, yy, zz, rad)
+    new_phi, new_theta = cartesian_to_spherical(xx, yy, zz)
+    Y_remap2 = 2 * new_theta / torch.pi * h_half + h_half
+    X_remap2 = new_phi / torch.pi * w_half + w_half
+
+    make_map_time2 = time.perf_counter()
+    make_map_time = make_map_time2 - make_map_time1
+
+    return Y_remap1, X_remap1, Y_remap2, X_remap2, make_map_time
+
+
 
 def remap_image(image_path, output_path, YX_remap):
     (Y_remap, X_remap) = YX_remap
@@ -119,6 +146,34 @@ def filter_keypoints(pts_, desc_, img_hw, invert_mask=False):
     return pts, desc
 
 
+def filter_keypoints_r(pts_, desc_, img_hw, rad=torch.pi*2/3):
+    img_height = img_hw[0]
+    img_width = img_hw[1]
+
+    theta = (pts_[:, 1] / img_height) * torch.pi
+    phi = (pts_[:, 0] / img_width) * 2 * torch.pi
+    x, y, z = spherical_to_cartesian(phi, theta)
+    xx1, yy1, zz1 = rotate_pitch(x, y, z, rad)
+    xx2, yy2, zz2 = rotate_pitch(xx1, yy1, zz1, rad)
+    _, theta1 = cartesian_to_spherical(xx1, yy1, zz1)
+    _, theta2 = cartesian_to_spherical(xx2, yy2, zz2)
+    i1 = (theta1 / torch.pi * img_height + img_height) % img_height
+    i2 = (theta2 / torch.pi * img_height + img_height) % img_height
+
+    print(pts_[:, 1][0:10])
+    print(i1[0:10])
+    print(i2[0:10])
+
+    mask1 = torch.abs(pts_[:, 1] - img_height // 2) < torch.abs(i1 - img_height // 2)
+    mask2 = torch.abs(pts_[:, 1] - img_height // 2) < torch.abs(i2 - img_height // 2) 
+    mask3 = torch.abs(pts_[:, 1] - img_height // 2) < img_height // 6
+
+    mask = mask1 & mask2 & mask3
+    pts = pts_[mask]
+    desc = desc_.T[mask].T
+
+    return pts, desc
+
 
 def filter_keypoints_abridged(pts_, desc_, img_hw, invert_mask=False):
     img_height = img_hw[0]
@@ -180,6 +235,30 @@ def convert_coordinates_vectorized(tensor, image_size_hw, rad=-torch.pi/2):
     xx, yy, zz = rotate_pitch(xx, yy, zz, rad)
     xx, yy, zz = rotate_yaw(xx, yy, zz, rad)
 
+    new_phi, new_theta = cartesian_to_spherical(xx, yy, zz)
+
+    new_y = new_theta * h_half / (torch.pi/2) + h_half
+    new_x = new_phi * w_half / torch.pi + w_half
+    
+    transformed_tensor = tensor
+    transformed_tensor[:, 0] = new_x
+    transformed_tensor[:, 1] = new_y
+    
+    return transformed_tensor
+
+def convert_coordinates_vectorized_r(tensor, image_size_hw, rad=torch.pi):
+    h, w = image_size_hw
+    w_half = w / 2
+    h_half = h / 2
+
+    x_coords = tensor[:, 0]
+    y_coords = tensor[:, 1]
+
+    phi = (x_coords - w_half) * torch.pi * 2 / w
+    theta = (y_coords - h_half) * torch.pi / h
+    
+    x, y, z = spherical_to_cartesian(phi, theta)
+    xx, yy, zz = rotate_pitch(x, y, z, rad)
     new_phi, new_theta = cartesian_to_spherical(xx, yy, zz)
 
     new_y = new_theta * h_half / (torch.pi/2) + h_half
