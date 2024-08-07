@@ -47,8 +47,6 @@ def main():
     img_hw = (512, 1024)
     path_o = path + f'/O.png'
     path_r = path + f'/R.png'
-    Rx = np.load(path+"/R.npy")
-    Tx = np.load(path+"/T.npy")
 
     opt, mode, sphered = get_descriptor(descriptor)
 
@@ -107,17 +105,10 @@ def main():
     x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
     s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
 
-    E, can, inlier_idx = get_cam_pose_by_ransac_GSM_const_wRT(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers)
+    E, cam, inlier_idx = get_cam_pose_by_ransac(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers, solver="SK")
     R1_,R2_,T1_,T2_ = decomposeE(E.T)
     R_,T_ = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
     print("True:", sum(inlier_idx), len(inlier_idx), ", ratio:", sum(inlier_idx) / len(inlier_idx))
-
-    print(Rx, Tx)
-    threshold = 0.2
-    mse, count_under_threshold, ratio_under_threshold = transform_and_evaluate(x1, x2, Rx, Tx, threshold)
-    print(f"MSE: {mse}")
-    print(f"Threshold under {threshold} pixels: {count_under_threshold} points")
-    print(f"Ratio of points under threshold: {ratio_under_threshold * 100:.2f}%")
 
     
     vis_img = plot_matches(img_o, img_r, s_pts1[:, :2], s_pts2[:, :2], x1_[:, :2], x2_[:, :2], inlier_idx)

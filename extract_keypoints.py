@@ -35,8 +35,8 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 base_order = 0  # Base sphere resolution
 sample_order = 8  # Determines sample resolution (10 = 2048 x 4096) (0, 8): 20*256*256
 scale_factor = 1.0  # How much to scale input equirectangular image by
-np.random.seed(1)
-random.seed(1)
+np.random.seed(0)
+random.seed(0)
 
 def main():
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
@@ -144,14 +144,17 @@ def main():
                         R_ERROR[indicador].append(R_error)
                         T_ERROR[indicador].append(T_error)
                         T_LENGTH_ERROR[indicador].append(t_length_error)
+
                         TIMES_MAKEMAP[indicador].append(make_map_time)
                         TIMES_REMAP[indicador].append(remap_time)
                         TIMES_FEATURE[indicador].append(feature_time)
+
                         FP_NUM[indicador].append(len_pts)
                         MATCHING_NUM[indicador].append(results["total_matches"])
                         VALID_MATCHING_NUM[indicador].append(results["valid_matches"])
-                        MEAN_MATCHING_ACCURACY[indicador].append(results["valid_ratio"])
                         MATCHING_SCORE[indicador].append(results["valid_matches"]/len_pts)
+                        MEAN_MATCHING_ACCURACY[indicador].append(results["valid_ratio"])
+                        
                         MAE[indicador].append(results["mae"])
                         MSE[indicador].append(results["mse"])
                         
@@ -195,6 +198,7 @@ def compute_essential_matrix(R, t):
 
 def evaluate_matches(x1, x2, E, threshold=0.01):
     epipolar_results = np.einsum('ij,jk,ik->i', x2, E, x1)
+    epipolar_results = np.arcsin(epipolar_results)
     valid_matches = np.sum(abs(epipolar_results) < threshold)
     total_matches = len(epipolar_results)
     valid_ratio = valid_matches / total_matches

@@ -117,8 +117,8 @@ def main():
 
     print(E.shape, x1.shape)
     Ex1 = x1.dot(E_true.T)
-    print(Ex1[0:10])
-    print(x2[0:10])
+    #print(Ex1[0:10])
+    #print(x2[0:10])
     #A = np.abs(np.einsum('ij,ij->i',x2,Ex1))/(np.linalg.norm(Ex1, axis=1)+1e-5)
     #print(A)
 
@@ -141,6 +141,7 @@ def main():
 
 def evaluate_matches(x1, x2, E, threshold=0.01):
     epipolar_results = np.einsum('ij,jk,ik->i', x2, E, x1)
+    epipolar_results = np.arcsin(epipolar_results)
     valid_matches = np.sum(abs(epipolar_results) < threshold)
     total_matches = len(epipolar_results)
     valid_ratio = valid_matches / total_matches

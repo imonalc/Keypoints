@@ -231,5 +231,17 @@ class EightPointAlgorithmGeneralGeometry:
         B = np.abs(np.einsum('ij,ij->i',kwargs["x1"].T,Ex2))/(np.linalg.norm(Ex2, axis=1)+1e-5)
 
         return (A+B)/2.
+    
+    @staticmethod
+    def projected_error_sphere(**kwargs):
+        Ex1 = kwargs["x1"].T.dot(kwargs["e"])
+        A = np.abs(np.einsum('ij,ij->i',kwargs["x2"].T,Ex1))/(np.linalg.norm(Ex1, axis=1)+1e-5)
+        error_sphere_A = np.arcsin(A)
+        
+        Ex2 = kwargs["x2"].T.dot(kwargs["e"].T)
+        B = np.abs(np.einsum('ij,ij->i',kwargs["x1"].T,Ex2))/(np.linalg.norm(Ex2, axis=1)+1e-5)
+        error_sphere_B = np.arcsin(B)
+
+        return (error_sphere_A+error_sphere_B)/2.
 
 

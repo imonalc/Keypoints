@@ -63,11 +63,12 @@ class RANSAC_POSE_ESTIMATOR:
             )
 
             # * Evaluation
-            sample_residuals = self.solver.projected_error2(
+            sample_residuals = self.solver.projected_error_sphere(  # projected_error2(
                 e=e_hat,
                 x1=bearings_1,
                 x2=bearings_2
             )
+
             sample_evaluation = np.sum(sample_residuals ** 2)
 
             # * Selection

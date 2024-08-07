@@ -293,8 +293,8 @@ def keypoint_proposed(img, opt, scale_factor, img_hw):
     crop_start_xy = ((img_hw[0]-img_hw_crop[0])//2 - 1, (img_hw[1]-img_hw_crop[1])//2 - 1)
 
     img1, img2, remap_time = remap_crop_image(img, (Y_remap, X_remap), img_hw_crop, crop_start_xy)
-    img1 = torch.from_numpy(img1).permute(2, 0, 1).float().unsqueeze(0)
 
+    img1 = torch.from_numpy(img1).permute(2, 0, 1).float().unsqueeze(0)
     img1 = F.interpolate(img1, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
     img2 = torch.from_numpy(img2).permute(2, 0, 1).float().unsqueeze(0)
     img2 = F.interpolate(img2, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
@@ -347,7 +347,6 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
 
 def keypoint_rotated(img, opt, scale_factor, img_hw):
     Y_remap1, X_remap1, Y_remap2, X_remap2, make_map_time = make_image_map_r(img_hw)
-    #img_hw_crop = (img_hw[0]//3+padding_length*2, img_hw[1])
     img_hw_crop = (img_hw[0]//3, img_hw[1])
     crop_start_xy = (img_hw[0]//3 - 1, 0)
 
@@ -377,12 +376,12 @@ def keypoint_rotated(img, opt, scale_factor, img_hw):
     pts2_, desc2_ = filter_keypoints_r(pts2_, desc2_, img_hw)
     pts3_, desc3_ = filter_keypoints_r(pts3_, desc3_, img_hw)
 
-    pts2_ = convert_coordinates_vectorized_r(pts2_, img_hw, rad=torch.pi*2/3)
-    pts3_ = convert_coordinates_vectorized_r(pts3_, img_hw, rad=-torch.pi*2/3)
+    pts2_ = convert_coordinates_vectorized_r(pts2_, img_hw, rad=-torch.pi*2/3)
+    pts3_ = convert_coordinates_vectorized_r(pts3_, img_hw, rad=torch.pi*2/3)
     image_kp = torch.cat([pts1_, pts2_, pts3_], dim=0)
     image_desc = torch.cat([desc1_, desc2_, desc3_], dim=1)
-    image_kp = pts3_
-    image_desc = desc3_
+    #image_kp = pts2_
+    #image_desc = desc2_
 
     return image_kp, image_desc, make_map_time, remap_time, feature_time
 

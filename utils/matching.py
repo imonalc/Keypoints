@@ -138,6 +138,19 @@ def mnn_matcher_hamming(desc1, desc2, constant_cut=0.0):
     return matches
 
 
+def mnn_matcher_alike(desc1, desc2):
+    sim = desc1 @ desc2.transpose()
+    sim[sim < 0.7] = 0
+    nn12 = np.argmax(sim, axis=1)
+    nn21 = np.argmax(sim, axis=0)
+    ids1 = np.arange(0, sim.shape[0])
+    mask = (ids1 == nn21[nn12])
+    matches = np.stack([ids1[mask], nn12[mask]])
+    matches_idx = matches.transpose()
+    matches = [cv2.DMatch(i, j, 0) for i, j in matches_idx]
+
+    return matches
+
 
 def mnn_matcher_L2(desc1, desc2, constant_cut=0.0):
     d1_square = np.sum(np.square(desc1), axis=1, keepdims=True)
@@ -207,6 +220,8 @@ def matched_points(pts1, pts2, desc1, desc2, opt, args_opt, match="BF", constant
     elif match == 'MNN':
         if 'args_opt' in ['orb', 'sphorb', 'akaze']:
             matches = mnn_matcher_hamming(desc1, desc2)
+        elif 'args_opt' in ['alike', 'aliked']:
+            matches = mnn_matcher_alike(desc1, desc2)
         else:
             matches = mnn_matcher_L2(s_desc1, s_desc2)
     else:

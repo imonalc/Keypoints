@@ -146,29 +146,30 @@ def filter_keypoints(pts_, desc_, img_hw, invert_mask=False):
     return pts, desc
 
 
-def filter_keypoints_r(pts_, desc_, img_hw, rad=torch.pi*2/3):
+def filter_keypoints_r(pts_, desc_, img_hw, rad=torch.pi/3):
     img_height = img_hw[0]
     img_width = img_hw[1]
 
-    theta = (pts_[:, 1] / img_height) * torch.pi
+    theta = ((pts_[:, 1] - img_height /2)/ img_height) * torch.pi
     phi = (pts_[:, 0] / img_width) * 2 * torch.pi
     x, y, z = spherical_to_cartesian(phi, theta)
     xx1, yy1, zz1 = rotate_pitch(x, y, z, rad)
     xx2, yy2, zz2 = rotate_pitch(xx1, yy1, zz1, rad)
     _, theta1 = cartesian_to_spherical(xx1, yy1, zz1)
     _, theta2 = cartesian_to_spherical(xx2, yy2, zz2)
-    i1 = (theta1 / torch.pi * img_height + img_height) % img_height
-    i2 = (theta2 / torch.pi * img_height + img_height) % img_height
+    i1 = (theta1 / (torch.pi / 2) + 1) * img_height / 2
+    i2 = (theta2 / (torch.pi / 2) + 1) * img_height / 2
 
-    print(pts_[:, 1][0:10])
-    print(i1[0:10])
-    print(i2[0:10])
+    #print(pts_[:, 1][0:10])
+    #print(i1[0:10])
+    #print(i2[0:10])
+    #print(min(pts_[:, 0]), max(pts_[:, 0]))
+    #print(min(pts_[:, 1]), max(pts_[:, 1]))
 
     mask1 = torch.abs(pts_[:, 1] - img_height // 2) < torch.abs(i1 - img_height // 2)
     mask2 = torch.abs(pts_[:, 1] - img_height // 2) < torch.abs(i2 - img_height // 2) 
-    mask3 = torch.abs(pts_[:, 1] - img_height // 2) < img_height // 6
 
-    mask = mask1 & mask2 & mask3
+    mask = mask1 & mask2
     pts = pts_[mask]
     desc = desc_.T[mask].T
 
@@ -254,15 +255,15 @@ def convert_coordinates_vectorized_r(tensor, image_size_hw, rad=torch.pi):
     x_coords = tensor[:, 0]
     y_coords = tensor[:, 1]
 
-    phi = (x_coords - w_half) * torch.pi * 2 / w
+    phi = x_coords / w_half * torch.pi
     theta = (y_coords - h_half) * torch.pi / h
     
     x, y, z = spherical_to_cartesian(phi, theta)
     xx, yy, zz = rotate_pitch(x, y, z, rad)
-    new_phi, new_theta = cartesian_to_spherical(xx, yy, zz)
-
-    new_y = new_theta * h_half / (torch.pi/2) + h_half
-    new_x = new_phi * w_half / torch.pi + w_half
+    phi2, theta2 = cartesian_to_spherical(xx, yy, zz)
+    phi2[phi2 < 0] += 2 * np.pi
+    new_y = (theta2 / (torch.pi / 2) + 1) * h_half
+    new_x = (phi2 / (2 * torch.pi)) * w_half * 2
     
     transformed_tensor = tensor
     transformed_tensor[:, 0] = new_x
@@ -351,51 +352,67 @@ def convert_img_eq_to_cube(img, output_sqr=256, margin=50):
     )
     make_map_time2 = time.perf_counter()
 
-    remap_time1 = time.perf_counter()
+    remap_time11 = time.perf_counter()
     bottom_img = cv2.remap(
         img,
-        bottom_map_x.astype("float32"),
-        bottom_map_y.astype("float32"),
+        bottom_map_x.astype(np.float32),
+        bottom_map_y.astype(np.float32),
         cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP,
     )
+    remap_time12 = time.perf_counter()
     bottom_img = cv2.rotate(bottom_img, cv2.ROTATE_90_CLOCKWISE)
     
+    remap_time21 = time.perf_counter()
     top_img = cv2.remap(
-        img, top_map_x.astype("float32"), top_map_y.astype("float32"), cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP
+        img, top_map_x.astype(np.float32), top_map_y.astype(np.float32), cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP
     )
+    remap_time22 = time.perf_counter()
     top_img = cv2.flip(top_img, 1)
     top_img = cv2.rotate(top_img, cv2.ROTATE_90_CLOCKWISE)
 
+    remap_time31 = time.perf_counter()
     front_img = cv2.remap(
         img,
-        front_map_x.astype("float32"),
-        front_map_y.astype("float32"),
+        front_map_x.astype(np.float32),
+        front_map_y.astype(np.float32),
         cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP,
     )
+    remap_time32 = time.perf_counter()
     front_img = cv2.flip(front_img, 1)
 
-
+    remap_time41 = time.perf_counter()
     back_img = cv2.remap(
-        img, back_map_x.astype("float32"), back_map_y.astype("float32"), cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP
+        img, back_map_x.astype(np.float32), back_map_y.astype(np.float32), cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP
     )
+    remap_time42 = time.perf_counter()
     
+    remap_time51 = time.perf_counter()
     left_img = cv2.remap(
-        img, left_map_x.astype("float32"), left_map_y.astype("float32"), cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP
+        img, left_map_x.astype(np.float32), left_map_y.astype(np.float32), cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP
     )
+    remap_time52 = time.perf_counter()
     left_img = cv2.flip(left_img, 1)
     left_img = cv2.rotate(left_img, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
+    remap_time61 = time.perf_counter()
     right_img = cv2.remap(
         img,
-        right_map_x.astype("float32"),
-        right_map_y.astype("float32"),
+        right_map_x.astype(np.float32),
+        right_map_y.astype(np.float32),
         cv2.INTER_CUBIC, borderMode=cv2.BORDER_WRAP,
     )
+    remap_time62 = time.perf_counter()
     right_img = cv2.rotate(right_img, cv2.ROTATE_90_CLOCKWISE)
-    remap_time2 = time.perf_counter()
 
     make_map_time = make_map_time2 - make_map_time1
-    remap_time = remap_time2 - remap_time1
+    remap_time1 = remap_time12 - remap_time11
+    remap_time2 = remap_time22 - remap_time21
+    remap_time3 = remap_time32 - remap_time31
+    remap_time4 = remap_time42 - remap_time41
+    remap_time5 = remap_time52 - remap_time51
+    remap_time6 = remap_time62 - remap_time61
+
+    remap_time = remap_time1 + remap_time2 + remap_time3 + remap_time4 + remap_time5 + remap_time6
 
     return [back_img, bottom_img, front_img, left_img, right_img, top_img], make_map_time, remap_time
 
