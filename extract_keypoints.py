@@ -157,11 +157,13 @@ def main():
                         
                         MAE[indicador].append(results["mae"])
                         MSE[indicador].append(results["mse"])
-                        
 
                         std.append(x1.shape[0])
-                except:     
-                    print("Unexpected error:",indicador, opt)
+                except:
+                    R_ERROR[indicador].append(3.14)
+                    T_ERROR[indicador].append(3.14)
+                    T_LENGTH_ERROR[indicador].append(2.0)
+                    print("Unexpected error:", descriptor)
 
 
         for indicador, descriptor in enumerate(DESCRIPTORS):

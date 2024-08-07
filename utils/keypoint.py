@@ -13,7 +13,7 @@ import utils.superpoint.train_sp.superpoint as train_sp
 from utils.ALIKE.alike import ALike, configs
 from utils.ALIKED.nets.aliked import ALIKED
 
-padding_length = 50
+padding_length = 40
 
 ## call instance
 orb_model = cv2.ORB_create(scoreType=cv2.ORB_HARRIS_SCORE, nfeatures=1000)
@@ -245,7 +245,7 @@ def keypoint_tangent_images(tex_image, base_order, sample_order, image_shape, op
 
 
 
-def keypoint_cube_images(img, opt, output_sqr=256, margin=50):
+def keypoint_cube_images(img, opt, output_sqr=256, margin=40):
     kp_list, desc_list = [], []
     [back_img, bottom_img, front_img, left_img, right_img, top_img], make_map_time, remap_time = convert_img_eq_to_cube(img.permute(1, 2, 0).cpu().numpy(), output_sqr, margin)
 
@@ -347,14 +347,14 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
 
 def keypoint_rotated(img, opt, scale_factor, img_hw):
     Y_remap1, X_remap1, Y_remap2, X_remap2, make_map_time = make_image_map_r(img_hw)
-    img_hw_crop = (img_hw[0]//3, img_hw[1])
-    crop_start_xy = (img_hw[0]//3 - 1, 0)
+    img_hw_crop = (img_hw[0]//3+padding_length*2, img_hw[1])
+    crop_start_xy = ((img_hw[0]-img_hw_crop[0])//2 - 1,  0)
 
     img1, img2, remap_time1 = remap_crop_image(img, (Y_remap1, X_remap1), img_hw_crop, crop_start_xy)
     _, img3, remap_time2 = remap_crop_image(img, (Y_remap2, X_remap2), img_hw_crop, crop_start_xy)
-    cv2.imwrite('img1.jpg', img1)
-    cv2.imwrite('img2.jpg', img2)
-    cv2.imwrite('img3.jpg', img3)
+    #cv2.imwrite('img1.jpg', img1)
+    #cv2.imwrite('img2.jpg', img2)
+    #cv2.imwrite('img3.jpg', img3)
     remap_time = remap_time1 + remap_time2
     img1 = torch.from_numpy(img1).permute(2, 0, 1).float().unsqueeze(0)
     img1 = F.interpolate(img1, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
