@@ -13,7 +13,7 @@ import utils.superpoint.train_sp.superpoint as train_sp
 from utils.ALIKE.alike import ALike, configs
 from utils.ALIKED.nets.aliked import ALIKED
 
-padding_length = 40
+padding_length = 50
 
 ## call instance
 orb_model = cv2.ORB_create(scoreType=cv2.ORB_HARRIS_SCORE, nfeatures=1000)
@@ -245,7 +245,7 @@ def keypoint_tangent_images(tex_image, base_order, sample_order, image_shape, op
 
 
 
-def keypoint_cube_images(img, opt, output_sqr=256, margin=40):
+def keypoint_cube_images(img, opt, output_sqr=256, margin=50):
     kp_list, desc_list = [], []
     [back_img, bottom_img, front_img, left_img, right_img, top_img], make_map_time, remap_time = convert_img_eq_to_cube(img.permute(1, 2, 0).cpu().numpy(), output_sqr, margin)
 
@@ -299,9 +299,10 @@ def keypoint_proposed(img, opt, scale_factor, img_hw):
     img2 = torch.from_numpy(img2).permute(2, 0, 1).float().unsqueeze(0)
     img2 = F.interpolate(img2, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
 
+    feature_time_b = time.perf_counter()
     pts1_, desc1_, feature_time1 = keypoint_equirectangular(img1, opt)
     pts2_, desc2_, feature_time2 = keypoint_equirectangular(img2, opt)
-    feature_time = feature_time1 + feature_time2
+    #feature_time = feature_time1 + feature_time2
 
     pts1_ = add_offset_to_image(pts1_, crop_start_xy)
     pts2_ = add_offset_to_image(pts2_, crop_start_xy)
@@ -310,6 +311,8 @@ def keypoint_proposed(img, opt, scale_factor, img_hw):
     pts2_, desc2_ = filter_keypoints(pts2_, desc2_, img_hw, invert_mask=True)
     image_kp = torch.cat((pts1_, pts2_), dim=0)
     image_desc = torch.cat((desc1_, desc2_), dim=1)
+    feature_time_a = time.perf_counter()
+    feature_time = feature_time_a - feature_time_b
 
     return image_kp, image_desc, make_map_time, remap_time, feature_time
 
@@ -363,10 +366,11 @@ def keypoint_rotated(img, opt, scale_factor, img_hw):
     img3 = torch.from_numpy(img3).permute(2, 0, 1).float().unsqueeze(0)
     img3 = F.interpolate(img3, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
     
+    feature_time_b = time.perf_counter()
     pts1_, desc1_, feature_time1 = keypoint_equirectangular(img1, opt)
     pts2_, desc2_, feature_time2 = keypoint_equirectangular(img2, opt)
     pts3_, desc3_, feature_time3 = keypoint_equirectangular(img3, opt)
-    feature_time = feature_time1 + feature_time2 + feature_time3
+    #feature_time = feature_time1 + feature_time2 + feature_time3
 
     pts1_ = add_offset_to_image(pts1_, crop_start_xy)
     pts2_ = add_offset_to_image(pts2_, crop_start_xy)
@@ -382,6 +386,8 @@ def keypoint_rotated(img, opt, scale_factor, img_hw):
     image_desc = torch.cat([desc1_, desc2_, desc3_], dim=1)
     #image_kp = pts2_
     #image_desc = desc2_
+    feature_time_a = time.perf_counter()
+    feature_time = feature_time_a - feature_time_b
 
     return image_kp, image_desc, make_map_time, remap_time, feature_time
 
