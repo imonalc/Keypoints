@@ -12,16 +12,16 @@ descriptors_setr="rorb rsift rspoint rakaze raliked"
 descriptors_special1="sphorb"
 
 match="MNN"
-points=1000
+points=500
 
 process_data() {
   echo "Processing $1 with $2"
   python3 extract_keypoints.py --datas $1 --descriptors $2 --match $match --points $points
 }
 
-# ルームデータセット
-process_data "$INDOORS" "$descriptors_set1"
-process_data "$OUTDOORS" "$descriptors_set1"
+
+process_data "$INDOORS" "$descriptors_set"
+process_data "$OUTDOORS" "$descriptors_set"
 
 process_data "$INDOORS" "$descriptors_setc"
 process_data "$OUTDOORS" "$descriptors_setc"
