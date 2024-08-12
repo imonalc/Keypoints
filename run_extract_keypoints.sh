@@ -1,5 +1,5 @@
 # test
-python3 extract_keypoints.py --datas Room --descriptors orb rorb rspoint --match MNN --points 1000
+python3 extract_keypoints.py --datas Room --descriptors orb rorb torb porb corb akaze --match MNN --points 1000
 
 INDOORS="Room Classroom Realistic Interior1 Interior2"
 OUTDOORS="Urban1 Urban2 Urban3 Urban4"
@@ -12,7 +12,7 @@ descriptors_setr="rorb rsift rspoint rakaze raliked"
 descriptors_special1="sphorb"
 
 match="MNN"
-points=500
+points=1000
 
 process_data() {
   echo "Processing $1 with $2"

@@ -17,18 +17,18 @@ padding_length = 50
 
 ## call instance
 orb_model = cv2.ORB_create(scoreType=cv2.ORB_HARRIS_SCORE, nfeatures=1000)
-sift_model = cv2.SIFT_create(nfeatures=10000)
-akaze_model = cv2.AKAZE_create()
+sift_model = cv2.SIFT_create(nfeatures=1000)
+akaze_model = cv2.AKAZE_create(threshold=0.0001)
 sp_model = train_sp.SuperPointFrontend(weights_path = 'utils/models/superpoint-trained.pth.tar', 
                                  nms_dist= 4, #nms_dist, 
-                                 conf_thresh = 0.015, #conf_thresh, 
+                                 conf_thresh = 0.01, #conf_thresh, 
                                  nn_thresh= 0.7, #nn_thresh, 
                                  cuda = True ) # 4 0.015 or 3 0.005
 aliked_model = ALIKED(model_name="aliked-n16",
     device="cuda",
     top_k=-1,
-    scores_th=0.2,
-    n_limit=10000)
+    scores_th=0.15,
+    n_limit=1000)
 
 
 
@@ -170,21 +170,26 @@ def computes_sift_keypoints(img):
 
 
 def compute_keypoints(img, opt):
+    feature_time1 = time.perf_counter()
     if opt == 'superpoint':
         img = process_img(img)
-        return computes_superpoint_keypoints(img)
+        ret_img = computes_superpoint_keypoints(img)
     if opt == 'sift':
-        return computes_sift_keypoints(img)
+        ret_img = computes_sift_keypoints(img)
     if opt == 'orb':
-        return computes_orb_keypoints(img)
+        ret_img = computes_orb_keypoints(img)
     if opt == 'surf':
-        return computes_surf_keypoints(img)
+        ret_img = computes_surf_keypoints(img)
     if opt == 'alike':
-        return computes_alike_keypoints(img)
+        ret_img = computes_alike_keypoints(img)
     if opt == 'aliked':
-        return computes_aliked_keypoints(img)
+        ret_img = computes_aliked_keypoints(img)
     if opt == 'akaze':
-        return computes_akaze_keypoints(img)
+        ret_img = computes_akaze_keypoints(img)
+    feature_time2 = time.perf_counter()
+    feature_time = feature_time2 - feature_time1
+
+    return ret_img, feature_time
 
 
 
@@ -205,9 +210,11 @@ def keypoint_tangent_images(tex_image, base_order, sample_order, image_shape, op
     # ----------------------------------------------
     kp_list = []  # Stores keypoint coords
     desc_list = []  # Stores keypoint descriptors
+    feature_time = 0
     for i in range(tex_image.shape[1]):
         img = tex_image[:, i, ...]
-        kp_details = compute_keypoints(img, opt)
+        kp_details, fp_time = compute_keypoints(img, opt)
+        feature_time += fp_time
 
         if kp_details is not None:
             valid_mask = get_valid_coordinates(base_order,
@@ -241,7 +248,7 @@ def keypoint_tangent_images(tex_image, base_order, sample_order, image_shape, op
     all_visible_kp = all_visible_kp[mask]  # M x 4
     all_visible_desc = all_visible_desc[mask]  # M x 128
 
-    return all_visible_kp, np.transpose(all_visible_desc,[1,0])
+    return all_visible_kp, np.transpose(all_visible_desc,[1,0]), feature_time
 
 
 
@@ -259,8 +266,9 @@ def keypoint_cube_images(img, opt, output_sqr=256, margin=50):
     feature_time = 0
     for idx, (face, img) in enumerate(face_dict.items()):
         img = torch.from_numpy(img.astype(np.float32)).clone().permute(2, 1, 0)
-        feature_time1 = time.perf_counter()
-        kp_details = compute_keypoints(img, opt)
+        #feature_time1 = time.perf_counter()
+        kp_details, fp_time = compute_keypoints(img, opt)
+        feature_time += fp_time
         
         if kp_details is not None:
             kp, desc = kp_details
@@ -276,16 +284,15 @@ def keypoint_cube_images(img, opt, output_sqr=256, margin=50):
             kp_converted = torch.cat([new_coords, new_kps], dim=1)
             kp_list.append(kp_converted)
             desc_list.append(new_desc)
-        feature_time2 = time.perf_counter()
-        
-        feature_time += feature_time2 - feature_time1
+        #feature_time2 = time.perf_counter()
+        #feature_time += feature_time2 - feature_time1
     
-    feature_time1 = time.perf_counter()
+    #feature_time1 = time.perf_counter()
     kp_list = torch.cat(kp_list, dim=0)
     desc_list = torch.cat(desc_list, dim=0)
-    feature_time2 = time.perf_counter()
+    #feature_time2 = time.perf_counter()
 
-    feature_time += feature_time2 - feature_time1
+    #feature_time += feature_time2 - feature_time1
 
     return kp_list, np.transpose(desc_list,[1,0]), make_map_time, remap_time, feature_time
 
@@ -303,10 +310,10 @@ def keypoint_proposed(img, opt, scale_factor, img_hw):
     img2 = torch.from_numpy(img2).permute(2, 0, 1).float().unsqueeze(0)
     img2 = F.interpolate(img2, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
 
-    feature_time_b = time.perf_counter()
+    #feature_time_b = time.perf_counter()
     pts1_, desc1_, feature_time1 = keypoint_equirectangular(img1, opt)
     pts2_, desc2_, feature_time2 = keypoint_equirectangular(img2, opt)
-    #feature_time = feature_time1 + feature_time2
+    feature_time = feature_time1 + feature_time2
 
     pts1_ = add_offset_to_image(pts1_, crop_start_xy)
     pts2_ = add_offset_to_image(pts2_, crop_start_xy)
@@ -315,8 +322,8 @@ def keypoint_proposed(img, opt, scale_factor, img_hw):
     pts2_, desc2_ = filter_keypoints(pts2_, desc2_, img_hw, invert_mask=True)
     image_kp = torch.cat((pts1_, pts2_), dim=0)
     image_desc = torch.cat((desc1_, desc2_), dim=1)
-    feature_time_a = time.perf_counter()
-    feature_time = feature_time_a - feature_time_b
+    #feature_time_a = time.perf_counter()
+    #feature_time = feature_time_a - feature_time_b
 
     return image_kp, image_desc, make_map_time, remap_time, feature_time
 
@@ -333,9 +340,11 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
     # ----------------------------------------------
     # Compute descriptors on equirect image
     # ----------------------------------------------
-    feature_time1 = time.perf_counter()
-    kp_details = compute_keypoints(img, opt)
-    feature_time2 = time.perf_counter()
+    #feature_time1 = time.perf_counter()
+    feature_time = 0
+    kp_details, fp_time = compute_keypoints(img, opt)
+    feature_time += fp_time
+
     erp_kp = kp_details[0]
     erp_desc = kp_details[1]
 
@@ -346,8 +355,9 @@ def keypoint_equirectangular(img, opt ='superpoint', crop_degree=0):
     mask = (erp_kp[:, 1] > crop_h) & (erp_kp[:, 1] < img.shape[1] - crop_h)
     erp_kp = erp_kp[mask]
     erp_desc = erp_desc[mask]
+    #feature_time2 = time.perf_counter()
 
-    feature_time = feature_time2 - feature_time1
+    #feature_time = feature_time2 - feature_time1
 
     return erp_kp, np.transpose(erp_desc,[1,0]), feature_time
 
@@ -370,11 +380,11 @@ def keypoint_rotated(img, opt, scale_factor, img_hw):
     img3 = torch.from_numpy(img3).permute(2, 0, 1).float().unsqueeze(0)
     img3 = F.interpolate(img3, scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
     
-    feature_time_b = time.perf_counter()
+    #feature_time_b = time.perf_counter()
     pts1_, desc1_, feature_time1 = keypoint_equirectangular(img1, opt)
     pts2_, desc2_, feature_time2 = keypoint_equirectangular(img2, opt)
     pts3_, desc3_, feature_time3 = keypoint_equirectangular(img3, opt)
-    #feature_time = feature_time1 + feature_time2 + feature_time3
+    feature_time = feature_time1 + feature_time2 + feature_time3
 
     pts1_ = add_offset_to_image(pts1_, crop_start_xy)
     pts2_ = add_offset_to_image(pts2_, crop_start_xy)
@@ -388,9 +398,8 @@ def keypoint_rotated(img, opt, scale_factor, img_hw):
     pts3_ = convert_coordinates_vectorized_r(pts3_, img_hw, rad=torch.pi*2/3)
     image_kp = torch.cat([pts1_, pts2_, pts3_], dim=0)
     image_desc = torch.cat([desc1_, desc2_, desc3_], dim=1)
-    feature_time_a = time.perf_counter()
-    
-    feature_time = feature_time_a - feature_time_b
+    #feature_time_a = time.perf_counter()
+    #feature_time = feature_time_a - feature_time_b
 
     return image_kp, image_desc, make_map_time, remap_time, feature_time
 
@@ -406,12 +415,11 @@ def process_image_to_keypoints(image_path, scale_factor, base_order, sample_orde
         time2 = time.perf_counter()
         tex_image = create_tangent_images_from_map(img, sample_map, base_order, sample_order).byte()
         time3 = time.perf_counter()
-        image_kp, image_desc = keypoint_tangent_images(tex_image, base_order, sample_order, img.shape[-2:], opt , 0)
+        image_kp, image_desc, feature_time = keypoint_tangent_images(tex_image, base_order, sample_order, img.shape[-2:], opt , 0)
         time4 = time.perf_counter()
         
         make_map_time = time2 - time1
         remap_time = time3 - time2
-        feature_time = time4 - time3
     elif mode == 'cube':
         image_kp, image_desc, make_map_time, remap_time, feature_time = keypoint_cube_images(img, opt)
     elif mode == 'proposed':

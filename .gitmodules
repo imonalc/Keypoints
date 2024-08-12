@@ -10,3 +10,9 @@
 [submodule "utils/ALIKED"]
 	path = utils/ALIKED
 	url = git@github.com:Shiaoming/ALIKED.git
+[submodule "utils/ALIKE"]
+    path = utils/ALIKE
+    url = git@github.com:Shiaoming/ALIKE.git
+[submodule "utils/d2net"]
+	path = utils/d2net
+	url = git@github.com:mihaidusmanu/d2-net.git
