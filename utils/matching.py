@@ -10,6 +10,62 @@ from utils.metrics  import *
 from utils.camera_recovering import *
 from scipy.spatial import distance
 
+from SuperGluePretrainedNetwork.models.superpoint import SuperPoint
+from SuperGluePretrainedNetwork.models.superglue import SuperGlue
+
+OUTDOORS = ["urban1", "urban2", "urban3", "urban4"]
+
+
+class SGMatching(torch.nn.Module):
+    """ Image Matching Frontend (SuperPoint + SuperGlue) """
+    def __init__(self, config={}):
+        super().__init__()
+        self.superpoint = SuperPoint(config.get('superpoint', {}))
+        self.superglue = SuperGlue(config.get('superglue', {}))
+
+    def forward(self, data):
+        """ Run SuperPoint (optionally) and SuperGlue
+        SuperPoint is skipped if ['keypoints0', 'keypoints1'] exist in input
+        Args:
+          data: dictionary with minimal keys: ['image0', 'image1']
+        """
+        pred = {}
+
+        # Extract SuperPoint (keypoints, scores, descriptors) if not provided
+        if 'keypoints0' not in data:
+            pred0 = self.superpoint({'image': data['image0']})
+            pred = {**pred, **{k+'0': v for k, v in pred0.items()}}
+        if 'keypoints1' not in data:
+            pred1 = self.superpoint({'image': data['image1']})
+            pred = {**pred, **{k+'1': v for k, v in pred1.items()}}
+
+        matching_b = time.perf_counter()
+        data = {**data, **pred}
+
+        for k in data:
+            if isinstance(data[k], (list, tuple)):
+                data[k] = torch.stack(data[k])
+
+        pred = {**pred, **self.superglue(data)}
+        matching_a = time.perf_counter()
+        matching_time = matching_a - matching_b
+
+        return pred, matching_time
+
+config_indoor = {
+    'superglue': {
+        'weights': "indoor",
+        'match_threshold': 0.03
+    }
+}
+sg_matcher_indoor = SGMatching(config_indoor).eval().to(device)
+config_outdoor = {
+    'superglue': {
+        'weights': "outdoor",
+        'match_threshold': 0.03
+    }
+}
+sg_matcher_outdoor = SGMatching(config_outdoor).eval().to(device)
 
 
 def sort_key(pts1, pts2, desc1, desc2, points):
@@ -277,6 +333,8 @@ def get_descriptor(descriptor):
     
     descriptor_configs = {
         'sphorb': ('sphorb', image_mode, 640),
+        'loftr': ('loftr', image_mode, 512),
+        'spglue': ('superpoint', image_mode, 512),
         'sift': ('sift', image_mode, 512),
         'orb': ('orb', image_mode, 512),
         'spoint': ('superpoint', image_mode, 512),
@@ -320,6 +378,47 @@ def AUC(ROT, TRA, MET, L):
 
     return RAUC, TAUC, np.array(MET)
 
+
+def superglue_matching(path_o, path_r, scale_factor, device, scene):
+    x1_, x2_ = [], []
+    matcher = sg_matcher_outdoor if scene in OUTDOORS else sg_matcher_indoor
+    img_o = load_torch_img(path_o)[:3, ...].float()
+    img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+    img_r = load_torch_img(path_r)[:3, ...].float()
+    img_r = F.interpolate(img_r.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
+    img_o = torch2numpy(img_o.byte())
+    img_r = torch2numpy(img_r.byte())
+    img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
+    img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
+    img_o_tensor = torch.from_numpy(img_o).float()/255.0
+    img_o_tensor = img_o_tensor.permute(2, 0, 1).unsqueeze(0).to(device)
+    img_r_tensor = torch.from_numpy(img_r).float()/255.0
+    img_r_tensor = img_r_tensor.permute(2, 0, 1).unsqueeze(0).to(device)
+    img_o_tensor = img_o_tensor[:, 0:1, :, :]
+    img_r_tensor = img_r_tensor[:, 0:1, :, :]
+    
+    data = {
+        "image0":img_o_tensor,
+        "image1":img_r_tensor,
+    }
+    
+    pred, matching_time = matcher(data)
+    keypoints0_tensor = pred["keypoints0"][0]
+    keypoints1_tensor = pred["keypoints1"][0]
+
+    kpt1 = keypoints0_tensor.cpu().numpy()
+    kpt1 = np.hstack((kpt1, np.ones((kpt1.shape[0], 1))))
+    kpt2 = keypoints1_tensor.cpu().numpy()
+    kpt2 = np.hstack((kpt2, np.ones((kpt2.shape[0], 1))))
+    matches1 = pred["matches0"][0].cpu().numpy()
+    for i in range(len(matches1)):
+        if matches1[i] == -1: continue
+        x1_.append(kpt1[i])
+        x2_.append(kpt2[matches1[i]])
+    s_pts1, s_pts2 = np.array(kpt1), np.array(kpt2)
+    x1_, x2_ = np.array(x1_), np.array(x2_)
+
+    return s_pts1, s_pts2, x1_, x2_, matching_time
 
 
 def get_data(DATAS):

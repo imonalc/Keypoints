@@ -20,6 +20,7 @@ from utils.method  import *
 from utils.camera_recovering import *
 from utils.matching import *
 from utils.spherical_module import *
+from utils.loftr import *
 
 from os import listdir
 from os.path import isfile, join, isdir
@@ -38,6 +39,8 @@ scale_factor = 1.0  # How much to scale input equirectangular image by
 np.random.seed(0)
 random.seed(0)
 
+
+
 def main():
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
     parser.add_argument('--points', type=int, default = 10000)
@@ -53,13 +56,8 @@ def main():
     DATAS       = args.datas
     DESCRIPTORS = args.descriptors
     padding_length = args.padding_length
-    # ----------------------------------------------
-    # Parameters
-    # ----------------------------------------------
-
     img_sample = cv2.imread('./data/data_100/Room/0/O.png')
     img_hw = img_sample.shape[:2]
-
 
     NUM = 0
     METRICS = np.zeros((len(DESCRIPTORS),2))
@@ -72,6 +70,7 @@ def main():
         TIMES_MAKEMAP = [[] for _ in range(len(DESCRIPTORS))]
         TIMES_REMAP = [[] for _ in range(len(DESCRIPTORS))]
         TIMES_FEATURE = [[] for _ in range(len(DESCRIPTORS))]
+        TIMES_MATCHING = [[] for _ in range(len(DESCRIPTORS))]
         MATCHING_SCORE = [[] for _ in range(len(DESCRIPTORS))]
         MEAN_MATCHING_ACCURACY = [[] for _ in range(len(DESCRIPTORS))]
         MATCHING_NUM = [[] for _ in range(len(DESCRIPTORS))]
@@ -94,71 +93,74 @@ def main():
             E_true = compute_essential_matrix(R_true, T_true_norm)
 
             for indicador, descriptor in enumerate(DESCRIPTORS):
-
                 try:
                     opt, mode, sphered = get_descriptor(descriptor)
                     dim = np.array([2*sphered, sphered])
-
-                    if opt == 'sphorb':
-                        os.chdir('SPHORB-master/')
-                        make_map_time, remap_time = 0, 0
-                        t_featurepoint_b = time.perf_counter()
-                        pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
-                        pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
-                        pts1_, desc1_ = convert_sphorb(pts1, desc1)
-                        pts2_, desc2_ = convert_sphorb(pts2, desc2)
-                        t_featurepoint_a = time.perf_counter()
-                        feature_time = t_featurepoint_a - t_featurepoint_b
-                        os.chdir('../')
+                    make_map_time, remap_time, matching_time = 0, 0, 0
+                    if opt == "loftr":
+                        s_pts1, s_pts2, x1_, x2_, feature_time = loftr_match(path_o, path_r, data)
+                        len_pts = 1000
                     else:
-                        pts1_, desc1_, make_map_time, remap_time, feature_time = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode, img_hw)
-                        pts2_, desc2_, make_map_time, remap_time, feature_time = process_image_to_keypoints(path_r, scale_factor, base_order, sample_order, opt, mode, img_hw)
-
-
-                    num_points = args.points
-                    pts1, desc1, _ = sort_key_div(pts1_, desc1_, num_points)   
-                    pts2, desc2, _ = sort_key_div(pts2_, desc2_, num_points)
-                    len_pts = (len(pts1) + len(pts2)) / 2
-
-                    if len(pts1.shape) == 1:
-                        pts1 = pts1.reshape(1,-1)
-                    if len(pts2.shape) == 1:
-                        pts2 = pts2.reshape(1,-1)
-
-
-                    if pts1.shape[0] > 0 or pts2.shape[0] >0:
-                        s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match)
-                        x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
-                        s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
-                        results = evaluate_matches(x1, x2, E_true)
-                        
-                        if x1.shape[0] < 8:
-                            R_error, T_error = 3.14, 3.14
+                        if opt == 'sphorb':
+                            os.chdir('SPHORB-master/')
+                            t_featurepoint_b = time.perf_counter()
+                            pts1, desc1 = get_kd(sphorb.sphorb(path_o, args.points))
+                            pts2, desc2 = get_kd(sphorb.sphorb(path_r, args.points))
+                            t_featurepoint_a = time.perf_counter()
+                            pts1_, desc1_ = convert_sphorb(pts1, desc1)
+                            pts2_, desc2_ = convert_sphorb(pts2, desc2)
+                            feature_time = t_featurepoint_a - t_featurepoint_b
+                            os.chdir('../')
                         else:
-                            E, cam, inlier_idx = get_cam_pose_by_ransac(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers, solver=args.solver)
-                            R1_,R2_,T1_,T2_ = decomposeE(E.T)
-                            R_estimated, T_estimated = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
-                            t_length_error = np.linalg.norm(T_true_norm - T_estimated)
-                            R_error, T_error = r_error(R_true, R_estimated), t_error(T_true,T_estimated)
+                            pts1_, desc1_, make_map_time1, remap_time1, feature_time1 = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode, img_hw)
+                            pts2_, desc2_, make_map_time2, remap_time2, feature_time2 = process_image_to_keypoints(path_r, scale_factor, base_order, sample_order, opt, mode, img_hw)
+                            make_map_time = make_map_time1 + make_map_time2
+                            remap_time = remap_time1 + remap_time2
+                            feature_time = feature_time1 + feature_time2
 
-                        R_ERROR[indicador].append(R_error)
-                        T_ERROR[indicador].append(T_error)
-                        T_LENGTH_ERROR[indicador].append(t_length_error)
+                        num_points = args.points
+                        pts1, desc1, scores1 = sort_key_div(pts1_, desc1_, num_points)   
+                        pts2, desc2, scores2 = sort_key_div(pts2_, desc2_, num_points)
+                        len_pts = (len(pts1) + len(pts2)) / 2
 
-                        TIMES_MAKEMAP[indicador].append(make_map_time)
-                        TIMES_REMAP[indicador].append(remap_time)
-                        TIMES_FEATURE[indicador].append(feature_time)
+                        if len(pts1.shape) == 1:
+                            pts1 = pts1.reshape(1,-1)
+                        if len(pts2.shape) == 1:
+                            pts2 = pts2.reshape(1,-1)
 
-                        FP_NUM[indicador].append(len_pts)
-                        MATCHING_NUM[indicador].append(results["total_matches"])
-                        VALID_MATCHING_NUM[indicador].append(results["valid_matches"])
-                        MATCHING_SCORE[indicador].append(results["valid_matches"]/len_pts)
-                        MEAN_MATCHING_ACCURACY[indicador].append(results["valid_ratio"])
-                        
-                        MAE[indicador].append(results["mae"])
-                        MSE[indicador].append(results["mse"])
-
-                        std.append(x1.shape[0])
+                        if pts1.shape[0] > 0 or pts2.shape[0] >0:
+                            if descriptor == "spglue":
+                                s_pts1, s_pts2, x1_, x2_, matching_time = superglue_matching(path_o, path_r, scale_factor, device, data)
+                            else:
+                                matching_timea = time.perf_counter()
+                                s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match)
+                                matching_time = time.perf_counter() - matching_timea
+                    #print(descriptor, x1_.shape)
+                    x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
+                    s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
+                    results = evaluate_matches(x1, x2, E_true)
+                    E, cam, inlier_idx = get_cam_pose_by_ransac(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers, solver=args.solver)
+                    R1_,R2_,T1_,T2_ = decomposeE(E.T)
+                    R_estimated, T_estimated = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
+                    t_length_error = np.linalg.norm(T_true_norm - T_estimated)
+                    R_error, T_error = r_error(R_true, R_estimated), t_error(T_true,T_estimated)
+                    
+                    R_ERROR[indicador].append(R_error)
+                    T_ERROR[indicador].append(T_error)
+                    T_LENGTH_ERROR[indicador].append(t_length_error)
+                    TIMES_MAKEMAP[indicador].append(make_map_time/2)
+                    TIMES_REMAP[indicador].append(remap_time/2)
+                    TIMES_FEATURE[indicador].append(feature_time/2)
+                    TIMES_MATCHING[indicador].append(matching_time)
+                    FP_NUM[indicador].append(len_pts)
+                    MATCHING_NUM[indicador].append(results["total_matches"])
+                    VALID_MATCHING_NUM[indicador].append(results["valid_matches"])
+                    MATCHING_SCORE[indicador].append(results["valid_matches"]/len_pts)
+                    MEAN_MATCHING_ACCURACY[indicador].append(results["valid_ratio"])
+                    
+                    MAE[indicador].append(results["mae"])
+                    MSE[indicador].append(results["mse"])
+                    std.append(x1.shape[0])
                 except:
                     R_ERROR[indicador].append(3.14)
                     T_ERROR[indicador].append(3.14)
@@ -168,6 +170,8 @@ def main():
 
         for indicador, descriptor in enumerate(DESCRIPTORS):
             base_path = f'results/data_100/FP_{args.points}/values/'+data+'/'+descriptor+'/'+args.match+'_'+args.inliers+'_'+args.solver
+            if os.path.exists(base_path):
+                os.system('rm -rf '+base_path)
             os.system('mkdir -p '+base_path)
             np.savetxt(base_path+'/R_ERRORS.csv',np.array(R_ERROR[indicador]),delimiter=",")
             np.savetxt(base_path+'/T_ERRORS.csv',np.array(T_ERROR[indicador]),delimiter=",")
@@ -175,6 +179,7 @@ def main():
             np.savetxt(base_path+'/TIMES_MAKEMAP.csv',np.array(TIMES_MAKEMAP[indicador]),delimiter=",")
             np.savetxt(base_path+'/TIMES_REMAP.csv',np.array(TIMES_REMAP[indicador]),delimiter=",")
             np.savetxt(base_path+'/TIMES_FEATURE.csv',np.array(TIMES_FEATURE[indicador]),delimiter=",")
+            np.savetxt(base_path+'/TIMES_MATCHING.csv',np.array(TIMES_MATCHING[indicador]),delimiter=",")
             np.savetxt(base_path+'/MATCHING_SCORE.csv',np.array(MATCHING_SCORE[indicador]),delimiter=",")
             np.savetxt(base_path+'/MEAN_MATCHING_ACCURACY.csv',np.array(MEAN_MATCHING_ACCURACY[indicador]),delimiter=",")
             np.savetxt(base_path+'/MATCHING_NUM.csv',np.array(MATCHING_NUM[indicador]),delimiter=",")
@@ -203,7 +208,7 @@ def evaluate_matches(x1, x2, E, threshold=0.01):
     epipolar_results = np.arcsin(epipolar_results)
     valid_matches = np.sum(abs(epipolar_results) < threshold)
     total_matches = len(epipolar_results)
-    valid_ratio = valid_matches / total_matches
+    valid_ratio = valid_matches / max(total_matches, 1)
     threshold_results = np.where(abs(epipolar_results) < threshold, 1, 0)
     epipolar_result_under_threshold = epipolar_results[threshold_results == 1]
     mae = np.mean(abs(epipolar_result_under_threshold))

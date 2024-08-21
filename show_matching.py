@@ -12,13 +12,6 @@ import numpy as np
 import argparse
 from PIL import Image
 
-import kornia as K
-import kornia.feature as KF
-
-from utils.d2net.lib.model_test import D2Net
-from utils.d2net.lib.utils import preprocess_image
-from utils.d2net.lib.pyramid import process_multiscale
-
 
 from utils.coord    import coord_3d
 from utils.ransac   import *
@@ -28,49 +21,13 @@ from utils.method  import *
 from utils.camera_recovering import *
 from utils.matching import *
 from utils.spherical_module import *
+from utils.loftr import *
 
 sys.path.append(os.getcwd()+'/SPHORB-master')
 
 import build1.sphorb_cpp as sphorb
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-
-model = D2Net(
-        model_file='./utils/models/d2_tf.pth',
-        use_relu=True,
-        use_cuda=True
-    )
-
-def load_image(image_path, device):
-    """Load an image and convert it to a torch tensor, then transfer it to the specified device."""
-    image = Image.open(image_path).convert('RGB')
-    image = np.array(image).astype('float')
-    image = preprocess_image(image, preprocessing='torch')
-    return torch.tensor(image[np.newaxis, :, :, :].astype(np.float32), device=device)
-
-def detect_and_extract_d2net(path_o, path_r, model, device):
-    """Detect and extract features using D2-Net."""
-    img1 = load_image(path_o, device)
-    img2 = load_image(path_r, device)
-
-    with torch.no_grad():
-        keypoints1, scores1, descriptors1 = process_multiscale(img1, model)
-        keypoints2, scores2, descriptors2 = process_multiscale(img2, model)
-
-    keypoints1 = np.array(keypoints1)[:, [1, 0, 2]]
-    keypoints2 = np.array(keypoints2)[:, [1, 0, 2]]
-    pts1_ = np.hstack((keypoints1[:, :2], scores1[:, None]))
-    pts2_ = np.hstack((keypoints2[:, :2], scores2[:, None]))
-
-    pts1_ = torch.tensor(pts1_)
-    pts2_ = torch.tensor(pts2_)
-    descriptors1 = torch.tensor(descriptors1).T
-    descriptors2 = torch.tensor(descriptors2).T
-
-    #print(pts1_[0:5], pts1_.shape)
-    #print(scores1[0:5], scores1.shape)
-
-    return pts1_, pts2_, descriptors1, descriptors2
 
 def main():
 
@@ -116,18 +73,9 @@ def main():
     img_o = cv2.cvtColor(img_o, cv2.COLOR_BGR2RGB)
     img_r = cv2.cvtColor(img_r, cv2.COLOR_BGR2RGB)
     
-    opt = "d2net"
     if opt == "loftr":
-        matcher = KF.LoFTR(pretrained='indoor')
-        img1 = load_torch_image(path_o)
-        img2 = load_torch_image(path_r)
-        input_dict = {"image0": K.color.rgb_to_grayscale(img1), "image1": K.color.rgb_to_grayscale(img2)}
-        with torch.inference_mode():
-            correspondences = matcher(input_dict)
-        x1_ = correspondences["keypoints0"].cpu().numpy()
-        x2_ = correspondences["keypoints1"].cpu().numpy()
-        s_pts1 = x1_.copy()
-        s_pts2 = x2_.copy()
+        s_pts1, s_pts2, x1_, x2_, feature_time = loftr_match(path_o, path_r, "Urban1")
+        print(feature_time)
     else:
         if opt == "sphorb":           
             os.chdir('SPHORB-master/')
@@ -135,11 +83,9 @@ def main():
             path_r = "."+path_r
             pts1_, desc1_ = get_kd(sphorb.sphorb(path_o, args.points))
             pts2_, desc2_ = get_kd(sphorb.sphorb(path_r, args.points))
-            pts1_, desc1_ = convert_sphorb(pts1, desc1)
-            pts2_, desc2_ = convert_sphorb(pts2, desc2)
+            pts1_, desc1_ = convert_sphorb(pts1_, desc1_)
+            pts2_, desc2_ = convert_sphorb(pts2_, desc2_)
             os.chdir('../')
-        elif opt == "d2net":
-            pts1_, pts2_, desc1_, desc2_ = detect_and_extract_d2net(path_o, path_r, model, device)
         else:
             pts1_, desc1_, make_map_time, remap_time, feature_time = process_image_to_keypoints(path_o, scale_factor, base_order, sample_order, opt, mode, img_hw)
             pts2_, desc2_, make_map_time, remap_time, feature_time = process_image_to_keypoints(path_r, scale_factor, base_order, sample_order, opt, mode, img_hw)
@@ -152,13 +98,15 @@ def main():
         if args.match == 'MNN':
             num_points_1 = min(num_points_1, 3000)
             num_points_2 = min(num_points_2, 3000)
-        pts1, desc1, _ = sort_key_div(pts1_, desc1_, num_points_1)   
-        pts2, desc2, _ = sort_key_div(pts2_, desc2_, num_points_2)  
+        pts1, desc1, scores1 = sort_key_div(pts1_, desc1_, num_points_1)   
+        pts2, desc2, scores2 = sort_key_div(pts2_, desc2_, num_points_2)  
         if len(pts1.shape) == 1:
             pts1 = pts1.reshape(1,-1)
-        s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, match=args.match, constant=method_idx)
+        if descriptor == "spglue":
+            s_pts1, s_pts2, x1_, x2_, matching_time = superglue_matching(path_o, path_r, scale_factor, device, "Urban1")
+        else:
+            s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, match=args.match, constant=method_idx)
     
-    print(x1_)
     x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
     s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
     E, cam, inlier_idx = get_cam_pose_by_ransac(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers, solver="SK")
@@ -197,10 +145,6 @@ def main():
         if c == 27: # esc
             break
 
-def load_torch_image(fname):
-    img = K.image_to_tensor(cv2.imread(fname), False).float() /255.
-    img = K.color.bgr_to_rgb(img)
-    return img
 
 
 def evaluate_matches(x1, x2, E, threshold=0.01):
@@ -342,7 +286,7 @@ def plot_matches(image0,
     for kpt0, kpt1, mt in zip(mkpts0, mkpts1, match_true):
         (x0, y0), (x1, y1) = kpt0, kpt1
         if mt == 0 :
-            #continue
+            continue
             mcolor = (0, 0, 255) 
         else :
             mcolor = (0, 255, 0)
