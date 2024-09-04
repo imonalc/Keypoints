@@ -147,7 +147,7 @@ def main():
 
 
 
-def evaluate_matches(x1, x2, E, threshold=0.01):
+def evaluate_matches(x1, x2, E, threshold=0.05):
     epipolar_results = np.einsum('ij,jk,ik->i', x2, E, x1)
     epipolar_results = np.arcsin(epipolar_results)
     valid_matches = np.sum(abs(epipolar_results) < threshold)
@@ -173,7 +173,7 @@ def evaluate_matches(x1, x2, E, threshold=0.01):
 
 def plot_epipolar_results(epipolar_results):
     plt.figure()
-    range = (-0.05, 0.05)
+    range = (-0.15, 0.15)
     plt.hist(epipolar_results, bins=50, color='blue', alpha=0.7, range=range)
     plt.title("Epipolar Results Distribution")
     plt.xlabel("Value")

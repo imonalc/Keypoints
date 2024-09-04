@@ -144,6 +144,7 @@ def main():
                     R_estimated, T_estimated = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
                     t_length_error = np.linalg.norm(T_true_norm - T_estimated)
                     R_error, T_error = r_error(R_true, R_estimated), t_error(T_true,T_estimated)
+
                     
                     R_ERROR[indicador].append(R_error)
                     T_ERROR[indicador].append(T_error)
@@ -203,7 +204,7 @@ def compute_essential_matrix(R, t):
     E = t_cross.dot(R)
     return E
 
-def evaluate_matches(x1, x2, E, threshold=0.01):
+def evaluate_matches(x1, x2, E, threshold=0.05):
     epipolar_results = np.einsum('ij,jk,ik->i', x2, E, x1)
     epipolar_results = np.arcsin(epipolar_results)
     valid_matches = np.sum(abs(epipolar_results) < threshold)
