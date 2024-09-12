@@ -40,24 +40,22 @@ np.random.seed(0)
 random.seed(0)
 
 
-
 def main():
     parser = argparse.ArgumentParser(description = 'Tangent Plane')
     parser.add_argument('--points', type=int, default = 10000)
     parser.add_argument('--match', default="BF")
-    parser.add_argument('--padding_length', default=50)
     parser.add_argument('--solver', default="SK")
     parser.add_argument('--inliers', default="8PA")
     parser.add_argument('--datas'      , nargs='+')
     parser.add_argument('--descriptors', nargs='+')
+    parser.add_argument('--data_folder', default='data_100')
     args = parser.parse_args()
 
 
     DATAS       = args.datas
     DESCRIPTORS = args.descriptors
-    padding_length = args.padding_length
-    img_sample = cv2.imread('./data/data_100/Room/0/O.png')
-    img_hw = img_sample.shape[:2]
+    data_folder = args.data_folder
+    img_hw = [512, 1024]
 
     NUM = 0
     METRICS = np.zeros((len(DESCRIPTORS),2))
@@ -79,8 +77,8 @@ def main():
         MAE = [[] for _ in range(len(DESCRIPTORS))]
         MSE = [[] for _ in range(len(DESCRIPTORS))]
 
-        mypath = os.path.join('data/data_100',data)
-        paths  = [os.path.join(os.getcwd(),'data/data_100',data,f) for f in listdir('data/data_100/'+data) if isdir(join(mypath, f))]
+        mypath = os.path.join(f'data/{data_folder}',data)
+        paths  = [os.path.join(os.getcwd(),f'data/{data_folder}',data,f) for f in listdir(f'data/{data_folder}/'+data) if isdir(join(mypath, f))]
         NUM = NUM + len(paths)
         std = []
 
@@ -135,15 +133,18 @@ def main():
                                 matching_timea = time.perf_counter()
                                 s_pts1, s_pts2, x1_, x2_ = matched_points(pts1, pts2, desc1, desc2, "100p", opt, args.match)
                                 matching_time = time.perf_counter() - matching_timea
-                    #print(descriptor, x1_.shape)
+
                     x1,x2 = coord_3d(x1_, dim), coord_3d(x2_, dim)
                     s_pts1, s_pts2 = coord_3d(s_pts1, dim), coord_3d(s_pts2, dim)
                     results = evaluate_matches(x1, x2, E_true)
                     E, cam, inlier_idx = get_cam_pose_by_ransac(x1.copy().T,x2.copy().T, get_E = True, I = args.inliers, solver=args.solver)
                     R1_,R2_,T1_,T2_ = decomposeE(E.T)
                     R_estimated, T_estimated = choose_rt(R1_,R2_,T1_,T2_,x1,x2)
-                    t_length_error = np.linalg.norm(T_true_norm - T_estimated)
+                    T_estimated_norm = T_estimated / np.linalg.norm(T_estimated) 
+                    t_length_error = np.linalg.norm(T_true_norm - T_estimated_norm)
                     R_error, T_error = r_error(R_true, R_estimated), t_error(T_true,T_estimated)
+                    #print(T_estimated, T_true_norm)
+                    #print(T_error)
 
                     
                     R_ERROR[indicador].append(R_error)
@@ -170,7 +171,7 @@ def main():
 
 
         for indicador, descriptor in enumerate(DESCRIPTORS):
-            base_path = f'results/data_100/FP_{args.points}/values/'+data+'/'+descriptor+'/'+args.match+'_'+args.inliers+'_'+args.solver
+            base_path = f'results/{data_folder}/FP_{args.points}/values/'+data+'/'+descriptor+'/'+args.match+'_'+args.inliers+'_'+args.solver
             if os.path.exists(base_path):
                 os.system('rm -rf '+base_path)
             os.system('mkdir -p '+base_path)
@@ -204,7 +205,7 @@ def compute_essential_matrix(R, t):
     E = t_cross.dot(R)
     return E
 
-def evaluate_matches(x1, x2, E, threshold=0.05):
+def evaluate_matches(x1, x2, E, threshold=0.1):
     epipolar_results = np.einsum('ij,jk,ik->i', x2, E, x1)
     epipolar_results = np.arcsin(epipolar_results)
     valid_matches = np.sum(abs(epipolar_results) < threshold)

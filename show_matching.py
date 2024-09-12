@@ -115,6 +115,14 @@ def main():
     E_true = compute_essential_matrix(R_true, T_true_norm)
     results = evaluate_matches(x1, x2, E_true)
 
+    #print(R_estimated)
+    #print(R_true)
+    plot_rotation_matrix(R_estimated, R_true)
+    print(T_estimated, T_true_norm)
+    plot_translation_vectors(T_estimated, T_true_norm)
+
+
+
     print("Evaluation Results:")
     print(f"Valid Matches: {results['valid_matches']} / {results['total_matches']}")
     print(f"Valid Ratio: {results['valid_ratio']*100:.2f}%")
@@ -147,7 +155,7 @@ def main():
 
 
 
-def evaluate_matches(x1, x2, E, threshold=0.05):
+def evaluate_matches(x1, x2, E, threshold=0.1):
     epipolar_results = np.einsum('ij,jk,ik->i', x2, E, x1)
     epipolar_results = np.arcsin(epipolar_results)
     valid_matches = np.sum(abs(epipolar_results) < threshold)
@@ -173,21 +181,15 @@ def evaluate_matches(x1, x2, E, threshold=0.05):
 
 def plot_epipolar_results(epipolar_results):
     plt.figure()
-    range = (-0.15, 0.15)
+    range = (-0.5, 0.5)
     plt.hist(epipolar_results, bins=50, color='blue', alpha=0.7, range=range)
     plt.title("Epipolar Results Distribution")
     plt.xlabel("Value")
     plt.ylabel("Frequency")
     plt.xlim(range) 
     plt.grid(True)
-    plt.savefig("temp_histogram.png")
+    plt.show()
     plt.close()
-    
-    vis_img = cv2.imread("temp_histogram.png")
-    cv2.imshow("Epipolar Results Histogram", vis_img)
-    c = cv2.waitKey()
-    if c == 27:  # Escキーで閉じる
-        cv2.destroyAllWindows()
 
 
 def cross_product_matrix(t):
@@ -201,6 +203,71 @@ def compute_essential_matrix(R, t):
     t_cross = cross_product_matrix(t)
     E = t_cross.dot(R)
     return E
+
+def plot_rotation_matrix(R1, R2):
+    # ベクトルの原点
+    origin = np.array([[0, 0, 0]])
+    
+    # 単位ベクトル
+    unit_vectors = np.array([[1, 0, 0],
+                             [0, 1, 0],
+                             [0, 0, 1]])
+    rot = np.dot(R1.T, R2)
+    
+    def plot_rotation(ax, R, color):
+        # 回転後のベクトルを計算
+        vectors = R @ unit_vectors.T
+        for i in range(3):
+            ax.quiver(*origin.T, *vectors[:, i], color=color[i], length=1.2, normalize=True)
+    
+    fig = plt.figure(figsize=(8, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # 色を設定
+    colors = np.array([['r', 'g', 'b'],  # R1のベクトルの色
+                       ['m', 'y', 'c']])  # R2のベクトルの色
+    
+    # 回転行列を描画
+    plot_rotation(ax, rot, colors[0])
+    #plot_rotation(ax, R2, colors[1])
+    
+    # 軸の設定
+    ax.set_xlim([-1.5, 1.5])
+    ax.set_ylim([-1.5, 1.5])
+    ax.set_zlim([-1.5, 1.5])
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.view_init(elev=20, azim=30)  # 視点の調整
+    plt.show()
+
+
+def plot_translation_vectors(v1, v2):
+    # ベクトルの原点
+    origin = np.array([[0, 0, 0]])
+
+    def plot_vectors(ax, vectors, colors):
+        for vector, color in zip(vectors, colors):
+            ax.quiver(*origin.T, *vector, color=color, length=1.2, normalize=True)
+
+    # 各ベクトルの色を指定
+    vector_colors = ['r', 'g']  # v1は赤色，v2は緑色
+
+    fig = plt.figure(figsize=(6, 6))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # ベクトルを描画
+    plot_vectors(ax, [v1, v2], vector_colors)
+
+    # 軸の設定
+    ax.set_xlim([-1.5, 1.5])
+    ax.set_ylim([-1.5, 1.5])
+    ax.set_zlim([-1.5, 1.5])
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.view_init(elev=20, azim=30)  # 視点の調整
+    plt.show()
 
 
 def plot_match(image0,
