@@ -8,8 +8,8 @@ import numpy as np
 
 
 from utils.spherical_module import *
-import utils.superpoint.magic_sp.superpoint as magic_sp
-import utils.superpoint.train_sp.superpoint as train_sp
+from utils.superpoint.train_sp.superpoint import SuperPointFrontend
+from utils.superpoint.train_sp.superpoint_sph import SuperPointFrontend_deform
 from utils.ALIKE.alike import ALike, configs
 from utils.ALIKED.nets.aliked import ALIKED
 
@@ -19,7 +19,12 @@ padding_length = 50
 orb_model = cv2.ORB_create(scoreType=cv2.ORB_HARRIS_SCORE, nfeatures=1000)
 sift_model = cv2.SIFT_create(nfeatures=1000)
 akaze_model = cv2.AKAZE_create(threshold=0.0001)
-sp_model = train_sp.SuperPointFrontend(weights_path = 'utils/models/superpoint-trained.pth.tar', 
+sp_model = SuperPointFrontend(weights_path = 'utils/models/superpoint-trained.pth.tar', 
+                                 nms_dist= 4, #nms_dist, 
+                                 conf_thresh = 0.01, #conf_thresh, 
+                                 nn_thresh= 0.7, #nn_thresh, 
+                                 cuda = True ) # 4 0.015 or 3 0.005
+sph_model = SuperPointFrontend_deform(weights_path = 'utils/models/superpoint-trained.pth.tar', 
                                  nms_dist= 4, #nms_dist, 
                                  conf_thresh = 0.01, #conf_thresh, 
                                  nn_thresh= 0.7, #nn_thresh, 
@@ -52,6 +57,19 @@ def process_img(img):
 
 def computes_superpoint_keypoints(img):
     pts, desc, _ = sp_model.run(img)
+    kpt_details = np.zeros((pts.shape[1],4))
+    kpt_details[:,0] = pts[0,:]
+    kpt_details[:,1] = pts[1,:]
+    kpt_details[:,2] = pts[2,:]
+    kpt_details[:,3] = pts[2,:]
+    if pts.shape[1] != 0:
+        desc = np.transpose(desc, [1,0])
+        return torch.from_numpy(kpt_details), torch.from_numpy(desc)
+    return None
+
+
+def computes_sphpoint_keypoints(img):
+    pts, desc, _ = sph_model.run(img)
     kpt_details = np.zeros((pts.shape[1],4))
     kpt_details[:,0] = pts[0,:]
     kpt_details[:,1] = pts[1,:]
@@ -175,6 +193,10 @@ def compute_keypoints(img, opt):
         img = process_img(img)
         feature_time1 = time.perf_counter()
         ret_img = computes_superpoint_keypoints(img)
+    if opt == 'sphpoint':
+        img = process_img(img)
+        feature_time1 = time.perf_counter()
+        ret_img = computes_sphpoint_keypoints(img)
     if opt == 'sift':
         ret_img = computes_sift_keypoints(img)
     if opt == 'orb':
@@ -412,6 +434,7 @@ def process_image_to_keypoints(image_path, scale_factor, base_order, sample_orde
     img = load_torch_img(image_path)[:3, ...].float()
     img = F.interpolate(img.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)
     make_map_time, remap_time, feature_time = 0, 0, 0
+
 
     if mode == 'tangent':
         time1 = time.perf_counter()

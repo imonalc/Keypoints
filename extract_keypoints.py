@@ -83,6 +83,7 @@ def main():
         std = []
 
         for path in tqdm(paths):
+            #print(path)
             path_o = path + '/O.png'
             path_r = path + '/R.png'
             R_true = np.load(path+"/R.npy")
@@ -143,6 +144,7 @@ def main():
                     T_estimated_norm = T_estimated / np.linalg.norm(T_estimated) 
                     t_length_error = np.linalg.norm(T_true_norm - T_estimated_norm)
                     R_error, T_error = r_error(R_true, R_estimated), t_error(T_true,T_estimated)
+                    #print(R_estimated, R_true)
                     #print(T_estimated, T_true_norm)
                     #print(T_error)
 
@@ -205,7 +207,7 @@ def compute_essential_matrix(R, t):
     E = t_cross.dot(R)
     return E
 
-def evaluate_matches(x1, x2, E, threshold=0.1):
+def evaluate_matches(x1, x2, E, threshold=0.01):
     epipolar_results = np.einsum('ij,jk,ik->i', x2, E, x1)
     epipolar_results = np.arcsin(epipolar_results)
     valid_matches = np.sum(abs(epipolar_results) < threshold)

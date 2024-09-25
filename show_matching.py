@@ -118,7 +118,7 @@ def main():
     #print(R_estimated)
     #print(R_true)
     plot_rotation_matrix(R_estimated, R_true)
-    print(T_estimated, T_true_norm)
+    #print(T_estimated, T_true_norm)
     plot_translation_vectors(T_estimated, T_true_norm)
 
 
@@ -350,6 +350,7 @@ def plot_matches(image0,
     else:
         thickness = 2
     
+    cnt = 0
     for kpt0, kpt1, mt in zip(mkpts0, mkpts1, match_true):
         (x0, y0), (x1, y1) = kpt0, kpt1
         if mt == 0 :
@@ -361,6 +362,9 @@ def plot_matches(image0,
                  color=mcolor,
                  thickness=thickness,
                  lineType=cv2.LINE_AA)
+        cnt += 1
+        if cnt >500:
+            break
 
     return out
 

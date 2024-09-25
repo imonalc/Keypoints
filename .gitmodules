@@ -16,3 +16,6 @@
 [submodule "utils/d2net"]
 	path = utils/d2net
 	url = git@github.com:mihaidusmanu/d2-net.git
+[submodule "utils/omniconv"]
+	path = utils/omniconv
+	url = git@github.com:COATZ/OMNI-CONV.git

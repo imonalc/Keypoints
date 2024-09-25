@@ -7,13 +7,14 @@ descriptors_akaze="akaze cakaze takaze pakaze rakaze"
 descriptors_spoint="spoint cspoint tspoint pspoint rspoint"
 descriptors_aliked="aliked caliked taliked paliked raliked"
 descriptors_special="sphorb loftr spglue"
+descriptors_sphpoint="sphpoint"
 
 match="MNN"
 points=1000
 
 ### test ###
 
-python3 extract_keypoints.py --datas atrium_day_10 --descriptors orb tspoint --match MNN --points 1000 --data_folder data_real
+python3 extract_keypoints.py --datas atrium_day_10 --descriptors orb tspoint sphpoint --match MNN --points 1000 --data_folder data_real
 #python3 extract_keypoints.py --datas atrium_night_5 hall_night_5 concourse_night_5 piatrium_night_5 --descriptors orb spoint --match MNN --points 1000 --data_folder data_real
 
 
@@ -25,7 +26,8 @@ process_data() {
   python3 extract_keypoints.py --datas $OUTDOORS --descriptors $1 --match $match --points $points
 }
 
-#process_data "$descriptors_orb"
+process_data "$descriptors_orb"
+process_data "$descriptors_sphpoint"
 #process_data "$descriptors_special"
 #process_data "$descriptors_orb"
 #process_data "$descriptors_sift"
@@ -42,51 +44,53 @@ process_data2() {
   echo "Processing Outdoors with interval $suffix and $descriptors"
   python3 extract_keypoints.py --datas "hall_day_$suffix" "hall_night_$suffix" "piatrium_day_$suffix" "piatrium_night_$suffix" --descriptors $descriptors --match $match --points $points --data_folder data_real
 }
+#FRAME_INTERVAL=5
+#process_data2 "$FRAME_INTERVAL" "$descriptors_sphpoint"
 
-FRAME_INTERVAL=2
-process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
-process_data2 "$FRAME_INTERVAL" "$descriptors_special"
-process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
-process_data2 "$FRAME_INTERVAL" "$descriptors_sift"
-process_data2 "$FRAME_INTERVAL" "$descriptors_akaze"
-process_data2 "$FRAME_INTERVAL" "$descriptors_spoint"
-process_data2 "$FRAME_INTERVAL" "$descriptors_aliked"
-
-FRAME_INTERVAL=3
-process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
-process_data2 "$FRAME_INTERVAL" "$descriptors_special"
-process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
-process_data2 "$FRAME_INTERVAL" "$descriptors_sift"
-process_data2 "$FRAME_INTERVAL" "$descriptors_akaze"
-process_data2 "$FRAME_INTERVAL" "$descriptors_spoint"
-process_data2 "$FRAME_INTERVAL" "$descriptors_aliked"
-
-FRAME_INTERVAL=5
-process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
-process_data2 "$FRAME_INTERVAL" "$descriptors_special"
-process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
-process_data2 "$FRAME_INTERVAL" "$descriptors_sift"
-process_data2 "$FRAME_INTERVAL" "$descriptors_akaze"
-process_data2 "$FRAME_INTERVAL" "$descriptors_spoint"
-process_data2 "$FRAME_INTERVAL" "$descriptors_aliked"
-
-FRAME_INTERVAL=10
-process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
-process_data2 "$FRAME_INTERVAL" "$descriptors_special"
-process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
-process_data2 "$FRAME_INTERVAL" "$descriptors_sift"
-process_data2 "$FRAME_INTERVAL" "$descriptors_akaze"
-process_data2 "$FRAME_INTERVAL" "$descriptors_spoint"
-process_data2 "$FRAME_INTERVAL" "$descriptors_aliked"
-
-FRAME_INTERVAL=20
-process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
-process_data2 "$FRAME_INTERVAL" "$descriptors_special"
-process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
-process_data2 "$FRAME_INTERVAL" "$descriptors_sift"
-process_data2 "$FRAME_INTERVAL" "$descriptors_akaze"
-process_data2 "$FRAME_INTERVAL" "$descriptors_spoint"
-process_data2 "$FRAME_INTERVAL" "$descriptors_aliked"
+#FRAME_INTERVAL=2
+#process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_special"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_sift"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_akaze"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_spoint"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_aliked"
+#
+#FRAME_INTERVAL=3
+#process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_special"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_sift"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_akaze"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_spoint"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_aliked"
+#
+#FRAME_INTERVAL=5
+#process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_special"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_sift"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_akaze"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_spoint"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_aliked"
+#
+#FRAME_INTERVAL=10
+#process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_special"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_sift"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_akaze"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_spoint"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_aliked"
+#
+#FRAME_INTERVAL=20
+#process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_special"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_orb"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_sift"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_akaze"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_spoint"
+#process_data2 "$FRAME_INTERVAL" "$descriptors_aliked"
 
 
 echo "完了"
