@@ -64,6 +64,8 @@ config_outdoor = {
         'match_threshold': 0.03
     }
 }
+sg_matcher_indoor = SGMatching(config_indoor).eval().to(device)
+sg_matcher_outdoor = SGMatching(config_outdoor).eval().to(device)
 
 
 def sort_key(pts1, pts2, desc1, desc2, points):
@@ -337,6 +339,7 @@ def get_descriptor(descriptor):
         'orb': ('orb', image_mode, 512),
         'spoint': ('superpoint', image_mode, 512),
         'sphpoint': ('sphpoint', image_mode, 512),
+        'sphaliked': ('sphaliked', image_mode, 512),
         'akaze': ('akaze', image_mode, 512),
         'alike': ('alike', image_mode, 512),
         'aliked': ('aliked', image_mode, 512),
@@ -380,8 +383,6 @@ def AUC(ROT, TRA, MET, L):
 
 def superglue_matching(path_o, path_r, scale_factor, device, scene):
     x1_, x2_ = [], []
-    sg_matcher_indoor = SGMatching(config_indoor).eval().to(device)
-    sg_matcher_outdoor = SGMatching(config_outdoor).eval().to(device)
     matcher = sg_matcher_outdoor if scene in OUTDOORS else sg_matcher_indoor
     img_o = load_torch_img(path_o)[:3, ...].float()
     img_o = F.interpolate(img_o.unsqueeze(0), scale_factor=scale_factor, mode='bilinear', align_corners=False, recompute_scale_factor=True).squeeze(0)

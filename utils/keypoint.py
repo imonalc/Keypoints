@@ -12,6 +12,7 @@ from utils.superpoint.train_sp.superpoint import SuperPointFrontend
 from utils.superpoint.train_sp.superpoint_sph import SuperPointFrontend_deform
 from utils.ALIKE.alike import ALike, configs
 from utils.ALIKED.nets.aliked import ALIKED
+from utils.ALIKED.nets.aliked_sphe import SPHALIKED
 
 padding_length = 50
 
@@ -32,8 +33,14 @@ sph_model = SuperPointFrontend_deform(weights_path = 'utils/models/superpoint-tr
 aliked_model = ALIKED(model_name="aliked-n16",
     device="cuda",
     top_k=-1,
-    scores_th=0.15,
+    #scores_th=0.15,
     n_limit=1000)
+sphaliked_model = SPHALIKED(model_name="aliked-n16",
+    device="cuda",
+    top_k=-1,
+    #scores_th=0.15,
+    n_limit=1000)
+
 
 
 
@@ -131,6 +138,26 @@ def computes_aliked_keypoints(img):
     return None
 
 
+def computes_sphaliked_keypoints(img):
+    img_rgb = cv2.cvtColor(img.permute(1, 2, 0).numpy(), cv2.COLOR_BGR2RGB)
+    pred = sphaliked_model.run(img_rgb)
+    kpts = pred["keypoints"]
+    desc = pred["descriptors"]
+    scores = pred["scores"]
+    #print(kpts.shape, desc.shape, scores.shape, score_map.shape)
+
+    kpt_details = np.zeros((kpts.shape[0],4))
+
+    kpt_details[:,0] = kpts[:,0]
+    kpt_details[:,1] = kpts[:,1]
+    kpt_details[:,2] = scores.squeeze()
+    kpt_details[:,3] = scores.squeeze()
+
+    if len(kpts)>0:
+        #desc = np.transpose(desc, [1,0])
+        return torch.from_numpy(kpt_details), torch.from_numpy(desc)
+    return None
+
 def format_keypoints(keypoints, desc):
     """
     Formatear puntos de interes y descriptores de opencv para su posterior tratamiento
@@ -207,6 +234,8 @@ def compute_keypoints(img, opt):
         ret_img = computes_alike_keypoints(img)
     if opt == 'aliked':
         ret_img = computes_aliked_keypoints(img)
+    if opt == 'sphaliked':
+        ret_img = computes_sphaliked_keypoints(img)
     if opt == 'akaze':
         ret_img = computes_akaze_keypoints(img)
     feature_time2 = time.perf_counter()
